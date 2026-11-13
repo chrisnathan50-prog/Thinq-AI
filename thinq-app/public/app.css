@@ -216,3 +216,10 @@ body{overflow:hidden;background:var(--panel)}
 .suggestions.loading{pointer-events:none}
 .suggestions .sk{display:inline-block;height:38px;width:170px;border-radius:999px;background:linear-gradient(110deg,#efedf5 30%,#f8f7fb 50%,#efedf5 70%) 0 0/200% 100%;animation:shimmer 1.4s linear infinite}
 .suggestions .sk:nth-child(2){width:210px}.suggestions .sk:nth-child(3){width:240px}.suggestions .sk:nth-child(4){width:190px}
+
+/* ---------- WhatsApp card ---------- */
+.conn.wa .row svg{color:#16a34a}
+.wa-actions{display:flex;flex-wrap:wrap;gap:8px}
+.wa-actions .btn svg{flex:none}
+.wa-code{font-size:24px;font-weight:600;letter-spacing:.12em;font-variant-numeric:tabular-nums;text-align:center;padding:8px;border-radius:12px;background:var(--panel);border:1px dashed var(--line);user-select:all}
+.conn .meta{font-size:12px}

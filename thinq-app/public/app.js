@@ -56,7 +56,7 @@ async function api(path, opts = {}) {
 // ---------------- state ----------------
 async function refresh() {
   state = await api("/api/state");
-  renderAccount(); renderConn(); renderNotes(); renderConvos(); renderApprovals(); renderGreeting();
+  renderAccount(); renderConn(); renderWhatsApp(); renderNotes(); renderConvos(); renderApprovals(); renderGreeting();
 }
 
 function renderGreeting() {
@@ -119,6 +119,54 @@ function renderConn() {
     if (!confirm("Disconnect your Google account? Thinq will lose access to your Gmail and Calendar and switch back to the demo inbox.")) return;
     await api("/auth/google/disconnect", { method: "POST" });
     await refresh(); loadAgenda();
+  });
+}
+
+// ---------------- WhatsApp ----------------
+let waPending = null; // { code, url, until } while waiting for the person to send the code
+let waPoll = null;
+function renderWhatsApp() {
+  const box = $("#wa"), wa = state.whatsapp || {};
+  box.hidden = !wa.available;
+  if (!wa.available) return;
+  if (wa.linked) {
+    waPending = null; clearInterval(waPoll);
+    box.innerHTML = `<div class="row"><span class="dot live"></span><b>WhatsApp connected</b></div>
+      <p>${esc(wa.linked.number)}${wa.linked.name ? ` · ${esc(wa.linked.name)}` : ""}. Message Thinq there, send voice notes and files, or forward messages.</p>
+      <div class="wa-actions">${wa.chatUrl ? `<a class="btn sm" href="${esc(wa.chatUrl)}" target="_blank" rel="noopener">${icon("i-wa", 14)}Open chat</a>` : ""}<button class="btn ghost sm" id="waUnlink">Unlink</button></div>`;
+    $("#waUnlink").addEventListener("click", async () => {
+      if (!confirm("Unlink WhatsApp? Thinq will stop answering messages from your number until you connect it again.")) return;
+      await api("/api/whatsapp", { method: "DELETE" }); refresh();
+    });
+    return;
+  }
+  if (waPending && Date.now() < waPending.until) {
+    const mins = Math.max(1, Math.ceil((waPending.until - Date.now()) / 60000));
+    box.innerHTML = `<div class="row"><span class="dot demo"></span><b>Link your WhatsApp</b></div>
+      <p>Send this code to Thinq on WhatsApp${wa.number ? ` (+${esc(wa.number)})` : ""}:</p>
+      <div class="wa-code" aria-label="Link code">${esc(waPending.code.replace(/(\d{3})(\d{3})/, "$1 $2"))}</div>
+      <div class="wa-actions">${waPending.url ? `<a class="btn sm" href="${esc(waPending.url)}" target="_blank" rel="noopener">${icon("i-wa", 14)}Open WhatsApp</a>` : ""}<button class="btn ghost sm" id="waCancel">Cancel</button></div>
+      <p class="meta">Works for ${mins} more minute${mins > 1 ? "s" : ""}. This box updates once it's linked.</p>`;
+    $("#waCancel").addEventListener("click", () => { waPending = null; clearInterval(waPoll); renderWhatsApp(); });
+    return;
+  }
+  box.innerHTML = `<div class="row">${icon("i-wa", 15)}<b>WhatsApp</b></div>
+    <p>Chat with Thinq from WhatsApp: voice notes, files, forwarded messages and chat exports.</p>
+    <button class="btn sm" id="waConnect">Connect WhatsApp</button>`;
+  $("#waConnect").addEventListener("click", async () => {
+    try {
+      const r = await api("/api/whatsapp/code", { method: "POST", body: JSON.stringify({ timeZone }) });
+      waPending = { code: r.code, url: r.url, until: Date.now() + r.expiresInMinutes * 60000 };
+      renderWhatsApp();
+      if (r.url) window.open(r.url, "_blank", "noopener");
+      clearInterval(waPoll);
+      waPoll = setInterval(async () => {
+        if (!waPending || Date.now() > waPending.until) { clearInterval(waPoll); waPending = null; return renderWhatsApp(); }
+        const s = await api("/api/state").catch(() => null);
+        if (s?.whatsapp?.linked) { clearInterval(waPoll); waPending = null; state = s; renderWhatsApp(); renderConvos(); notice("WhatsApp is connected. Say hi to Thinq there!", "ok"); }
+        else renderWhatsApp();
+      }, 4000);
+    } catch (err) { notice(err.message); }
   });
 }
 

@@ -1,5 +1,6 @@
 // Everything Thinq stores, always scoped to one user: conversations, approvals, remembered notes,
 // Google connections (encrypted), sessions and daily usage.
+import { randomInt } from "node:crypto";
 import { query, one } from "./db.js";
 import { id, encrypt, decrypt, hash, newToken } from "./secrets.js";
 
@@ -169,3 +170,28 @@ export async function deleteAllConversations(userId) {
   await query(`delete from conversations where user_id = $1`, [userId]);
   return n;
 }
+
+// ---------- WhatsApp (people link their number with a one-time code shown in the app) ----------
+export async function createWhatsAppCode(userId, timeZone) {
+  const code = String(randomInt(100000, 1000000));
+  await query(`delete from whatsapp_codes where user_id = $1 or expires_at < now()`, [userId]);
+  await query(`insert into whatsapp_codes (code_hash, user_id, time_zone, expires_at) values ($1, $2, $3, now() + interval '10 minutes')`, [hash(code), userId, timeZone]);
+  return code;
+}
+export async function useWhatsAppCode(code, waId, name) {
+  const row = await one(`delete from whatsapp_codes where code_hash = $1 and expires_at > now() returning user_id, time_zone`, [hash(code)]);
+  if (!row) return null;
+  await query(`delete from whatsapp_links where user_id = $1 or wa_id = $2`, [row.user_id, waId]); // one number per person, one person per number
+  await query(`insert into whatsapp_links (wa_id, user_id, name, time_zone) values ($1, $2, $3, $4)`, [waId, row.user_id, name, row.time_zone]);
+  return row.user_id;
+}
+export const whatsappLinkByNumber = (waId) => one(`select * from whatsapp_links where wa_id = $1`, [waId]);
+export const whatsappLinkForUser = (userId) => one(`select wa_id, name, linked_at from whatsapp_links where user_id = $1`, [userId]);
+export const unlinkWhatsApp = (userId) => query(`delete from whatsapp_links where user_id = $1`, [userId]);
+export const setWhatsAppConversation = (waId, conversationId) => query(`update whatsapp_links set conversation_id = $2 where wa_id = $1`, [waId, conversationId]);
+export async function firstTimeWhatsAppMessage(messageId) { // Meta can deliver the same message twice
+  await query(`delete from whatsapp_seen where at < now() - interval '3 days'`).catch(() => {});
+  return (await query(`insert into whatsapp_seen (message_id) values ($1) on conflict do nothing returning message_id`, [messageId])).length > 0;
+}
+export const setConversationTitle = (userId, conversationId, title) =>
+  query(`update conversations set title = $3 where id = $1 and user_id = $2`, [conversationId, userId, title]);

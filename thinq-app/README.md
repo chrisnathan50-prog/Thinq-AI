@@ -28,6 +28,32 @@ One server runs everything:
 - **Voice notes** use Groq's free Whisper speech-to-text (`whisper-large-v3-turbo`, change with `GROQ_TRANSCRIBE_MODEL`), so they need `GROQ_API_KEY` even if you use Claude for chat. The recording is sent once to be transcribed and isn't stored. Each voice note counts as one request toward the daily limit.
 - **Read aloud** uses the browser's built-in voice, so it costs nothing.
 
+### WhatsApp (optional)
+
+People can chat with Thinq on WhatsApp through Meta's official **WhatsApp Cloud API**. Each person links their number once: in the app, *Connect WhatsApp* shows a 6-digit code that they send to Thinq's WhatsApp number. After that they can:
+
+- chat, send **voice notes**, and send **documents** (PDF, Word, text);
+- **forward** a message from any chat and ask "what should I reply?";
+- share a **chat export** (in a chat: ⋯ → More → Export chat → Thinq) and ask for a summary — exports also work as attachments in the web app;
+- ask for **images**;
+- approve drafts and invites with **Send / Discard** buttons — still nothing is sent without a tap;
+- send *new* to start a fresh conversation, *help* for tips.
+
+Thinq never reads anyone's WhatsApp chats on its own — only what people send or forward to it.
+
+**Setup** (about 30 minutes, free to start):
+
+1. <https://developers.facebook.com> → **My Apps → Create app** → use case **Connect with customers through WhatsApp** (type *Business*). Link or create a Meta Business portfolio when asked.
+2. **WhatsApp → API Setup**: Meta gives you a free **test number**. Note the **Phone number ID**, click **Generate access token** (lasts 24 h — fine for testing), and under *To*, add up to 5 people's WhatsApp numbers who may test it.
+3. **App settings → Basic**: copy the **App secret**.
+4. In Render → Environment add `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN` (any long random string you make up) and `WHATSAPP_NUMBER` (the test number, digits only).
+5. **WhatsApp → Configuration → Webhook → Edit**: Callback URL `https://YOUR-APP.onrender.com/webhooks/whatsapp`, Verify token = the same `WHATSAPP_VERIFY_TOKEN`. Then **Manage** webhook fields and subscribe to **messages**.
+6. In the Thinq app, click **Connect WhatsApp**.
+
+For real use: add your own phone number (one not already on WhatsApp) in WhatsApp → API Setup, and replace the 24-hour token with a permanent **System User** token (Business settings → Users → System users → Generate token with `whatsapp_business_messaging` and `whatsapp_business_management`).
+
+Cost: messages people send are free; each Thinq number gets 1,000 free replies a month, then roughly a cent each depending on the country. Thinq can only reply within 24 hours of someone's last message (it never messages people first).
+
 ### Images (free, optional)
 
 Thinq creates images with **Cloudflare Workers AI** (FLUX.1 schnell) through a `create_image` tool. It works with either AI choice (Groq or Claude).
@@ -109,7 +135,7 @@ Notes:
 
 ```
 Browser ──▶ server.js ──▶ src/auth.js         sign-in, sessions, invite list
-                     ├──▶ src/agent.js         assistant: instructions + 9 tools ──▶ Groq or Claude
+                     ├──▶ src/agent.js         assistant: instructions + 9 tools; src/whatsapp.js for WhatsApp ──▶ Groq or Claude
                      ├──▶ src/providers/       google.js (real Gmail/Calendar) or demo.js (sample data)
                      └──▶ src/store.js + db.js per-user data in Postgres (PGlite locally)
 ```

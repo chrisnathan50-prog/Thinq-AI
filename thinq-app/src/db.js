@@ -125,6 +125,24 @@ async function migrate() {
       created_at timestamptz not null default now()
     );
     create index if not exists images_user on images(user_id, created_at desc);
+    create table if not exists whatsapp_links (
+      wa_id text primary key,
+      user_id text not null unique references users(id) on delete cascade,
+      name text,
+      conversation_id text references conversations(id) on delete set null,
+      time_zone text,
+      linked_at timestamptz not null default now()
+    );
+    create table if not exists whatsapp_codes (
+      code_hash text primary key,
+      user_id text not null references users(id) on delete cascade,
+      time_zone text,
+      expires_at timestamptz not null
+    );
+    create table if not exists whatsapp_seen (
+      message_id text primary key,
+      at timestamptz not null default now()
+    );
     alter table messages add column if not exists attachments jsonb;
     create index if not exists documents_conv on documents(conversation_id);
     create index if not exists conversations_user on conversations(user_id, created_at desc);

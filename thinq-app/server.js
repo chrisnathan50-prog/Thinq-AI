@@ -7,31 +7,33 @@ import express from "express";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import Anthropic from "@anthropic-ai/sdk";
 import { initDb } from "./src/db.js";
 import * as store from "./src/store.js";
-import { runTurn, hasApiKey, apiKeyName, MODEL, AI_PROVIDER } from "./src/agent.js";
-import { GroqError } from "./src/llm/groq.js";
+import { hasApiKey, apiKeyName, MODEL, AI_PROVIDER } from "./src/agent.js";
 import { providerFor } from "./src/providers/index.js";
 import { googleConfigured, publicUrl, redirectUri } from "./src/providers/google.js";
 import { attachUser, requireUser, mountAuth } from "./src/auth.js";
 import { extractDocument, DocumentError, ACCEPTED, MAX_UPLOAD_BYTES, partCount } from "./src/documents.js";
 import { transcribe, voiceAvailable, MAX_AUDIO_BYTES } from "./src/llm/transcribe.js";
 import { imagesAvailable, IMAGE_DAILY_LIMIT } from "./src/llm/images.js";
-import { suggestionsFor, forgetSuggestions } from "./src/suggestions.js";
+import { suggestionsFor } from "./src/suggestions.js";
+import { friendlyError } from "./src/errors.js";
+import { chatTurn, TurnError, busy, DAILY_LIMIT } from "./src/turns.js";
+import { approveItem, declineItem } from "./src/approvals.js";
+import { mountWhatsApp, whatsappConfigured, whatsappNumber, linkUrl } from "./src/whatsapp.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SITE_DIR = process.env.SITE_DIR || path.resolve(here, "..", "thinq-site");
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1");
-const DAILY_LIMIT = Number(process.env.DAILY_REQUEST_LIMIT ?? 60); // AI requests per user per day (0 = no limit)
 
 await initDb();
 
 const app = express();
 app.set("trust proxy", 1); // behind Render's proxy, so secure cookies work
 app.disable("x-powered-by");
-app.use(express.json({ limit: "200kb" }));
+// Keep the raw bytes of WhatsApp webhook calls so their signature can be checked.
+app.use(express.json({ limit: "200kb", verify: (req, res, buf) => { if (req.originalUrl.startsWith("/webhooks/")) req.rawBody = buf; } }));
 
 // Basic security headers.
 app.use((req, res, next) => {
@@ -48,6 +50,7 @@ app.use((req, res, next) => {
 });
 
 app.get("/healthz", (req, res) => res.json({ ok: true }));
+mountWhatsApp(app); // Meta calls this directly - no Thinq sign-in
 app.use(attachUser);
 mountAuth(app);
 
@@ -74,6 +77,7 @@ api.get("/state", async (req, res) => {
     model: MODEL,
     usage: { today: await store.usageToday(req.user.id), limit: DAILY_LIMIT },
     voiceAvailable: voiceAvailable(),
+    whatsapp: await whatsappState(req.user.id),
     images: { available: imagesAvailable(), today: await store.imagesToday(req.user.id), limit: IMAGE_DAILY_LIMIT },
     documentTypes: ACCEPTED,
     conversations: await store.listConversations(req.user.id),
@@ -107,7 +111,6 @@ api.get("/conversations/:id", async (req, res) => {
 });
 
 // ---------- chat (Server-Sent Events) ----------
-const busy = new Set();
 api.post("/chat", async (req, res) => {
   const { conversationId, text } = req.body || {};
   const attachmentIds = Array.isArray(req.body?.attachments) ? req.body.attachments.map(String).slice(0, 5) : [];
@@ -120,57 +123,17 @@ api.post("/chat", async (req, res) => {
 
   res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive", "X-Accel-Buffering": "no" });
   const send = (event) => res.write(`data: ${JSON.stringify(event)}\n\n`);
-
-  if (!hasApiKey()) {
-    send({ type: "error", text: `Thinq's AI isn't set up yet. The site owner needs to add ${apiKeyName()} to the server settings.` });
-    return res.end();
-  }
-  const usage = await store.useRequest(req.user.id, DAILY_LIMIT);
-  if (!usage.allowed) {
-    send({ type: "error", text: `You've used today's ${DAILY_LIMIT} requests. Your limit resets tomorrow.` });
-    return res.end();
-  }
-
-  busy.add(req.user.id);
   try {
-    let reply;
-    await store.attachDocuments(req.user.id, conversationId, attachments.map((d) => d.id));
-    for await (const event of runTurn({ user: req.user, conversationId, userText: text.trim(), timeZone, attachments })) {
-      if (event.type === "reply") reply = event;
-      else send(event);
-    }
-    // Save the turn only once it finished, so a failed turn can simply be retried.
-    await store.appendMessage(req.user.id, conversationId, "user", text.trim(), attachments.map(({ id, name, pages, chars }) => ({ id, name, pages, chars })));
-    await store.appendMessage(req.user.id, conversationId, "assistant", reply.text, reply.images?.length ? reply.images.map((i) => ({ type: "image", id: i.id, prompt: i.prompt })) : null);
-    send({ ...reply, approvals: await Promise.all(reply.approvals.map((id) => store.getApproval(req.user.id, id))) });
+    const reply = await chatTurn({ user: req.user, conversationId, text: text.trim(), timeZone, attachments, onStatus: (t) => send({ type: "status", text: t }) });
+    send(reply);
   } catch (err) {
-    console.error(err);
-    send({ type: "error", text: friendlyError(err) });
+    if (!(err instanceof TurnError)) console.error(err);
+    send({ type: "error", text: err instanceof TurnError ? err.message : friendlyError(err) });
   } finally {
-    forgetSuggestions(req.user.id); // the inbox/calendar may have changed during this turn
-    busy.delete(req.user.id);
     res.end();
   }
 });
 
-function friendlyError(err) {
-  if (err instanceof GroqError) {
-    if (err.status === 401) return "The server's Groq API key was rejected. The site owner needs to check GROQ_API_KEY.";
-    if (err.status === 429) return "Thinq's AI is busy (free-tier limit reached). Wait a minute and try again.";
-    if (err.status === 404 || err.code === "model_not_found" || err.code === "model_decommissioned") return `The AI model "${MODEL}" isn't available any more. The site owner needs to set GROQ_MODEL.`;
-    if (err.status === 413 || err.code === "context_length_exceeded") return "This conversation got too long. Start a new conversation and try again.";
-    if (err.status === 400 && err.code === "tool_use_failed") return "The AI got confused while using a tool. Try rephrasing your request.";
-    if (err.status === 0) return "Couldn't reach the AI service. Try again in a moment.";
-    return `The AI service returned an error (${err.status}). Try again in a moment.`;
-  }
-  if (err instanceof Anthropic.AuthenticationError) return "The server's Anthropic API key was rejected. The site owner needs to check ANTHROPIC_API_KEY.";
-  if (err instanceof Anthropic.PermissionDeniedError) return "The server's API key doesn't have access to the model.";
-  if (err instanceof Anthropic.RateLimitError) return "Thinq is getting too many requests right now. Wait a minute and try again.";
-  if (err instanceof Anthropic.APIConnectionError) return "Couldn't reach the AI service. Try again in a moment.";
-  if (err instanceof Anthropic.APIError) return `The AI service returned an error (${err.status}). Try again in a moment.`;
-  if (/invalid_grant|Google is not connected/i.test(String(err?.message))) return "Your Google connection has expired. Click “Connect Gmail & Calendar” in the sidebar to reconnect.";
-  return "Something went wrong. Try again in a moment.";
-}
 
 // ---------- documents ----------
 const rawBody = (limit) => express.raw({ type: () => true, limit });
@@ -188,6 +151,24 @@ api.post("/documents", rawBody(MAX_UPLOAD_BYTES + 1024), async (req, res) => {
   }
 });
 api.delete("/documents/:id", async (req, res) => { await store.deleteDocument(req.user.id, req.params.id); res.json({ ok: true }); });
+
+// ---------- WhatsApp linking ----------
+async function whatsappState(userId) {
+  if (!whatsappConfigured()) return { available: false };
+  const link = await store.whatsappLinkForUser(userId);
+  return { available: true, number: whatsappNumber(), chatUrl: whatsappNumber() ? `https://wa.me/${whatsappNumber()}` : null,
+    linked: link ? { number: `+${link.wa_id.slice(0, -4).replace(/\d/g, "•")}${link.wa_id.slice(-4)}`, name: link.name, since: link.linked_at } : null };
+}
+api.post("/whatsapp/code", async (req, res) => {
+  if (!whatsappConfigured()) return res.status(400).json({ error: "WhatsApp isn't set up on this server yet." });
+  const code = await store.createWhatsAppCode(req.user.id, validTz(req.body?.timeZone));
+  res.json({ code, url: whatsappNumber() ? linkUrl(code) : null, number: whatsappNumber(), expiresInMinutes: 10 });
+});
+api.delete("/whatsapp", async (req, res) => {
+  await store.unlinkWhatsApp(req.user.id);
+  await store.logAction(req.user.id, "whatsapp_unlinked", {});
+  res.json({ ok: true });
+});
 
 // ---------- generated images ----------
 api.get("/images/:id", async (req, res) => {
@@ -231,25 +212,13 @@ api.patch("/approvals/:id", async (req, res) => {
 });
 
 api.post("/approvals/:id/approve", async (req, res) => {
-  const a = await store.claimApproval(req.user.id, req.params.id);
-  if (!a) return res.status(404).json({ error: "This item is no longer waiting for approval." });
-  try {
-    const p = await providerFor(req.user);
-    const result = a.kind === "email" ? await p.sendEmail(a.payload) : await p.createEvent(a.payload);
-    await store.logAction(req.user.id, a.kind === "email" ? "email_sent" : "event_created", { approvalId: a.id, summary: a.summary, mode: p.mode });
-    res.json(await store.updateApproval(req.user.id, a.id, { status: "done", result, mode: p.mode }));
-  } catch (err) {
-    console.error(err);
-    await store.updateApproval(req.user.id, a.id, { status: "pending", error: String(err.message || err).slice(0, 300) });
-    res.status(500).json({ error: friendlyError(err) });
-  }
+  const out = await approveItem(req.user, req.params.id);
+  out.ok ? res.json(out.approval) : res.status(out.status).json({ error: out.error });
 });
 
 api.post("/approvals/:id/decline", async (req, res) => {
-  const a = await store.getApproval(req.user.id, req.params.id);
-  if (!a || a.status !== "pending") return res.status(404).json({ error: "Nothing to decline" });
-  await store.logAction(req.user.id, "declined", { approvalId: a.id, summary: a.summary });
-  res.json(await store.updateApproval(req.user.id, a.id, { status: "declined" }));
+  const out = await declineItem(req.user, req.params.id);
+  out.ok ? res.json(out.approval) : res.status(404).json({ error: out.error });
 });
 
 // ---------- agenda panel ----------
@@ -289,5 +258,6 @@ app.listen(PORT, HOST, () => {
   console.log(`  AI: ${AI_PROVIDER === "groq" ? "Groq" : "Anthropic"} (${MODEL})${hasApiKey() ? "" : ` - ⚠ ${apiKeyName()} missing`}`);
   console.log(`  Google sign-in: ${googleConfigured() ? `on (redirect URI: ${redirectUri()})` : "⚠ not configured"}`);
   console.log(`  Invite list: ${process.env.ALLOWED_EMAILS ? process.env.ALLOWED_EMAILS : process.env.NODE_ENV === "production" ? "⚠ empty - nobody can sign in" : "not set (anyone can sign in locally)"}`);
+  console.log(`  WhatsApp: ${whatsappConfigured() ? `on (+${whatsappNumber() || "number not set"})` : "off"}`);
   console.log(`  Daily limit: ${DAILY_LIMIT || "none"} AI requests per person\n`);
 });
