@@ -1,0 +1,69 @@
+/* Shared Thinq foundation, copied from the website stylesheet (thinq-site/assets/styles.css). */
+/* =========================================================
+   Thinq AI — shared styles for every page
+   ========================================================= */
+:root{
+  --ink:#0b0b0c; --ink-2:#3a3a3d; --muted:#7d7d83; --soft:#b1b1b6;
+  --line:#ececee; --line-2:#f3f3f5; --panel:#f7f7f8; --bg:#ffffff;
+  --pink:#f7b6d2; --lilac:#c9b6ff; --blue:#a9cdfd; --violet:#7a5cff;
+  --radius-xl:28px; --radius-lg:22px; --radius-md:16px; --radius-sm:12px;
+  --ease:cubic-bezier(.2,.7,.2,1);
+  --glass-bg:rgba(255,255,255,.72);
+  --glass-border:rgba(255,255,255,.65);
+  --glass-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 1px 2px rgba(16,12,40,.06),0 24px 60px -18px rgba(24,12,48,.35);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;overflow-x:clip;scroll-padding-top:88px}
+body{font-family:"Geist",system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;overflow-x:clip;letter-spacing:-.011em;font-size:15px;line-height:1.5;font-feature-settings:"ss01","cv11"}
+a{color:inherit;text-decoration:none}
+button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+img{display:block;max-width:100%}
+:focus-visible{outline:2px solid #6b5cff;outline-offset:3px;border-radius:8px}
+.wrap{width:min(1120px,100% - 32px);margin-inline:auto}
+.narrow{width:min(760px,100% - 32px);margin-inline:auto}
+.num-tab{font-variant-numeric:tabular-nums}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* type scale */
+h1,h2,h3{font-weight:400;text-wrap:balance}
+h1{font-size:clamp(42px,6.6vw,76px);line-height:1.02;letter-spacing:-.045em}
+.h1-sm{font-size:clamp(38px,5.4vw,64px)}
+.h2{font-size:clamp(30px,3.7vw,44px);line-height:1.08;letter-spacing:-.04em}
+.h3{font-size:20px;line-height:1.25;letter-spacing:-.025em;font-weight:500}
+.g{color:var(--soft)}
+.lede{color:var(--muted);font-size:16px;line-height:1.55;max-width:520px}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:999px;padding:11px 20px;font-size:14px;font-weight:500;letter-spacing:-.01em;white-space:nowrap;
+  color:#fff;background:linear-gradient(180deg,#2a2a2e,#0b0b0c);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 1px 2px rgba(0,0,0,.2),0 6px 16px -6px rgba(0,0,0,.35);
+  transition:transform .25s var(--ease),box-shadow .25s var(--ease),filter .25s}
+.btn:hover{transform:translateY(-1px);filter:brightness(1.15);box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 2px 4px rgba(0,0,0,.2),0 10px 22px -8px rgba(0,0,0,.4)}
+.btn:active{transform:translateY(0)}
+.btn.sm{padding:8px 16px;font-size:13px}
+.btn.lg{padding:13px 24px;font-size:15px}
+.btn.light{color:var(--ink);background:linear-gradient(180deg,#fff,#f4f4f6);box-shadow:inset 0 1px 0 #fff,0 0 0 1px rgba(0,0,0,.07),0 6px 16px -6px rgba(0,0,0,.2)}
+.btn.ghost{color:var(--ink);background:transparent;box-shadow:inset 0 0 0 1px var(--line)}
+.btn.ghost:hover{background:var(--panel);filter:none}
+.btn.block{width:100%}
+.link{color:var(--ink);text-decoration:underline;text-decoration-color:var(--soft);text-underline-offset:3px;transition:text-decoration-color .2s}
+.link:hover{text-decoration-color:var(--ink)}
+
+/* glass surface */
+.glass{background:var(--glass-bg);-webkit-backdrop-filter:blur(22px) saturate(1.7);backdrop-filter:blur(22px) saturate(1.7);border:1px solid var(--glass-border);box-shadow:var(--glass-shadow)}
+
+/* pill */
+.pill{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2);padding:5px 12px 5px 8px;border-radius:999px;background:var(--panel);border:1px solid var(--line-2)}
+.pill .dot{width:7px;height:7px;border-radius:50%;background:var(--violet);box-shadow:0 0 0 3px rgba(122,92,255,.15)}
+.pill .stars{color:#f5a524;letter-spacing:1px;font-size:11px}
+
+/* ---------- logo ---------- */
+.logo{display:flex;align-items:center;gap:10px;font-weight:500;font-size:17px;letter-spacing:-.02em}
+.logo svg{width:24px;height:24px}
+
+/* shared icon tile */
+.ico{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:#fff;border:1px solid var(--line);box-shadow:0 1px 2px rgba(0,0,0,.04);color:var(--ink)}
+.ico svg{width:16px;height:16px}
+.ico.lg{width:44px;height:44px;border-radius:13px}
+.ico.lg svg{width:20px;height:20px}
+

@@ -1,0 +1,31 @@
+# Render "Blueprint": creates the Thinq web service (website + app) from this repository.
+# In Render: New -> Blueprint -> pick this repo. You'll be asked for the values marked sync: false.
+services:
+  - type: web
+    name: thinq
+    runtime: node
+    plan: free # sleeps after ~15 min idle (first visit then takes ~1 min); upgrade to "starter" to keep it awake
+    buildCommand: cd thinq-app && npm ci
+    startCommand: cd thinq-app && npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "24"
+      - key: AI_PROVIDER
+        value: groq
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: DATABASE_URL # Postgres connection string, e.g. from a free Neon database
+        sync: false
+      - key: ALLOWED_EMAILS # who can sign in: emails and/or @domains, comma-separated
+        sync: false
+      - key: TOKEN_ENCRYPTION_KEY # encrypts stored Google tokens - Render generates it; never change it later
+        generateValue: true
+      - key: DAILY_REQUEST_LIMIT
+        value: "60"

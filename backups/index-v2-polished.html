@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thinq AI — Work faster. Think better.</title>
+<meta name="description" content="Thinq AI connects with your favorite tools to help you write, organize, and get work done faster.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://images.unsplash.com">
+<link rel="preload" as="image" href="https://images.unsplash.com/photo-1470240731273-7821a6eeb6bd?auto=format&fit=crop&w=1600&q=80" imagesrcset="https://images.unsplash.com/photo-1470240731273-7821a6eeb6bd?auto=format&fit=crop&w=800&q=80 800w, https://images.unsplash.com/photo-1470240731273-7821a6eeb6bd?auto=format&fit=crop&w=1600&q=80 1600w, https://images.unsplash.com/photo-1470240731273-7821a6eeb6bd?auto=format&fit=crop&w=2400&q=80 2400w" imagesizes="(max-width: 1100px) 100vw, 1000px" fetchpriority="high">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0b0b0c; --ink-2:#3a3a3d; --muted:#7d7d83; --soft:#b1b1b6;
+    --line:#ececee; --line-2:#f3f3f5; --panel:#f7f7f8; --bg:#ffffff;
+    --pink:#f7b6d2; --lilac:#c9b6ff; --blue:#a9cdfd;
+    --radius-xl:28px; --radius-lg:22px; --radius-md:16px; --radius-sm:12px;
+    --ease:cubic-bezier(.2,.7,.2,1);
+    --glass-bg:rgba(255,255,255,.72);
+    --glass-border:rgba(255,255,255,.65);
+    --glass-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 1px 2px rgba(16,12,40,.06),0 24px 60px -18px rgba(24,12,48,.35);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth;overflow-x:clip}
+  body{font-family:"Geist",system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;overflow-x:clip;letter-spacing:-.011em;font-size:15px;line-height:1.5;font-feature-settings:"ss01","cv11"}
+  a{color:inherit;text-decoration:none}
+  button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+  img{display:block;max-width:100%}
+  :focus-visible{outline:2px solid #6b5cff;outline-offset:3px;border-radius:8px}
+  .wrap{width:min(1120px,100% - 32px);margin-inline:auto}
+  .num-tab{font-variant-numeric:tabular-nums}
+
+  /* type scale */
+  h1,h2{font-weight:400;text-wrap:balance}
+  h1{font-size:clamp(42px,6.6vw,76px);line-height:1.02;letter-spacing:-.045em}
+  .h2{font-size:clamp(30px,3.7vw,44px);line-height:1.08;letter-spacing:-.04em}
+
+  /* buttons */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:999px;padding:11px 20px;font-size:14px;font-weight:500;letter-spacing:-.01em;
+    color:#fff;background:linear-gradient(180deg,#2a2a2e,#0b0b0c);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 1px 2px rgba(0,0,0,.2),0 6px 16px -6px rgba(0,0,0,.35);
+    transition:transform .25s var(--ease),box-shadow .25s var(--ease),filter .25s}
+  .btn:hover{transform:translateY(-1px);filter:brightness(1.15);box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 2px 4px rgba(0,0,0,.2),0 10px 22px -8px rgba(0,0,0,.4)}
+  .btn:active{transform:translateY(0)}
+  .btn.sm{padding:8px 16px;font-size:13px}
+  .btn.light{color:var(--ink);background:linear-gradient(180deg,#fff,#f4f4f6);box-shadow:inset 0 1px 0 #fff,0 0 0 1px rgba(0,0,0,.06),0 6px 16px -6px rgba(0,0,0,.25)}
+
+  /* glass surface */
+  .glass{background:var(--glass-bg);-webkit-backdrop-filter:blur(22px) saturate(1.7);backdrop-filter:blur(22px) saturate(1.7);border:1px solid var(--glass-border);box-shadow:var(--glass-shadow)}
+
+  /* logo */
+  .logo{display:flex;align-items:center;gap:10px;font-weight:500;font-size:17px;letter-spacing:-.02em}
+  .logo svg{width:24px;height:24px}
+
+  /* nav */
+  nav.top{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.7);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-bottom:1px solid transparent;transition:background .3s,border-color .3s,backdrop-filter .3s}
+  nav.top.scrolled{background:rgba(255,255,255,.8);-webkit-backdrop-filter:blur(20px) saturate(1.6);backdrop-filter:blur(20px) saturate(1.6);border-bottom-color:var(--line)}
+  nav.top .wrap{display:flex;align-items:center;justify-content:space-between;height:68px}
+  .links{display:flex;gap:30px;font-size:14px;color:var(--ink-2)}
+  .links a{display:flex;align-items:center;gap:4px;transition:color .2s}
+  .links a:hover{color:var(--ink)}
+  .links svg{width:10px;height:10px;opacity:.6}
+  .nav-right{display:flex;align-items:center;gap:22px;font-size:14px}
+
+  /* hero */
+  .hero{text-align:center;padding:56px 0 0}
+  .rating{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2);margin-bottom:24px;padding:5px 12px 5px 8px;border-radius:999px;background:var(--panel);border:1px solid var(--line-2)}
+  .rating .stars{color:#f5a524;letter-spacing:1px;font-size:11px}
+  h1 .g{color:var(--soft)}
+  .hero p.sub{margin:24px auto 28px;max-width:440px;color:var(--muted);font-size:16px;line-height:1.55}
+  .tabs{display:inline-flex;gap:2px;margin-top:32px;padding:4px;border-radius:999px;background:var(--panel);border:1px solid var(--line-2)}
+  .tabs button{display:flex;align-items:center;gap:7px;padding:7px 15px;border-radius:999px;font-size:13px;color:var(--muted);transition:background .25s,color .25s,box-shadow .25s}
+  .tabs button:hover{color:var(--ink)}
+  .tabs button svg{width:14px;height:14px}
+  .tabs button[aria-selected="true"]{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.06),0 2px 8px rgba(0,0,0,.05)}
+
+  /* soft halo — tight and faint */
+  .glow{position:relative;isolation:isolate}
+  .glow::before{content:"";position:absolute;inset:-28px -24px;z-index:-1;filter:blur(36px);opacity:.55;border-radius:inherit;
+    background:radial-gradient(35% 50% at 2% 45%,var(--pink),transparent 70%),
+               radial-gradient(35% 50% at 98% 35%,var(--blue),transparent 70%),
+               radial-gradient(40% 30% at 50% 102%,var(--lilac),transparent 70%)}
+
+  /* photo scenes with blur-up */
+  .scene{position:relative;overflow:hidden;border-radius:var(--radius-xl);background:#cfd6c8 center/cover no-repeat;transform:translateZ(0)}
+  .scene > .bg,.band > .bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transform:scale(1.04);transition:opacity .9s var(--ease),transform 1.4s var(--ease)}
+  .scene > .bg.loaded,.band > .bg.loaded{opacity:1;transform:scale(1)}
+  .scene::before,.band::before{content:"";position:absolute;inset:-20px;background:inherit;filter:blur(18px);transform:scale(1.1)}
+  .scene > *:not(.bg),.band > *:not(.bg){position:relative}
+
+  .hero-shot{margin:60px auto 0;max-width:1040px}
+  .hero-shot .scene{aspect-ratio:2.35/1;display:grid;place-items:center;box-shadow:0 1px 0 rgba(255,255,255,.4) inset,0 40px 80px -40px rgba(60,30,100,.45)}
+  .hero-shot .bg{will-change:transform}
+  .hero-shot .scene::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(0,0,0,0) 40%,rgba(15,20,10,.45))}
+  .prompt{z-index:1;width:min(480px,86%);border-radius:20px;padding:18px 18px 14px;text-align:left}
+  .prompt .q{display:flex;gap:10px;align-items:center;font-size:15px;min-height:24px;letter-spacing:-.015em}
+  .prompt .q .spark{flex:none;width:15px;height:15px;color:#7a5cff}
+  .caret{display:inline-block;width:1.5px;height:17px;background:var(--ink);margin-left:1px;vertical-align:-3px;animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  .prompt .bar{display:flex;align-items:center;justify-content:space-between;margin-top:28px;font-size:12.5px;color:var(--muted)}
+  .prompt .bar .l{display:flex;align-items:center;gap:8px}
+  .icon-btn{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(0,0,0,.08);background:rgba(255,255,255,.6)}
+  .prompt .bar .r{display:flex;align-items:center;gap:12px}
+  .send{width:30px;height:30px;border-radius:50%;background:linear-gradient(180deg,#2a2a2e,#0b0b0c);color:#fff;display:grid;place-items:center;box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 4px 10px -4px rgba(0,0,0,.5);transition:transform .2s}
+  .send:hover{transform:scale(1.06)}
+  .hero-shot .note{position:absolute;z-index:1;left:0;right:0;bottom:9%;font-weight:500;text-align:center;color:#fff;font-size:13.5px;text-shadow:0 1px 10px rgba(0,0,0,.35)}
+  .hero-shot .note a{text-decoration:underline;text-decoration-color:rgba(255,255,255,.6);text-underline-offset:3px}
+
+  /* logos marquee */
+  .logos{max-width:1040px;margin:64px auto 0;overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
+  .logos .track{display:flex;width:max-content;gap:72px;animation:marquee 32s linear infinite}
+  .logos:hover .track{animation-play-state:paused}
+  .logos span{display:flex;align-items:center;gap:8px;color:#9a9aa0;font-weight:600;font-size:17px;letter-spacing:-.02em;white-space:nowrap;transition:color .2s}
+  .logos span:hover{color:var(--ink)}
+  .logos svg{width:22px;height:22px}
+  @keyframes marquee{to{transform:translateX(-50%)}}
+
+  /* statement */
+  .statement{text-align:center;padding:96px 0 112px}
+  .statement h2{font-size:clamp(28px,3.6vw,42px);line-height:1.18;letter-spacing:-.04em;max-width:660px;margin:0 auto}
+  .statement h2 .g{color:var(--soft)}
+  .joinbar{display:flex;align-items:center;justify-content:space-between;gap:16px;max-width:600px;margin:48px auto 0;padding:10px 10px 10px 14px;border-radius:18px;background:#fff;border:1px solid var(--line);box-shadow:0 1px 2px rgba(0,0,0,.04),0 12px 32px -12px rgba(0,0,0,.12)}
+  .avatars{display:flex}
+  .avatars img{object-fit:cover;width:32px;height:32px;border-radius:50%;border:2px solid #fff;margin-left:-8px;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+  .avatars img:first-child{margin-left:0}
+  .joinbar .txt{flex:1;text-align:left;font-size:14px;font-weight:500;letter-spacing:-.015em}
+  .joinbar .txt small{display:block;color:var(--muted);font-size:12px;font-weight:400;margin-top:1px}
+
+  /* testimonial band */
+  .band{position:relative;overflow:hidden;color:#fff;background:#9c7fb6 center/cover no-repeat}
+  .band::after{content:"";position:absolute;inset:0;pointer-events:none;
+    background:linear-gradient(90deg,rgba(38,14,52,.55),rgba(38,14,52,.15) 55%,transparent),linear-gradient(0deg,rgba(20,10,30,.45),transparent 45%)}
+  .band .wrap{z-index:1;padding:88px 0 64px;min-height:620px;display:flex;flex-direction:column;justify-content:space-between}
+  .band blockquote{font-size:clamp(28px,3.5vw,42px);line-height:1.14;letter-spacing:-.04em;max-width:580px;text-shadow:0 2px 24px rgba(30,10,40,.35)}
+  .story{align-self:flex-end;display:flex;align-items:center;gap:16px;padding:10px;border-radius:22px;margin-top:88px;color:var(--ink);background:rgba(255,255,255,.62)}
+  .story .photo{width:96px;height:112px;border-radius:14px;object-fit:cover}
+  .story .wave{width:64px;height:112px;display:grid;place-items:center;border-radius:14px;background:rgba(255,255,255,.7)}
+  .story .wave svg{width:36px;height:36px}
+  .wave rect{animation:pulse 1.2s ease-in-out infinite;transform-origin:center;transform-box:fill-box}
+  @keyframes pulse{50%{transform:scaleY(.45)}}
+  .story .meta{display:flex;flex-direction:column;justify-content:space-between;align-self:stretch;padding:8px 10px 6px 4px;gap:18px}
+  .story .name{font-size:15px;font-weight:500;letter-spacing:-.015em}
+  .story .name small{display:block;color:var(--muted);font-size:12px;font-weight:400;margin-top:2px}
+
+  /* sections */
+  .section{padding:136px 0 0}
+  .center-head{text-align:center}
+  .center-head p{color:var(--muted);font-size:15px;margin-top:18px}
+
+  /* stats */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:56px auto 0;max-width:980px}
+  .stat{position:relative;border-radius:var(--radius-lg);padding:26px 24px 24px;background:linear-gradient(180deg,#faf8ff 0%,#fff 60%);border:1px solid var(--line);box-shadow:0 1px 2px rgba(0,0,0,.03);overflow:hidden}
+  .stat::before{content:"";position:absolute;inset:0 0 auto;height:1px;background:linear-gradient(90deg,transparent,rgba(160,130,255,.5),transparent)}
+  .stat .num{font-size:clamp(48px,5vw,64px);line-height:1;letter-spacing:-.055em;font-variant-numeric:tabular-nums}
+  .stat .num sup{font-size:.42em;letter-spacing:-.02em;vertical-align:.95em;margin-left:2px;color:var(--muted)}
+  .stat .lbl{font-size:14px;color:var(--ink-2);margin-top:22px;padding-top:16px;border-top:1px solid var(--line-2)}
+  .stat .lbl span{color:var(--muted)}
+
+  /* split */
+  .split{display:grid;grid-template-columns:1fr 1.05fr;gap:72px;align-items:center;max-width:1000px;margin:0 auto}
+  .split .lead{color:var(--muted);font-size:15px;margin:18px 0 30px;max-width:380px}
+  .features{list-style:none;display:grid;gap:4px;margin-bottom:32px;max-width:400px}
+  .features li{display:flex;gap:14px;align-items:flex-start;padding:14px;border-radius:var(--radius-md);transition:background .25s}
+  .features li:hover{background:var(--panel)}
+  .features .ico{flex:none;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:#fff;border:1px solid var(--line);box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  .features .ico svg{width:16px;height:16px}
+  .features b{display:block;font-weight:500;font-size:14.5px;letter-spacing:-.015em}
+  .features p{color:var(--muted);font-size:13.5px;margin-top:2px;line-height:1.45}
+  .split .visual .scene{aspect-ratio:1/1.02;display:grid;place-items:center;box-shadow:0 40px 80px -40px rgba(80,40,120,.5)}
+  .setup{z-index:1;width:84%;border-radius:20px;padding:18px 18px 8px;font-size:13.5px}
+  .setup header{display:flex;justify-content:space-between;align-items:center;font-weight:500;letter-spacing:-.015em}
+  .setup header button{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;color:var(--muted);font-size:11px}
+  .setup header button:hover{background:rgba(0,0,0,.05)}
+  .progress{display:flex;align-items:center;gap:10px;margin:14px 0 10px;color:var(--muted);font-size:11.5px}
+  .progress .track{flex:1;height:6px;background:rgba(0,0,0,.06);border-radius:9px;overflow:hidden}
+  .progress .track i{display:block;height:100%;width:25%;background:linear-gradient(90deg,#f09bd6,#9d87ff);border-radius:9px;transition:width .7s var(--ease)}
+  .steps{list-style:none}
+  .steps li{display:flex;align-items:center;gap:10px;padding:10px 6px;margin:0 -6px;border-radius:10px;color:var(--soft);transition:background .2s,color .3s}
+  .steps li:hover{background:rgba(255,255,255,.6)}
+  .steps li .dot{width:20px;height:20px;border-radius:50%;border:1px solid currentColor;display:grid;place-items:center;font-size:10.5px;flex:none;transition:background .3s,border-color .3s}
+  .steps li.done{color:var(--ink)}
+  .steps li.done .dot{background:var(--ink);border-color:var(--ink);color:#fff}
+  .steps li.active{color:var(--ink-2)}
+  .steps li.active .dot{border-color:#9d87ff;color:#7a5cff;box-shadow:0 0 0 3px rgba(157,135,255,.18)}
+  .steps li .chev{margin-left:auto;opacity:.5}
+
+  /* proof */
+  .proof{max-width:1000px;margin:0 auto}
+  .proof .users{display:flex;align-items:center;gap:8px;font-size:14px;margin-top:12px;color:var(--ink-2)}
+  .proof .users i{width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.18)}
+  .proof hr{border:0;border-top:1px solid var(--line);margin:26px 0 48px}
+  .counter{display:flex;align-items:baseline;gap:22px;flex-wrap:wrap}
+  .counter .big{font-size:clamp(56px,8.6vw,104px);letter-spacing:-.06em;line-height:.95;font-variant-numeric:tabular-nums}
+  .counter .cap{font-size:clamp(20px,2.3vw,28px);color:var(--soft);letter-spacing:-.035em}
+
+  /* cta */
+  .cta{max-width:1040px;margin:136px auto 0}
+  .cta .scene{min-height:420px;display:grid;place-items:center;text-align:center;color:#fff;box-shadow:0 40px 80px -40px rgba(40,20,80,.6)}
+  .cta .scene::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(55% 55% at 50% 48%,rgba(20,12,40,.35),transparent 75%)}
+  .cta .scene-inner{z-index:1;display:grid;place-items:center;padding:48px 16px}
+  .cta h2{font-size:clamp(34px,4.6vw,54px);line-height:1.04;letter-spacing:-.045em;text-shadow:0 2px 24px rgba(0,0,0,.3)}
+  .cta p{font-size:15px;margin:18px 0 26px;opacity:.92}
+
+  /* footer */
+  footer{margin-top:136px;position:relative;overflow:hidden}
+  .foot{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:40px;padding-bottom:48px}
+  .foot h4{font-weight:500;font-size:14px;margin-bottom:20px;letter-spacing:-.01em}
+  .foot ul{list-style:none;display:grid;gap:14px;font-size:14px;color:var(--muted)}
+  .foot ul a{transition:color .2s}
+  .foot ul a:hover{color:var(--ink)}
+  .sub-title{font-weight:500;font-size:14px;margin:26px 0 6px}
+  .sub-copy{color:var(--muted);font-size:13.5px;line-height:1.5;max-width:300px}
+  .subscribe{display:flex;align-items:center;gap:8px;margin:20px 0 14px;max-width:340px;border:1px solid var(--line);border-radius:999px;padding:5px 5px 5px 14px;background:#fff;transition:border-color .2s,box-shadow .2s}
+  .subscribe:focus-within{border-color:#c9bcff;box-shadow:0 0 0 4px rgba(157,135,255,.15)}
+  .subscribe svg{width:16px;height:16px;color:var(--muted);flex:none}
+  .subscribe input{flex:1;min-width:0;border:0;outline:0;font:inherit;font-size:13.5px;background:none}
+  .fine{font-size:12px;color:var(--muted)}
+  .fine a{text-decoration:underline;color:var(--ink-2)}
+  .legal{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;border-top:1px solid var(--line);padding:22px 0 26px;font-size:12.5px;color:var(--muted)}
+  .legal nav{display:flex;gap:14px}
+  .legal nav a+a{border-left:1px solid var(--line);padding-left:14px}
+  .legal a:hover{color:var(--ink)}
+  .wordmark{font-size:clamp(96px,22vw,300px);font-weight:500;letter-spacing:-.07em;line-height:.8;text-align:center;margin-bottom:-.12em;user-select:none;
+    background:linear-gradient(180deg,#ececf0 10%,rgba(255,255,255,0) 95%);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .credit{font-size:11px;color:var(--soft);padding-bottom:16px}.credit a{text-decoration:underline}
+
+  /* page-load entrance (one moment) */
+  .rise{opacity:0;transform:translateY(14px);animation:rise .9s var(--ease) forwards}
+  .d1{animation-delay:.08s}.d2{animation-delay:.16s}.d3{animation-delay:.24s}.d4{animation-delay:.32s}.d5{animation-delay:.44s}
+  @keyframes rise{to{opacity:1;transform:none}}
+
+  @media (max-width:900px){
+    .links,.nav-right .login{display:none}
+    .split{grid-template-columns:1fr;gap:56px}
+    .foot{grid-template-columns:1fr 1fr}
+    .foot .brand{grid-column:1/-1}
+  }
+  @media (max-width:640px){
+    .hero{padding-top:40px}
+    .tabs{flex-wrap:wrap;justify-content:center;border-radius:20px}
+    .hero-shot{margin-top:44px}
+    .hero-shot .scene{aspect-ratio:4/5;border-radius:var(--radius-lg)}
+    .prompt{width:90%;padding:14px 14px 12px}
+    .prompt .q{font-size:14px}
+    .prompt .bar{margin-top:20px}
+    .hero-shot .note{bottom:6%;padding:0 20px;font-size:13px}
+    .logos .track{gap:44px}
+    .stats{grid-template-columns:1fr}
+    .joinbar{flex-wrap:wrap}
+    .joinbar .btn{width:100%}
+    .band .wrap{min-height:560px;padding-top:64px}
+    .story{align-self:stretch;flex-wrap:wrap}
+    .story .meta{flex:1 1 100%;flex-direction:row;align-items:center;padding:4px}
+    .glow::before{inset:-16px -8px}
+    .cta .scene{min-height:380px;border-radius:var(--radius-lg)}
+    .legal{flex-direction:column}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation:none!important;transition:none!important}
+    .rise{opacity:1;transform:none}
+    .scene > .bg,.band > .bg{opacity:1;transform:none}
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="mark" viewBox="0 0 24 24"><g fill="currentColor">
+    <circle cx="12" cy="3" r="2"/><circle cx="12" cy="21" r="2"/><circle cx="3" cy="12" r="2"/><circle cx="21" cy="12" r="2"/>
+    <circle cx="5.6" cy="5.6" r="1.7"/><circle cx="18.4" cy="5.6" r="1.7"/><circle cx="5.6" cy="18.4" r="1.7"/><circle cx="18.4" cy="18.4" r="1.7"/>
+    <circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="7.5" r="1.5"/><circle cx="12" cy="16.5" r="1.5"/><circle cx="7.5" cy="12" r="1.5"/><circle cx="16.5" cy="12" r="1.5"/>
+  </g></symbol>
+  <symbol id="chev" viewBox="0 0 10 10"><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+  <symbol id="l1" viewBox="0 0 24 24"><path d="M13 2 5 13h6l-1 9 8-11h-6z" fill="currentColor"/></symbol>
+  <symbol id="l2" viewBox="0 0 24 24"><path d="M2 16c3-8 6-8 10 0s7 8 10 0M2 16c3 8 6 8 10 0s7-8 10 0" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="l3" viewBox="0 0 24 24"><path d="M6 3h14l-2 4H6zM5 10h12l-2 4H5zM4 17h14l-2 4H4z" fill="currentColor"/></symbol>
+  <symbol id="l4" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="currentColor"/></symbol>
+  <symbol id="l5" viewBox="0 0 24 24"><path d="M3 20 12 4l9 16z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="l6" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2" fill="currentColor"/><rect x="13" y="13" width="8" height="8" rx="2" fill="currentColor"/><rect x="13" y="3" width="8" height="8" rx="4" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+</svg>
+
+<nav class="top" aria-label="Main">
+  <div class="wrap">
+    <a href="#" class="logo"><svg><use href="#mark"/></svg>Thinq AI</a>
+    <div class="links">
+      <a href="#">Products <svg><use href="#chev"/></svg></a>
+      <a href="#">Use Cases <svg><use href="#chev"/></svg></a>
+      <a href="#">Company</a>
+      <a href="#">Resources</a>
+    </div>
+    <div class="nav-right">
+      <a href="#" class="login">Login</a>
+      <a href="#start" class="btn sm">Get started free</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="rating rise"><span class="stars" aria-hidden="true">★★★★★</span> 5.0 from 24.5k+ reviews</div>
+    <h1 class="rise d1">Work faster. Think better.<br><span>Automate</span> <span class="g">everything.</span></h1>
+    <p class="sub rise d2">Thinq AI connects with your favorite tools to help you write, organize, and get work done faster — wherever you are.</p>
+    <a href="#start" class="btn rise d3">Start Free Trial</a>
+    <div><div class="tabs rise d4" role="tablist" aria-label="Workflow stage">
+      <button role="tab" aria-selected="true" data-prompt="Generate a workout plan for beginners...">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="6"/><path d="M8 2v6l4 3"/></svg>Analyse</button>
+      <button role="tab" aria-selected="false" data-prompt="Learn my writing style from last month's emails...">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3 13 13 3M9 3h4v4"/></svg>Train</button>
+      <button role="tab" aria-selected="false" data-prompt="Check this onboarding flow for confusing steps...">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M6 2h4M7 2v4l-4 7a1 1 0 0 0 1 1.5h8a1 1 0 0 0 1-1.5L9 6V2"/></svg>Testing</button>
+      <button role="tab" aria-selected="false" data-prompt="Send the weekly report to the team every Friday...">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M9 2c3 0 5 2 5 5l-5 5-5-5c0-3 2-5 5-5z"/><path d="M4 12l-2 2"/></svg>Deploy</button>
+    </div></div>
+  </div>
+
+  <div class="wrap">
+    <div class="hero-shot glow rise d5">
+      <div class="scene" data-photo="1470240731273-7821a6eeb6bd" data-eager>
+        <div class="prompt glass" role="group" aria-label="Thinq prompt preview">
+          <div class="q"><svg class="spark" viewBox="0 0 16 16"><path d="M8 0c.6 4.2 3.8 7.4 8 8-4.2.6-7.4 3.8-8 8-.6-4.2-3.8-7.4-8-8 4.2-.6 7.4-3.8 8-8z" fill="currentColor"/></svg><span id="typed"></span><span class="caret"></span></div>
+          <div class="bar">
+            <div class="l"><span class="icon-btn">+</span> Add Attachments</div>
+            <div class="r">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3 6v4M6 4v8M9 6v4M12 5v6"/></svg>
+              <button class="send" aria-label="Send"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="1.6"><path d="M6 10V2M2.5 5.5 6 2l3.5 3.5"/></svg></button>
+            </div>
+          </div>
+        </div>
+        <p class="note">Don't want to wait? <a href="#start">Try the early Thinq Beta today.</a></p>
+      </div>
+    </div>
+
+    <div class="logos" aria-label="Teams using Thinq">
+      <div class="track">
+        <span><svg><use href="#l1"/></svg>Sisyphus</span>
+        <span><svg><use href="#l2"/></svg>Magnolia</span>
+        <span><svg><use href="#l3"/></svg>Epicurious</span>
+        <span><svg><use href="#l4"/></svg>Halcyon</span>
+        <span><svg><use href="#l5"/></svg>Northwind</span>
+        <span><svg><use href="#l6"/></svg>Quadrant</span>
+        <span aria-hidden="true"><svg><use href="#l1"/></svg>Sisyphus</span>
+        <span aria-hidden="true"><svg><use href="#l2"/></svg>Magnolia</span>
+        <span aria-hidden="true"><svg><use href="#l3"/></svg>Epicurious</span>
+        <span aria-hidden="true"><svg><use href="#l4"/></svg>Halcyon</span>
+        <span aria-hidden="true"><svg><use href="#l5"/></svg>Northwind</span>
+        <span aria-hidden="true"><svg><use href="#l6"/></svg>Quadrant</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section class="statement">
+  <div class="wrap">
+    <h2>Thinq AI makes sure every task, message, <span class="g">and workflow is handled</span> automatically, anytime, <span class="g">anywhere.</span></h2>
+    <div class="joinbar">
+      <div class="avatars" aria-hidden="true">
+        <img src="https://images.unsplash.com/photo-1627161683077-e34782c24d81?auto=format&fit=crop&w=96&h=96&q=80&crop=faces" alt="">
+        <img src="https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&w=96&h=96&q=80&crop=faces" alt="">
+        <img src="https://images.unsplash.com/photo-1705645930353-0e335311ef20?auto=format&fit=crop&w=96&h=96&q=80&crop=faces" alt="">
+        <img src="https://images.unsplash.com/photo-1765005204058-10418f5123c5?auto=format&fit=crop&w=96&h=96&q=80&crop=faces" alt="">
+      </div>
+      <div class="txt">Join thousands using Thinq daily<small>Set up your Thinq assistant in one click</small></div>
+      <a href="#start" class="btn sm">Get Your Assistant</a>
+    </div>
+  </div>
+</section>
+
+<section class="band" aria-label="Customer story" data-photo="1616361847497-2e7b3c911599" data-full>
+  <div class="wrap">
+    <blockquote>“Thinq AI has completely changed how we work. Now we manage tasks faster and stay productive 24/7.”</blockquote>
+    <figure class="story glass">
+      <img class="photo" src="https://images.unsplash.com/photo-1568602471122-7832951cc4c5?auto=format&fit=crop&w=240&h=280&q=80&crop=faces" alt="Portrait of Wayne Grimshaw" loading="lazy">
+      <div class="wave" aria-hidden="true">
+        <svg viewBox="0 0 44 44" fill="#111">
+          <rect x="4" y="16" width="3" height="12" rx="1.5" style="animation-delay:-.1s"/>
+          <rect x="10" y="10" width="3" height="24" rx="1.5" style="animation-delay:-.3s"/>
+          <rect x="16" y="6" width="3" height="32" rx="1.5" style="animation-delay:-.5s"/>
+          <rect x="22" y="12" width="3" height="20" rx="1.5" style="animation-delay:-.2s"/>
+          <rect x="28" y="6" width="3" height="32" rx="1.5" style="animation-delay:-.6s"/>
+          <rect x="34" y="12" width="3" height="20" rx="1.5" style="animation-delay:-.4s"/>
+          <rect x="40" y="17" width="3" height="10" rx="1.5" style="animation-delay:-.7s"/>
+        </svg>
+      </div>
+      <figcaption class="meta">
+        <div class="name">Wayne Grimshaw<small>Head of Operations, Northwind</small></div>
+        <a href="#" class="btn sm">View Case Study</a>
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <div class="center-head">
+      <h2 class="h2">Boost Your Productivity<br>Like Never Before</h2>
+      <p>Designed to simplify your workflow — day or night — without constant effort.</p>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="num">4<sup>×</sup></div><div class="lbl">Faster task completion <span>— up to</span></div></div>
+      <div class="stat"><div class="num">96<sup>%</sup></div><div class="lbl">Less manual work <span>— up to</span></div></div>
+      <div class="stat"><div class="num">2.5<sup>×</sup></div><div class="lbl">Higher efficiency <span>— up to</span></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap split">
+    <div>
+      <h2 class="h2">Build, Plan, and<br>Execute with Thinq</h2>
+      <p class="lead">Thinq helps you manage time, tasks, and resources efficiently.</p>
+      <ul class="features">
+        <li><span class="ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="3" width="12" height="11" rx="2"/><path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3"/></svg></span>
+          <div><b>Plans your day</b><p>Turns your inbox and calendar into a clear list of what to do next.</p></div></li>
+        <li><span class="ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 1.5c.5 3.4 3.1 6 6.5 6.5-3.4.5-6 3.1-6.5 6.5-.5-3.4-3.1-6-6.5-6.5 3.4-.5 6-3.1 6.5-6.5z"/></svg></span>
+          <div><b>Handles the busywork</b><p>Drafts replies, files notes and updates your tools without being asked twice.</p></div></li>
+        <li><span class="ico"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 13.5h12M4 11V8M8 11V4.5M12 11V6.5"/></svg></span>
+          <div><b>Reports back</b><p>A short summary each evening of what got done and what needs you.</p></div></li>
+      </ul>
+      <a href="#start" class="btn sm">Get Started — Free</a>
+    </div>
+    <div class="visual glow">
+      <div class="scene" data-photo="1782440824284-a08cfca3a11c">
+        <div class="setup glass" role="group" aria-label="Workspace setup preview">
+          <header>Set Up Your Thinq Workspace <button aria-label="Close">✕</button></header>
+          <div class="progress"><span aria-hidden="true">🚀</span><span class="track"><i id="bar"></i></span><span id="pct" class="num-tab">25%</span></div>
+          <ol class="steps" id="steps">
+            <li class="done"><span class="dot">✓</span>Select AI Agent Type</li>
+            <li class="active"><span class="dot">2</span>Auto Onboarding...</li>
+            <li><span class="dot">3</span>Activate Thinq Assistant<span class="chev">›</span></li>
+            <li><span class="dot">4</span>Start Using Agent<span class="chev">›</span></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap proof">
+    <h2 class="h2">Don't Just Take Our Word for It</h2>
+    <p class="users"><i aria-hidden="true"></i>9,677+ Active Users</p>
+    <hr>
+    <div class="counter"><span class="big" id="count">26,900,789</span><span class="cap">Tasks Completed with Thinq AI</span></div>
+  </div>
+</section>
+
+<section class="wrap" id="start">
+  <div class="cta glow">
+    <div class="scene" data-photo="1712178420520-f308934a4e8d">
+      <div class="scene-inner">
+        <h2>Start Your Productivity<br>Journey Today</h2>
+        <p>Work smarter. Save time. Achieve more.</p>
+        <a href="#" class="btn light sm">Try Thinq for Free</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div class="brand">
+        <a href="#" class="logo"><svg><use href="#mark"/></svg>Thinq AI</a>
+        <div class="sub-title">Subscribe</div>
+        <p class="sub-copy">Join our newsletter to stay up to date on features and releases.</p>
+        <form class="subscribe" onsubmit="event.preventDefault();this.querySelector('button').textContent='Subscribed';">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="2" y="3.5" width="12" height="9" rx="1.5"/><path d="m2.5 4.5 5.5 4 5.5-4"/></svg>
+          <input type="email" placeholder="Enter your email" aria-label="Email address" required>
+          <button class="btn sm" type="submit">Subscribe</button>
+        </form>
+        <p class="fine">By subscribing you agree to our <a href="#">Privacy Policy</a>.</p>
+      </div>
+      <div><h4>Quick Links</h4><ul><li><a href="#">Home</a></li><li><a href="#">About</a></li><li><a href="#">Services</a></li><li><a href="#">Contact</a></li></ul></div>
+      <div><h4>Product</h4><ul><li><a href="#">Features</a></li><li><a href="#">Integrations</a></li><li><a href="#">Pricing</a></li><li><a href="#">Updates</a></li></ul></div>
+      <div><h4>Resources</h4><ul><li><a href="#">Help Center</a></li><li><a href="#">Documentation</a></li><li><a href="#">Community</a></li><li><a href="#">Tutorials</a></li></ul></div>
+    </div>
+    <div class="legal">
+      <span>© 2026 Thinq AI. All rights reserved. Photography from <a href="https://unsplash.com/?utm_source=thinq&utm_medium=referral" style="text-decoration:underline">Unsplash</a>.</span>
+      <nav aria-label="Legal"><a href="#">Terms of Service</a><a href="#">Privacy Policy</a><a href="#">Compliance</a></nav>
+    </div>
+  </div>
+  <div class="wordmark" aria-hidden="true">Thinq</div>
+</footer>
+
+<script>
+const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const U=(id,w,extra="")=>`https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=${w}&q=80${extra}`;
+
+/* ---------- Photos: tiny blurred placeholder, then fade in the sharp image ---------- */
+document.querySelectorAll("[data-photo]").forEach(el=>{
+  const id=el.dataset.photo;
+  el.style.backgroundImage=`url("${U(id,48,"&blur=40")}")`;
+  const img=new Image();
+  img.className="bg";img.alt="";img.decoding="async";
+  if(el.hasAttribute("data-eager")){img.fetchPriority="high"}else{img.loading="lazy"}
+  img.sizes=el.hasAttribute("data-full")?"100vw":"(max-width: 1100px) 100vw, 1040px";
+  img.srcset=[800,1200,1600,2400].map(w=>`${U(id,w)} ${w}w`).join(", ");
+  img.src=U(id,1600);
+  const done=()=>img.classList.add("loaded");
+  img.addEventListener("load",done,{once:true});
+  el.prepend(img);
+  if(img.complete&&img.naturalWidth)done();
+});
+
+/* ---------- Nav: hairline + stronger blur once scrolled ---------- */
+const nav=document.querySelector("nav.top");
+const heroImg=document.querySelector(".hero-shot .bg");
+let ticking=false;
+function onScroll(){
+  nav.classList.toggle("scrolled",scrollY>8);
+  if(!reduce&&heroImg&&heroImg.classList.contains("loaded")){
+    const r=heroImg.parentElement.getBoundingClientRect();
+    const p=Math.min(Math.max(1-(r.bottom/(innerHeight+r.height)),0),1); // 0→1 as it scrolls past
+    heroImg.style.transform=`scale(${1.08-p*0.08}) translateY(${p*18}px)`;
+  }
+  ticking=false;
+}
+addEventListener("scroll",()=>{if(!ticking){ticking=true;requestAnimationFrame(onScroll)}},{passive:true});
+heroImg&&heroImg.addEventListener("load",()=>{heroImg.style.transition="opacity .9s var(--ease)";onScroll()});
+onScroll();
+
+/* ---------- Typing prompt + tabs ---------- */
+const typed=document.getElementById("typed");
+let timer;
+function typeText(t){
+  clearInterval(timer);
+  if(reduce){typed.textContent=t;return}
+  typed.textContent="";let i=0;
+  timer=setInterval(()=>{typed.textContent=t.slice(0,++i);if(i>=t.length)clearInterval(timer)},32);
+}
+const tabs=[...document.querySelectorAll('[role="tab"]')];
+tabs.forEach(b=>b.addEventListener("click",()=>{
+  tabs.forEach(t=>t.setAttribute("aria-selected",t===b));typeText(b.dataset.prompt);
+}));
+setTimeout(()=>typeText(tabs[0].dataset.prompt),700);
+
+/* ---------- Workspace setup steps (click to advance) ---------- */
+const steps=[...document.querySelectorAll("#steps li")];
+let stepIdx=1;
+function renderSteps(){
+  steps.forEach((li,i)=>{li.className=i<stepIdx?"done":i===stepIdx?"active":"";li.querySelector(".dot").textContent=i<stepIdx?"✓":i+1});
+  const pct=Math.round(stepIdx/steps.length*100);
+  document.getElementById("bar").style.width=pct+"%";document.getElementById("pct").textContent=pct+"%";
+}
+steps.forEach((li,i)=>{li.style.cursor="pointer";li.addEventListener("click",()=>{stepIdx=Math.min(i+1,steps.length);renderSteps()})});
+renderSteps();
+
+/* ---------- Counter: counts up once when visible, then ticks ---------- */
+const countEl=document.getElementById("count"), target=26900789;
+const fmt=n=>n.toLocaleString("en-US");
+new IntersectionObserver((entries,obs)=>{
+  if(!entries[0].isIntersecting)return;obs.disconnect();
+  if(reduce)return;
+  const start=performance.now(),from=target-480000,dur=1800;
+  (function step(now){const k=Math.min((now-start)/dur,1),e=1-Math.pow(1-k,3);
+    countEl.textContent=fmt(Math.round(from+(target-from)*e));
+    if(k<1)requestAnimationFrame(step);else{let v=target;setInterval(()=>{v+=Math.ceil(Math.random()*3);countEl.textContent=fmt(v)},1400)}})(start);
+},{threshold:.5}).observe(countEl);
+</script>
+</body>
+</html>

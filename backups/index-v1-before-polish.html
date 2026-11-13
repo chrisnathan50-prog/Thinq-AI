@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thinq AI — Work faster. Think better.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0a0a0a; --ink-2:#3d3d3d; --muted:#8a8a8a; --soft:#b4b4b4;
+    --line:#ececec; --panel:#f6f6f6; --bg:#ffffff;
+    --pink:#f7b6d2; --lilac:#c9b6ff; --blue:#a9cdfd;
+    --radius-lg:22px; --radius-md:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth;overflow-x:clip}
+  body{font-family:"Geist",system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased;overflow-x:clip;letter-spacing:-.01em}
+  a{color:inherit;text-decoration:none}
+  button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+  :focus-visible{outline:2px solid #6b5cff;outline-offset:3px;border-radius:6px}
+  .wrap{width:min(1120px,100% - 32px);margin-inline:auto}
+  .btn{display:inline-flex;align-items:center;gap:8px;background:var(--ink);color:#fff;border-radius:999px;padding:10px 20px;font-size:14px;font-weight:500;transition:transform .2s,background .2s}
+  .btn:hover{background:#2a2a2a;transform:translateY(-1px)}
+  .btn.sm{padding:8px 16px;font-size:13px}
+  .btn.light{background:#fff;color:var(--ink);box-shadow:0 2px 10px rgba(0,0,0,.08)}
+  .btn.light:hover{background:#f3f3f3}
+
+  /* logo */
+  .logo{display:flex;align-items:center;gap:10px;font-weight:500;font-size:17px}
+  .logo svg{width:24px;height:24px}
+
+  /* nav */
+  nav.top{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.82);backdrop-filter:blur(12px)}
+  nav.top .wrap{display:flex;align-items:center;justify-content:space-between;height:72px}
+  .links{display:flex;gap:30px;font-size:14px;color:var(--ink-2)}
+  .links a{display:flex;align-items:center;gap:4px}
+  .links a:hover{color:var(--ink)}
+  .links svg{width:10px;height:10px}
+  .nav-right{display:flex;align-items:center;gap:22px;font-size:14px}
+  .burger{display:none}
+
+  /* hero */
+  .hero{text-align:center;padding:48px 0 0}
+  .rating{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2);margin-bottom:22px}
+  .rating .star{font-size:14px}
+  h1{font-weight:400;font-size:clamp(40px,6.4vw,72px);line-height:1.04;letter-spacing:-.035em}
+  h1 .g{color:var(--soft)}
+  .hero p.sub{margin:22px auto 26px;max-width:420px;color:var(--muted);font-size:15px;line-height:1.55}
+  .tabs{display:inline-flex;gap:4px;margin-top:30px;padding:4px;border-radius:999px;background:var(--panel)}
+  .tabs button{display:flex;align-items:center;gap:7px;padding:7px 15px;border-radius:999px;font-size:13px;color:var(--ink-2);transition:background .2s}
+  .tabs button svg{width:14px;height:14px}
+  .tabs button[aria-selected="true"]{background:#fff;color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+
+  .glow{position:relative}
+  .glow::before{content:"";position:absolute;inset:-60px -50px;z-index:-1;filter:blur(60px);opacity:.85;
+    background:radial-gradient(40% 55% at 4% 40%,var(--pink),transparent 70%),
+               radial-gradient(40% 55% at 96% 30%,var(--blue),transparent 70%),
+               radial-gradient(45% 40% at 50% 100%,var(--lilac),transparent 70%)}
+  .hero-shot{margin:56px auto 0;max-width:1000px;isolation:isolate}
+  .scene{position:relative;overflow:hidden;border-radius:var(--radius-lg)}
+  .scene > img.bg,.band > img.bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+  .scene{background:#cfd9c4}
+  .band{background:#b98fc9}
+  .hero-shot .scene{aspect-ratio:2.4/1;display:grid;place-items:center;box-shadow:0 30px 60px -30px rgba(80,40,120,.35)}
+  .prompt{position:relative;width:min(440px,86%);background:#fff;border-radius:16px;padding:18px 18px 14px;text-align:left;box-shadow:0 20px 40px rgba(0,0,0,.15)}
+  .prompt .q{display:flex;gap:10px;align-items:center;font-size:14px;min-height:22px}
+  .prompt .q .spark{flex:none;width:14px;height:14px}
+  .caret{display:inline-block;width:1px;height:16px;background:var(--ink);margin-left:1px;vertical-align:-3px;animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  .prompt .bar{display:flex;align-items:center;justify-content:space-between;margin-top:26px;font-size:12px;color:var(--muted)}
+  .prompt .bar .l{display:flex;align-items:center;gap:8px}
+  .icon-btn{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line)}
+  .prompt .bar .r{display:flex;align-items:center;gap:12px}
+  .send{width:28px;height:28px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center}
+  .hero-shot .scene::after,.cta .scene::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,transparent 45%,rgba(20,30,10,.35))}
+  .cta .scene::after{background:radial-gradient(60% 50% at 50% 50%,rgba(20,15,40,.25),transparent)}
+  .hero-shot .note,.cta .scene-inner,.prompt{z-index:1}
+  .hero-shot .note{position:absolute;left:0;right:0;bottom:12%;font-weight:500;text-align:center;color:#fff;font-size:13px;text-shadow:0 1px 8px rgba(0,0,0,.35)}
+  .hero-shot .note a{text-decoration:underline;text-underline-offset:2px}
+  .scene-inner{position:relative;display:grid;place-items:center;gap:0}
+
+  /* logos */
+  .logos{display:flex;justify-content:space-between;align-items:center;gap:24px;max-width:1000px;margin:56px auto 0;color:#333;font-weight:600;font-size:17px;letter-spacing:-.02em;flex-wrap:wrap}
+  .logos span{display:flex;align-items:center;gap:8px;opacity:.85}
+  .logos svg{width:22px;height:22px}
+
+  /* statement */
+  .statement{text-align:center;padding:72px 0 96px}
+  .statement h2{font-weight:400;font-size:clamp(28px,3.6vw,40px);line-height:1.22;letter-spacing:-.03em;max-width:620px;margin:0 auto}
+  .statement h2 .g{color:var(--soft)}
+  .joinbar{display:flex;align-items:center;justify-content:space-between;gap:16px;max-width:600px;margin:44px auto 0;padding:10px 10px 10px 16px;border-radius:14px;background:#fff;box-shadow:0 8px 30px rgba(0,0,0,.06),0 0 0 1px var(--line)}
+  .avatars{display:flex}
+  .avatars img{object-fit:cover;width:30px;height:30px;border-radius:8px;border:2px solid #fff;margin-left:-6px;display:block}
+  .avatars img:first-child{margin-left:0}
+  .joinbar .txt{flex:1;text-align:left;font-size:13.5px}
+  .joinbar .txt small{display:block;color:var(--muted);font-size:11.5px;margin-top:2px}
+
+  /* testimonial band */
+  .band{position:relative;min-height:600px;overflow:hidden;color:#fff}
+  .band::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(60,20,80,.35),transparent 60%)}
+  .band .wrap{z-index:1}
+  .band .wrap{position:relative;padding:72px 0 64px;min-height:600px;display:flex;flex-direction:column;justify-content:space-between}
+  .band blockquote{font-size:clamp(26px,3.4vw,38px);line-height:1.18;letter-spacing:-.03em;max-width:540px;font-weight:400;text-shadow:0 2px 20px rgba(90,40,120,.25)}
+  .band-cards{display:flex;align-items:flex-end;justify-content:flex-end;gap:32px;margin-top:80px}
+  .voice{display:flex;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,.18)}
+  .voice .photo{width:110px;height:124px}
+  .voice .wave{width:100px;display:grid;place-items:center}
+  .voice .wave svg{width:44px;height:44px}
+  .wave rect{animation:pulse 1.2s ease-in-out infinite;transform-origin:center;transform-box:fill-box}
+  @keyframes pulse{50%{transform:scaleY(.45)}}
+  .who{display:flex;flex-direction:column;align-items:flex-end;gap:42px;padding-left:32px;border-left:1px solid rgba(255,255,255,.6)}
+  .who .name{background:#fff;color:var(--ink);border-radius:8px;padding:10px 14px;font-size:14px}
+  .who .name small{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+
+  /* stats */
+  .section{padding:120px 0 0}
+  .center-head{text-align:center}
+  .center-head h2,.split h2,.proof h2{font-weight:400;font-size:clamp(30px,3.6vw,42px);line-height:1.12;letter-spacing:-.035em}
+  .center-head p{color:var(--muted);font-size:14px;margin-top:18px}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:52px auto 0;max-width:960px}
+  .stat{background:var(--panel);border-radius:var(--radius-md);padding:20px 20px 22px}
+  .stat .up{font-size:12.5px;color:var(--ink-2)}
+  .stat .num{font-size:44px;letter-spacing:-.04em;margin:14px 0 10px;font-weight:400}
+  .stat .lbl{font-size:12.5px;color:var(--muted)}
+
+  /* split */
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;max-width:960px;margin:0 auto}
+  .split .lead{color:var(--muted);font-size:13.5px;margin:18px 0 28px}
+  .feature{border-radius:var(--radius-md);padding:20px;background:#fff;box-shadow:0 0 0 1px var(--line),0 10px 30px rgba(0,0,0,.04);max-width:340px}
+  .feature b{font-weight:500;font-size:14px}
+  .feature p{color:var(--muted);font-size:12.5px;margin-top:6px;line-height:1.5}
+  .split .hint{color:var(--soft);font-size:13px;margin:22px 0 28px}
+  .split .visual{isolation:isolate}
+  .split .visual .scene{aspect-ratio:1.05/1;display:grid;place-items:center;box-shadow:0 30px 60px -30px rgba(80,40,120,.4)}
+  .setup{position:relative;width:84%;background:#fff;border-radius:14px;padding:18px 18px 10px;box-shadow:0 20px 40px rgba(0,0,0,.15);font-size:13px}
+  .setup header{display:flex;justify-content:space-between;align-items:center;font-weight:500}
+  .progress{display:flex;align-items:center;gap:10px;margin:14px 0 14px;color:var(--muted);font-size:11px}
+  .progress .track{flex:1;height:5px;background:#eee;border-radius:9px;overflow:hidden}
+  .progress .track i{display:block;height:100%;width:25%;background:linear-gradient(90deg,#e58fd0,#a58bff);border-radius:9px;transition:width .6s}
+  .steps{list-style:none}
+  .steps li{display:flex;align-items:center;gap:10px;padding:9px 0;color:var(--soft)}
+  .steps li .dot{width:18px;height:18px;border-radius:50%;border:1px solid currentColor;display:grid;place-items:center;font-size:10px;flex:none}
+  .steps li.done{color:var(--ink)}
+  .steps li.done .dot{background:var(--ink);border-color:var(--ink);color:#fff}
+  .steps li.active{color:var(--ink-2)}
+  .steps li .chev{margin-left:auto;opacity:.5}
+
+  /* proof */
+  .proof{max-width:960px;margin:0 auto}
+  .proof .users{font-size:14px;margin-top:10px;color:var(--ink-2)}
+  .proof hr{border:0;border-top:1px solid var(--line);margin:22px 0 44px}
+  .counter{display:flex;align-items:baseline;gap:20px;flex-wrap:wrap}
+  .counter .big{font-size:clamp(52px,8vw,92px);letter-spacing:-.05em;line-height:1;font-variant-numeric:tabular-nums}
+  .counter .cap{font-size:clamp(20px,2.3vw,28px);color:var(--soft);letter-spacing:-.03em}
+
+  /* cta */
+  .cta{max-width:1000px;margin:120px auto 0;isolation:isolate}
+  .cta .scene{min-height:400px;display:grid;place-items:center;text-align:center;color:#fff;box-shadow:0 30px 60px -30px rgba(40,20,80,.5)}
+  .cta .scene-inner{gap:0;padding:40px 16px}
+  .cta h2{font-weight:400;font-size:clamp(32px,4.4vw,50px);line-height:1.1;letter-spacing:-.035em;text-shadow:0 2px 20px rgba(0,0,0,.25)}
+  .cta p{font-size:14px;margin:18px 0 22px;opacity:.95}
+
+  /* footer */
+  footer{margin-top:120px}
+  .foot{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:40px;padding-bottom:48px}
+  .foot h4{font-weight:500;font-size:14px;margin-bottom:22px}
+  .foot ul{list-style:none;display:grid;gap:16px;font-size:13.5px;color:var(--ink-2)}
+  .foot ul a:hover{color:var(--ink)}
+  .sub-title{font-weight:500;font-size:14px;margin:26px 0 8px}
+  .sub-copy{color:var(--muted);font-size:13px;line-height:1.5;max-width:300px}
+  .subscribe{display:flex;align-items:center;gap:8px;margin:20px 0 14px;max-width:320px;border:1px solid var(--line);border-radius:999px;padding:5px 5px 5px 14px}
+  .subscribe svg{width:16px;height:16px;color:var(--muted);flex:none}
+  .subscribe input{flex:1;min-width:0;border:0;outline:0;font:inherit;font-size:13px;background:none}
+  .fine{font-size:11.5px;color:var(--muted)}
+  .fine a{text-decoration:underline;color:var(--ink-2)}
+  .legal{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;border-top:1px solid var(--line);padding:22px 0 30px;font-size:12px;color:var(--muted)}
+  .legal nav{display:flex;gap:14px}
+  .legal nav a+a{border-left:1px solid var(--line);padding-left:14px}
+
+  .credit{font-size:11px;color:var(--soft);padding-bottom:20px}.credit a{text-decoration:underline}
+  /* page-load entrance (one moment) */
+  .rise{opacity:0;transform:translateY(14px);animation:rise .9s cubic-bezier(.2,.7,.2,1) forwards}
+  .d1{animation-delay:.08s}.d2{animation-delay:.16s}.d3{animation-delay:.24s}.d4{animation-delay:.32s}.d5{animation-delay:.44s}
+  @keyframes rise{to{opacity:1;transform:none}}
+
+  @media (max-width:900px){
+    .links,.nav-right .login{display:none}
+    .split{grid-template-columns:1fr;gap:48px}
+    .foot{grid-template-columns:1fr 1fr}
+    .foot .brand{grid-column:1/-1}
+  }
+  @media (max-width:640px){
+    .tabs{flex-wrap:wrap;justify-content:center;border-radius:18px}
+    .hero-shot .scene{aspect-ratio:1/1}
+    .hero-shot .note{bottom:7%;padding:0 12px}
+    .logos{justify-content:center;gap:18px 28px;font-size:15px}
+    .stats{grid-template-columns:1fr}
+    .joinbar{flex-wrap:wrap}
+    .joinbar .btn{width:100%;justify-content:center}
+    .band-cards{flex-direction:column;align-items:flex-start;gap:20px}
+    .who{border-left:0;padding-left:0;align-items:flex-start;flex-direction:row;gap:12px;align-items:center}
+    .glow::before{inset:-30px -10px}
+    .legal{flex-direction:column}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation:none!important;transition:none!important}
+    .rise{opacity:1;transform:none}
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="mark" viewBox="0 0 24 24"><g fill="currentColor">
+    <circle cx="12" cy="3" r="2"/><circle cx="12" cy="21" r="2"/><circle cx="3" cy="12" r="2"/><circle cx="21" cy="12" r="2"/>
+    <circle cx="5.6" cy="5.6" r="1.7"/><circle cx="18.4" cy="5.6" r="1.7"/><circle cx="5.6" cy="18.4" r="1.7"/><circle cx="18.4" cy="18.4" r="1.7"/>
+    <circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="7.5" r="1.5"/><circle cx="12" cy="16.5" r="1.5"/><circle cx="7.5" cy="12" r="1.5"/><circle cx="16.5" cy="12" r="1.5"/>
+  </g></symbol>
+  <symbol id="chev" viewBox="0 0 10 10"><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+</svg>
+
+<nav class="top" aria-label="Main">
+  <div class="wrap">
+    <a href="#" class="logo"><svg><use href="#mark"/></svg>Thinq AI</a>
+    <div class="links">
+      <a href="#">Products <svg><use href="#chev"/></svg></a>
+      <a href="#">Use Cases <svg><use href="#chev"/></svg></a>
+      <a href="#">Company</a>
+      <a href="#">Resources</a>
+    </div>
+    <div class="nav-right">
+      <a href="#" class="login">Login</a>
+      <a href="#start" class="btn sm">Get started free</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="rating rise"><span class="star">★</span> 5.0 over 24.5k+ Reviews</div>
+    <h1 class="rise d1">Work faster. Think better.<br><span>Automate</span> <span class="g">everything.</span></h1>
+    <p class="sub rise d2">Thinq AI connects with your favorite tools to help you write, organize, and get work done faster — wherever you are.</p>
+    <a href="#start" class="btn rise d3">Start Free Trial</a>
+    <div><div class="tabs rise d4" role="tablist" aria-label="Workflow stage">
+      <button role="tab" aria-selected="true" data-prompt="Generate a workout plan for beginners...">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="6"/><path d="M8 2v6l4 3"/></svg>Analyse</button>
+      <button role="tab" aria-selected="false" data-prompt="Learn my writing style from last month's emails...">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3 13 13 3M9 3h4v4"/></svg>Train</button>
+      <button role="tab" aria-selected="false" data-prompt="Check this onboarding flow for confusing steps...">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M6 2h4M7 2v4l-4 7a1 1 0 0 0 1 1.5h8a1 1 0 0 0 1-1.5L9 6V2"/></svg>Testing</button>
+      <button role="tab" aria-selected="false" data-prompt="Send the weekly report to the team every Friday...">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M9 2c3 0 5 2 5 5l-5 5-5-5c0-3 2-5 5-5z"/><path d="M4 12l-2 2"/></svg>Deploy</button>
+    </div></div>
+  </div>
+
+  <div class="wrap">
+    <div class="hero-shot glow rise d5">
+      <div class="scene" data-scene="meadow">
+        <div class="prompt" role="group" aria-label="Thinq prompt preview">
+          <div class="q"><svg class="spark" viewBox="0 0 16 16"><path d="M8 0c.6 4.2 3.8 7.4 8 8-4.2.6-7.4 3.8-8 8-.6-4.2-3.8-7.4-8-8 4.2-.6 7.4-3.8 8-8z" fill="currentColor"/></svg><span id="typed"></span><span class="caret"></span></div>
+          <div class="bar">
+            <div class="l"><span class="icon-btn">+</span> Add Attachments</div>
+            <div class="r">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3 6v4M6 4v8M9 6v4M12 5v6"/></svg>
+              <button class="send" aria-label="Send"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="1.6"><path d="M6 10V2M2.5 5.5 6 2l3.5 3.5"/></svg></button>
+            </div>
+          </div>
+        </div>
+        <p class="note">Don't want to wait? <a href="#start">Try the early Thinq Beta today.</a></p>
+      </div>
+    </div>
+
+    <div class="logos" aria-label="Teams using Thinq">
+      <span><svg viewBox="0 0 24 24"><path d="M13 2 5 13h6l-1 9 8-11h-6z" fill="currentColor"/></svg>Sisyphus</span>
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 16c3-8 6-8 10 0s7 8 10 0M2 16c3 8 6 8 10 0s7-8 10 0"/></svg>Magnolia</span>
+      <span><svg viewBox="0 0 24 24"><path d="M6 3h14l-2 4H6zM5 10h12l-2 4H5zM4 17h14l-2 4H4z" fill="currentColor"/></svg>Epicurious</span>
+      <span><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>Halcyon</span>
+    </div>
+  </div>
+</header>
+
+<section class="statement">
+  <div class="wrap">
+    <h2>Thinq AI makes sure every task, message, <span class="g">and workflow is handled</span> automatically, anytime, <span class="g">anywhere.</span></h2>
+    <div class="joinbar">
+      <div class="avatars" aria-hidden="true">
+        <img src="https://images.unsplash.com/photo-1627161683077-e34782c24d81?auto=format&fit=crop&w=80&q=80&h=80&crop=faces" alt="">
+        <img src="https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&w=80&q=80&h=80&crop=faces" alt="">
+        <img src="https://images.unsplash.com/photo-1705645930353-0e335311ef20?auto=format&fit=crop&w=80&q=80&h=80&crop=faces" alt="">
+        <img src="https://images.unsplash.com/photo-1765005204058-10418f5123c5?auto=format&fit=crop&w=80&q=80&h=80&crop=faces" alt="">
+      </div>
+      <div class="txt">Join thousands using Thinq daily<small>Set up your Thinq assistant in one click</small></div>
+      <a href="#start" class="btn sm">Get Your Assistant</a>
+    </div>
+  </div>
+</section>
+
+<section class="band" aria-label="Customer story">
+  <i data-scene-svg="dusk"></i>
+  <div class="wrap">
+    <blockquote>“Thinq AI has completely changed how we work. Now we manage tasks faster and stay productive 24/7.”</blockquote>
+    <div class="band-cards">
+      <div class="voice">
+        <img class="photo" src="https://images.unsplash.com/photo-1568602471122-7832951cc4c5?auto=format&fit=crop&w=300&q=80&h=340&crop=faces" alt="Portrait of Wayne Grimshaw" style="object-fit:cover">
+        <div class="wave" aria-hidden="true">
+          <svg viewBox="0 0 44 44" fill="#111">
+            <rect x="4" y="16" width="3" height="12" rx="1.5" style="animation-delay:-.1s"/>
+            <rect x="10" y="10" width="3" height="24" rx="1.5" style="animation-delay:-.3s"/>
+            <rect x="16" y="6" width="3" height="32" rx="1.5" style="animation-delay:-.5s"/>
+            <rect x="22" y="12" width="3" height="20" rx="1.5" style="animation-delay:-.2s"/>
+            <rect x="28" y="6" width="3" height="32" rx="1.5" style="animation-delay:-.6s"/>
+            <rect x="34" y="12" width="3" height="20" rx="1.5" style="animation-delay:-.4s"/>
+            <rect x="40" y="17" width="3" height="10" rx="1.5" style="animation-delay:-.7s"/>
+          </svg>
+        </div>
+      </div>
+      <div class="who">
+        <div class="name">Wayne Grimshaw<small>Head of Operations, Northwind</small></div>
+        <a href="#" class="btn light sm">View Case Study</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <div class="center-head">
+      <h2>Boost Your Productivity<br>Like Never Before</h2>
+      <p>Designed to simplify your workflow — day or night — without constant effort.</p>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="up">Up-to</div><div class="num">4×</div><div class="lbl">4x Faster Task Completion</div></div>
+      <div class="stat"><div class="up">Up-to</div><div class="num">96%</div><div class="lbl">96% Less Manual Work</div></div>
+      <div class="stat"><div class="up">Up-to</div><div class="num">2.5×</div><div class="lbl">2.5x Higher Efficiency</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap split">
+    <div>
+      <h2>Build, Plan, and<br>Execute with Thinq</h2>
+      <p class="lead">Thinq helps you manage time, tasks, and resources efficiently.</p>
+      <div class="feature"><b>Think Beyond Limits</b><p>Thinq automates the busywork so you can focus on decisions that matter.</p></div>
+      <p class="hint">Think outside the box.</p>
+      <a href="#start" class="btn sm">Get Started — Free</a>
+    </div>
+    <div class="visual glow">
+      <div class="scene" data-scene="spring">
+        <div class="setup" role="group" aria-label="Workspace setup preview">
+          <header>Set Up Your Thinq Workspace <button aria-label="Close">✕</button></header>
+          <div class="progress"><span>🚀</span><span class="track"><i id="bar"></i></span><span id="pct">25%</span></div>
+          <ol class="steps" id="steps">
+            <li class="done"><span class="dot">✓</span>Select AI Agent Type</li>
+            <li class="active"><span class="dot">2</span>Auto Onboarding...</li>
+            <li><span class="dot">3</span>Activate Thinq Assistant<span class="chev">›</span></li>
+            <li><span class="dot">4</span>Start Using Agent<span class="chev">›</span></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap proof">
+    <h2>Don't Just Take Our Word for It</h2>
+    <p class="users">9,677+ Active Users</p>
+    <hr>
+    <div class="counter"><span class="big" id="count">26,900,789</span><span class="cap">Tasks Completed with Thinq AI</span></div>
+  </div>
+</section>
+
+<section class="wrap" id="start">
+  <div class="cta glow">
+    <div class="scene" data-scene="sunset">
+      <div class="scene-inner">
+        <h2>Start Your Productivity<br>Journey Today</h2>
+        <p>Work smarter. Save time. Achieve more.</p>
+        <a href="#" class="btn light sm">Try Thinq for Free</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div class="brand">
+        <a href="#" class="logo"><svg><use href="#mark"/></svg>Thinq AI</a>
+        <div class="sub-title">Subscribe</div>
+        <p class="sub-copy">Join our newsletter to stay up to date on features and releases.</p>
+        <form class="subscribe" onsubmit="event.preventDefault();this.querySelector('button').textContent='Subscribed';">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="2" y="3.5" width="12" height="9" rx="1.5"/><path d="m2.5 4.5 5.5 4 5.5-4"/></svg>
+          <input type="email" placeholder="Enter your email" aria-label="Email address" required>
+          <button class="btn sm" type="submit">Subscribe</button>
+        </form>
+        <p class="fine">By subscribing you agree to with our <a href="#">Privacy Policy</a></p>
+      </div>
+      <div><h4>Quick Links</h4><ul><li><a href="#">Home</a></li><li><a href="#">About</a></li><li><a href="#">Services</a></li><li><a href="#">Contact</a></li></ul></div>
+      <div><h4>Product</h4><ul><li><a href="#">Features</a></li><li><a href="#">Integrations</a></li><li><a href="#">Pricing</a></li><li><a href="#">Updates</a></li></ul></div>
+      <div><h4>Resources</h4><ul><li><a href="#">Help Center</a></li><li><a href="#">Documentation</a></li><li><a href="#">Community</a></li><li><a href="#">Tutorials</a></li></ul></div>
+    </div>
+    <div class="legal">
+      <span>© 2026 Thinq AI. All rights reserved.</span>
+      <nav aria-label="Legal"><a href="#">Terms of Service</a><a href="#">Privacy Policy</a><a href="#">Compliance</a></nav>
+    </div>
+  </div>
+  <p class="wrap credit">Photography from <a href="https://unsplash.com/?utm_source=thinq&utm_medium=referral">Unsplash</a>.</p>
+</footer>
+
+<script>
+/* ---------- Unsplash photography ---------- */
+const PHOTOS={meadow:["1470240731273-7821a6eeb6bd","Rolling meadow covered in wildflowers under a soft sky"],dusk:["1616361847497-2e7b3c911599","Purple flower field beneath a pink sunset sky"],spring:["1782440824284-a08cfca3a11c","Close-up of pink wildflowers in a meadow"],sunset:["1712178420520-f308934a4e8d","Sun setting over a field of lavender"]};
+function photo(key,cls){const [id,alt]=PHOTOS[key];const img=new Image();img.className=cls||"bg";img.alt="";img.decoding="async";
+  img.src=`https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=1600&q=80`;
+  img.srcset=[800,1200,1600,2400].map(w=>`https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=${w}&q=80 ${w}w`).join(", ");
+  img.sizes="(max-width: 1100px) 100vw, 1000px";return img}
+document.querySelectorAll("[data-scene]").forEach(el=>el.prepend(photo(el.dataset.scene)));
+document.querySelectorAll("[data-scene-svg]").forEach(el=>el.replaceWith(photo(el.dataset.sceneSvg)));
+
+/* ---------- Typing prompt + tabs ---------- */
+const typed=document.getElementById("typed");
+const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+let timer;
+function typeText(t){
+  clearInterval(timer);
+  if(reduce){typed.textContent=t;return}
+  typed.textContent="";let i=0;
+  timer=setInterval(()=>{typed.textContent=t.slice(0,++i);if(i>=t.length)clearInterval(timer)},32);
+}
+const tabs=[...document.querySelectorAll('[role="tab"]')];
+tabs.forEach(b=>b.addEventListener("click",()=>{
+  tabs.forEach(t=>t.setAttribute("aria-selected",t===b));typeText(b.dataset.prompt);
+}));
+setTimeout(()=>typeText(tabs[0].dataset.prompt),700);
+
+/* ---------- Workspace setup steps (click to advance) ---------- */
+const steps=[...document.querySelectorAll("#steps li")];
+let stepIdx=1;
+function renderSteps(){
+  steps.forEach((li,i)=>{li.className=i<stepIdx?"done":i===stepIdx?"active":"";li.querySelector(".dot").textContent=i<stepIdx?"✓":i+1});
+  const pct=Math.round(stepIdx/steps.length*100);
+  document.getElementById("bar").style.width=pct+"%";document.getElementById("pct").textContent=pct+"%";
+}
+steps.forEach((li,i)=>{li.style.cursor="pointer";li.addEventListener("click",()=>{stepIdx=Math.min(i+1,steps.length);renderSteps()})});
+renderSteps();
+
+/* ---------- Counter: counts up once when visible, then ticks ---------- */
+const countEl=document.getElementById("count"), target=26900789;
+const fmt=n=>n.toLocaleString("en-US");
+new IntersectionObserver((entries,obs)=>{
+  if(!entries[0].isIntersecting)return;obs.disconnect();
+  if(reduce)return;
+  const start=performance.now(),from=target-480000,dur=1800;
+  (function step(now){const k=Math.min((now-start)/dur,1),e=1-Math.pow(1-k,3);
+    countEl.textContent=fmt(Math.round(from+(target-from)*e));
+    if(k<1)requestAnimationFrame(step);else{let v=target;setInterval(()=>{v+=Math.ceil(Math.random()*3);countEl.textContent=fmt(v)},1400)}})(start);
+},{threshold:.5}).observe(countEl);
+</script>
+</body>
+</html>
