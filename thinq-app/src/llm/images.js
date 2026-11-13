@@ -17,8 +17,17 @@ export class ImageError extends Error {
 const mimeOf = (buf) =>
   buf[0] === 0x89 && buf[1] === 0x50 ? "image/png" : buf[0] === 0x52 && buf[8] === 0x57 ? "image/webp" : "image/jpeg";
 
+// A Cloudflare API token is one word of letters, digits, "-" and "_". Anything else (e.g. a pasted curl command)
+// is a setup mistake - say so without ever echoing the value.
+const tokenLooksValid = () => /^[A-Za-z0-9_-]{20,}$/.test(apiToken());
+const accountLooksValid = () => /^[a-f0-9]{32}$/i.test(accountId());
+
 export async function generateImage(prompt) {
   if (!imagesAvailable()) throw new ImageError("Image creation isn't set up on this server.");
+  if (!tokenLooksValid() || !accountLooksValid()) {
+    console.warn(`[images] setup problem: CLOUDFLARE_API_TOKEN ${tokenLooksValid() ? "ok" : "is not a plain token"}, CLOUDFLARE_ACCOUNT_ID ${accountLooksValid() ? "ok" : "is not a 32-character ID"}`);
+    throw new ImageError("Image creation is set up incorrectly on the server (the Cloudflare settings need fixing by the site owner).");
+  }
   const url = `${BASE_URL}/accounts/${accountId()}/ai/run/${IMAGE_MODEL}`;
   let res;
   try {
@@ -29,8 +38,8 @@ export async function generateImage(prompt) {
       signal: AbortSignal.timeout(60_000),
     });
   } catch (err) {
-    console.warn(`[images] request failed: ${err.name}: ${err.message}`);
-    throw new ImageError(`Couldn't reach the image service (${err.name === "TimeoutError" ? "it took too long" : err.message}).`);
+    console.warn(`[images] request failed: ${err.name}${err.name === "TimeoutError" ? " (timeout)" : ""}`); // never log err.message: it can contain header values
+    throw new ImageError(err.name === "TimeoutError" ? "The image service took too long. Try again." : "Couldn't reach the image service. Try again in a minute.");
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data.success === false || !data.result?.image) {
