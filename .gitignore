@@ -11,3 +11,6 @@ node_modules/
 .claude/
 # broken DB copy from the move
 thinq-app/data/
+
+# temporary GitHub token file - never commit
+.github-token
