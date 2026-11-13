@@ -229,7 +229,7 @@ function addMessage(role, text, extra = "", files = []) {
   wrap.className = `msg ${role}`;
   wrap.innerHTML = role === "user"
     ? `<div class="stack">${files.length ? `<div class="files">${files.map(fileChip).join("")}</div>` : ""}<div class="body">${esc(text)}</div></div>`
-    : `<div class="av" aria-hidden="true">${icon("mark", 15)}</div><div class="body">${md(text)}${gallery(files.filter((f) => f.type === "image"))}${extra}${text && canSpeak ? toolsRow() : ""}</div>`;
+    : `<div class="av" aria-hidden="true">${icon("mark", 15)}</div><div class="body">${md(text)}${gallery(files.filter((f) => f.type === "image"))}${extra}${text && canRead() ? toolsRow() : ""}</div>`;
   $("#messages").appendChild(wrap);
   scrollDown();
   return wrap;
@@ -287,7 +287,7 @@ function handleEvent(ev, node) {
     body.innerHTML = `<div class="status"><span class="spin"></span><span>${esc(ev.text)}…</span></div>`;
   } else if (ev.type === "reply") {
     const chips = (ev.approvals || []).filter(Boolean).map((a) => `<button class="chip" data-approval="${a.id}">${icon(a.kind === "email" ? "i-mail" : "i-cal", 12)}${esc(a.kind === "email" ? "Draft ready to review" : "Invite ready to review")}</button>`).join("");
-    body.innerHTML = md(ev.text) + gallery(ev.images) + (chips ? `<div class="queued">${chips}</div>` : "") + (canSpeak ? toolsRow() : "");
+    body.innerHTML = md(ev.text) + gallery(ev.images) + (chips ? `<div class="queued">${chips}</div>` : "") + (canRead() ? toolsRow() : "");
     if (ev.approvals?.length) { showTab("approvals"); openPanel(false); }
   } else if (ev.type === "error") {
     node.classList.add("error");
@@ -494,10 +494,47 @@ $("#micBtn").addEventListener("click", () => (rec ? stopRecording() : startRecor
 $("#recCancel").addEventListener("click", () => stopRecording(true));
 
 // ---------------- read aloud ----------------
+// Uses ElevenLabs' natural voice through the server when it's set up (state.speechAvailable), and the browser's
+// built-in voice otherwise - or whenever the natural voice fails, so Read aloud always works.
 const canSpeak = "speechSynthesis" in window;
-let speakingBtn = null;
-function stopSpeaking() { if (!canSpeak) return; speechSynthesis.cancel(); speakingBtn?.classList.remove("speaking"); if (speakingBtn) speakingBtn.querySelector("span").textContent = "Read aloud"; speakingBtn = null; }
-$("#messages").addEventListener("click", (e) => {
+const canRead = () => canSpeak || Boolean(state?.speechAvailable);
+const SILENT = "data:audio/wav;base64,UklGRnQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YVAAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==";
+const player = new Audio();
+const voiceCache = new Map(); // text -> audio URL, so replaying a message doesn't use credits again
+let naturalOff = false; // set after the natural voice runs out of credits, for the rest of this visit
+let speakingBtn = null, speakAbort = null;
+
+function setSpeakLabel(b, label) { b.querySelector("span").textContent = label; }
+function stopSpeaking() {
+  speakAbort?.abort(); speakAbort = null;
+  player.onended = player.onerror = null; player.pause();
+  if (canSpeak) speechSynthesis.cancel();
+  if (speakingBtn) { speakingBtn.classList.remove("speaking"); setSpeakLabel(speakingBtn, "Read aloud"); }
+  speakingBtn = null;
+}
+function speakWithBrowser(b, text) {
+  if (!canSpeak) { stopSpeaking(); return; }
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = 1.03;
+  u.onend = u.onerror = () => { if (speakingBtn === b) stopSpeaking(); };
+  setSpeakLabel(b, "Stop reading");
+  speechSynthesis.speak(u);
+}
+async function naturalVoiceUrl(text, signal) {
+  if (voiceCache.has(text)) return voiceCache.get(text);
+  const res = await fetch("/api/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }), signal });
+  if (res.status === 401) { location.href = "/login.html"; throw new Error("Please sign in again."); }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    if (data.quota) naturalOff = true;
+    throw Object.assign(new Error(data.error || `Read aloud failed (${res.status})`), { quota: data.quota });
+  }
+  const url = URL.createObjectURL(await res.blob());
+  if (voiceCache.size >= 20) { const [k, v] = voiceCache.entries().next().value; URL.revokeObjectURL(v); voiceCache.delete(k); }
+  voiceCache.set(text, url);
+  return url;
+}
+$("#messages").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-speak]"); if (!b) return;
   const was = speakingBtn === b;
   stopSpeaking();
@@ -506,11 +543,29 @@ $("#messages").addEventListener("click", (e) => {
   body.querySelectorAll(".tools,.queued").forEach((n) => n.remove());
   body.querySelectorAll("p,li,tr").forEach((n) => n.append(". "));
   const text = body.textContent.replace(/\s*\.\s*\.\s*/g, ". ").replace(/\s+/g, " ").trim();
-  const u = new SpeechSynthesisUtterance(text);
-  u.rate = 1.03;
-  u.onend = u.onerror = () => { if (speakingBtn === b) stopSpeaking(); };
-  speakingBtn = b; b.classList.add("speaking"); b.querySelector("span").textContent = "Stop reading";
-  speechSynthesis.speak(u);
+  speakingBtn = b; b.classList.add("speaking");
+  if (!state?.speechAvailable || naturalOff) return speakWithBrowser(b, text);
+
+  // Start playback inside the click so phones (iOS Safari) allow the audio once it arrives.
+  player.src = SILENT; player.play().catch(() => {});
+  const ctrl = new AbortController(); speakAbort = ctrl;
+  setSpeakLabel(b, voiceCache.has(text) ? "Stop reading" : "Loading voice…");
+  try {
+    const url = await naturalVoiceUrl(text, ctrl.signal);
+    if (speakingBtn !== b) return; // stopped or switched while loading
+    speakAbort = null;
+    player.onended = () => { if (speakingBtn === b) stopSpeaking(); };
+    player.onerror = () => { if (speakingBtn === b) speakWithBrowser(b, text); };
+    player.src = url;
+    setSpeakLabel(b, "Stop reading");
+    await player.play();
+  } catch (err) {
+    if (err.name === "AbortError" || speakingBtn !== b) return;
+    if (err.quota) notice("The natural voice is out of credits for now, so Thinq is using your device's voice instead.", "info");
+    else console.warn("Read aloud:", err.message);
+    player.onended = player.onerror = null;
+    speakWithBrowser(b, text);
+  }
 });
 
 // Small message at the top of the chat for problems with uploads or recording.

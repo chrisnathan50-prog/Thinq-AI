@@ -21,6 +21,8 @@ services:
         sync: false
       - key: CLOUDFLARE_API_TOKEN
         sync: false
+      - key: ELEVENLABS_API_KEY # optional: natural voices for Read aloud (ElevenLabs)
+        sync: false
       - key: WHATSAPP_TOKEN # optional: Thinq on WhatsApp (Meta WhatsApp Cloud API) - see thinq-app/README.md
         sync: false
       - key: WHATSAPP_PHONE_NUMBER_ID

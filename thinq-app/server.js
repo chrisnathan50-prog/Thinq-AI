@@ -16,6 +16,8 @@ import { attachUser, requireUser, mountAuth } from "./src/auth.js";
 import { extractDocument, DocumentError, ACCEPTED, MAX_UPLOAD_BYTES, partCount } from "./src/documents.js";
 import { transcribe, voiceAvailable, MAX_AUDIO_BYTES } from "./src/llm/transcribe.js";
 import { imagesAvailable, IMAGE_DAILY_LIMIT } from "./src/llm/images.js";
+import { speechAvailable, synthesize, trimForSpeech } from "./src/llm/speech.js";
+import { Readable } from "node:stream";
 import { suggestionsFor } from "./src/suggestions.js";
 import { friendlyError } from "./src/errors.js";
 import { chatTurn, TurnError, busy, DAILY_LIMIT } from "./src/turns.js";
@@ -77,6 +79,7 @@ api.get("/state", async (req, res) => {
     model: MODEL,
     usage: { today: await store.usageToday(req.user.id), limit: DAILY_LIMIT },
     voiceAvailable: voiceAvailable(),
+    speechAvailable: speechAvailable(),
     whatsapp: await whatsappState(req.user.id),
     images: { available: imagesAvailable(), today: await store.imagesToday(req.user.id), limit: IMAGE_DAILY_LIMIT },
     documentTypes: ACCEPTED,
@@ -193,6 +196,24 @@ api.post("/transcribe", rawBody(MAX_AUDIO_BYTES), async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(err.status === 429 ? 429 : 500).json({ error: err.status === 429 ? "Voice transcription is busy (free-tier limit). Wait a minute and try again." : friendlyError(err) });
+  }
+});
+
+// ---------- read aloud (ElevenLabs) ----------
+// The browser falls back to its built-in voice whenever this returns an error.
+api.post("/speak", async (req, res) => {
+  if (!speechAvailable()) return res.status(400).json({ error: "Natural voices aren't set up on this server." });
+  const text = trimForSpeech(req.body?.text);
+  if (!text) return res.status(400).json({ error: "Nothing to read." });
+  const usage = await store.useRequest(req.user.id, DAILY_LIMIT);
+  if (!usage.allowed) return res.status(429).json({ error: `You've used today's ${DAILY_LIMIT} requests. Your limit resets tomorrow.` });
+  try {
+    const audio = await synthesize(text);
+    await store.logAction(req.user.id, "read_aloud", { chars: text.length });
+    res.set({ "Content-Type": "audio/mpeg", "Cache-Control": "no-store" });
+    Readable.fromWeb(audio.body).on("error", () => res.destroy()).pipe(res);
+  } catch (err) {
+    res.status(err.status === 429 ? 429 : 502).json({ error: err.message, quota: Boolean(err.quota) });
   }
 });
 
