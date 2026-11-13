@@ -139,3 +139,16 @@ export async function conversationDocuments(userId, conversationId) {
   return (await query(`select * from documents where user_id = $1 and conversation_id = $2 order by created_at`, [userId, conversationId])).map(docOut);
 }
 export const deleteDocument = (userId, docId) => query(`delete from documents where id = $1 and user_id = $2`, [docId, userId]);
+
+// ---------- generated images ----------
+export async function addImage(userId, conversationId, { prompt, mime, buffer }) {
+  const row = await one(`insert into images (id, user_id, conversation_id, prompt, mime, data) values ($1, $2, $3, $4, $5, $6) returning id, prompt`,
+    [id("img"), userId, conversationId, prompt.slice(0, 2000), mime, buffer]);
+  return { id: row.id, prompt: row.prompt };
+}
+export async function getImage(userId, imageId) {
+  const row = await one(`select mime, data from images where id = $1 and user_id = $2`, [imageId, userId]);
+  return row && { mime: row.mime, data: Buffer.from(row.data) };
+}
+export const imagesToday = async (userId) =>
+  (await one(`select count(*)::int as n from images where user_id = $1 and created_at >= current_date`, [userId])).n;

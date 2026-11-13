@@ -12,6 +12,7 @@ import * as store from "./store.js";
 import { providerFor } from "./providers/index.js";
 import { runGroqTurn, GROQ_MODEL } from "./llm/groq.js";
 import { getPart, partCount } from "./documents.js";
+import { generateImage, imagesAvailable, ImageError, IMAGE_DAILY_LIMIT } from "./llm/images.js";
 
 export const AI_PROVIDER = (process.env.AI_PROVIDER || "anthropic").toLowerCase() === "groq" ? "groq" : "anthropic";
 export const MODEL = AI_PROVIDER === "groq" ? GROQ_MODEL : process.env.THINQ_MODEL || "claude-opus-5-5";
@@ -38,7 +39,7 @@ What you can do with your tools:
 - Remember lasting preferences the user tells you (how they like to write, who matters most, working hours).
 - Read documents the user attaches (PDF, Word, text) with read_document, then summarize them, answer questions about them, or use them when drafting emails. Long documents come in parts: read part 1 first, then later parts only as needed. Mention page numbers when they're shown.
 - Some messages are voice notes the user recorded and transcribed; they may contain small transcription mistakes, so read them generously.
-
+${imagesAvailable() ? "- Create images (illustrations, photos, logos, mockups) with create_image when the user asks for a picture. Write the prompt in English as a detailed visual description: subject, setting, style, lighting, composition. The image appears under your reply automatically - just say a sentence about it; never write image links or markdown. Don't put private details from emails or documents into an image prompt unless the user asked for that.\n" : ""}
 How to work:
 - Look things up before answering questions about the user's inbox or calendar; don't guess.
 - When asked to reply to an email, read it first, then draft the reply with reply_to_email_id set.
@@ -62,6 +63,7 @@ const STATUS = {
   propose_event: "Preparing an invite",
   remember: "Saving a preference",
   read_document: "Reading your document",
+  create_image: "Creating your image",
 };
 
 function tzOffset(timeZone, date = new Date()) {
@@ -91,10 +93,31 @@ function contextBlock({ timeZone, profile, mode, notes }) {
   ].join("\n");
 }
 
-export function buildTools({ userId, p, conversationId, timeZone, queued }) {
+export function buildTools({ userId, p, conversationId, timeZone, queued, images = [] }) {
   const offset = tzOffset(timeZone);
 
+  const imageTool = tool({
+    name: "create_image",
+    description: "Create an image from a text description. The image is shown to the user under your reply.",
+    inputSchema: z.object({ prompt: z.string().min(3).max(2000).describe("Detailed visual description in English") }),
+    run: async ({ prompt }) => {
+      if (images.length >= 4) return "You've already made 4 images in this reply. Stop here and show them.";
+      if ((await store.imagesToday(userId)) >= IMAGE_DAILY_LIMIT) return `The user has reached today's limit of ${IMAGE_DAILY_LIMIT} images. Tell them it resets tomorrow.`;
+      try {
+        const out = await generateImage(prompt);
+        const img = await store.addImage(userId, conversationId, { prompt, ...out });
+        images.push(img);
+        await store.logAction(userId, "image_created", { id: img.id });
+        return `Image created (${img.id}). It's shown to the user under your reply.`;
+      } catch (err) {
+        if (err instanceof ImageError) return `Couldn't create the image: ${err.message}`;
+        throw err;
+      }
+    },
+  });
+
   return [
+    ...(imagesAvailable() ? [imageTool] : []),
     tool({
       name: "search_inbox",
       description: "Search the user's email. Supports Gmail search syntax, e.g. 'is:unread', 'from:priya', 'subject:report newer_than:7d'. Returns a list with id, sender, subject, date, a short snippet and unread status.",
@@ -244,11 +267,13 @@ export async function* runTurn({ user, conversationId, userText, timeZone, attac
   const p = await providerFor(user);
   const profile = await p.profile().catch(() => null);
   const queued = [];
-  const specs = buildTools({ userId: user.id, p, conversationId, timeZone, queued });
+  const images = [];
+  const specs = buildTools({ userId: user.id, p, conversationId, timeZone, queued, images });
   const attachNote = (docs) => docs?.length
     ? `\n\n[Attached: ${docs.map((d) => `"${d.name}" (document_id: ${d.id}${d.parts ? `, ${d.parts} part${d.parts > 1 ? "s" : ""}` : ""})`).join("; ")}]`
     : "";
-  const history = conversation.messages.map((m) => ({ role: m.role, content: m.text + (m.role === "user" ? attachNote(m.attachments) : "") }));
+  const imageNote = (list) => list?.length ? `\n\n[Images shown under this reply: ${list.map((i) => `"${i.prompt}"`).join("; ")}]` : "";
+  const history = conversation.messages.map((m) => ({ role: m.role, content: m.text + (m.role === "user" ? attachNote(m.attachments) : imageNote(m.attachments?.filter((a) => a.type === "image"))) }));
   userText = userText + attachNote(attachments.map((d) => ({ ...d, parts: partCount(d.chars) })));
   const context = contextBlock({ timeZone, profile, mode: p.mode, notes: await store.listNotes(user.id) });
   const onTool = (name) => store.logAction(user.id, "tool", { tool: name, conversationId, ai: AI_PROVIDER });
@@ -259,8 +284,8 @@ export async function* runTurn({ user, conversationId, userText, timeZone, attac
       if (ev.type === "tool") { onTool(ev.name); yield { type: "status", text: STATUS[ev.name] || "Working" }; }
       if (ev.type === "final") text = ev.text;
     }
-    if (!text) text = queued.length ? "Done — it's waiting in your Approvals panel." : "Done.";
-    yield { type: "reply", text, approvals: queued };
+    if (!text) text = queued.length ? "Done — it's waiting in your Approvals panel." : images.length ? "Here you go." : "Done.";
+    yield { type: "reply", text, approvals: queued, images };
     return;
   }
 
@@ -297,8 +322,8 @@ export async function* runTurn({ user, conversationId, userText, timeZone, attac
     text = "I can't help with that request.";
   } else {
     text = (last?.content ?? []).filter((b) => b.type === "text").map((b) => b.text).join("\n\n").trim();
-    if (!text) text = queued.length ? "Done — it's waiting in your Approvals panel." : "Done.";
+    if (!text) text = queued.length ? "Done — it's waiting in your Approvals panel." : images.length ? "Here you go." : "Done.";
     if (last?.stop_reason === "max_tokens") text += "\n\n(My reply was cut short. Ask me to continue.)";
   }
-  yield { type: "reply", text, approvals: queued };
+  yield { type: "reply", text, approvals: queued, images };
 }

@@ -20,12 +20,23 @@ One server runs everything:
 - Attach a PDF, Word or text file (paperclip, drag-and-drop or paste) and ask "What are the key dates in this contract?"
 - Tap the microphone to record a voice note instead of typing (up to 2 minutes). It's turned into text you can check before sending.
 - Click **Read aloud** under any answer to hear it.
+- "Make an image of a cozy home office, warm morning light" — the picture appears in the chat with a Download button (needs the Cloudflare setting below).
 
 ### Documents and voice notes
 
 - **Documents**: up to 5 per message, 10 MB each (PDF with selectable text, .docx, .txt, .md, .csv, .json, .html). Thinq keeps only the text, not the file. Long documents are split into parts the AI reads one at a time with the `read_document` tool. Scanned PDFs (photos of pages) aren't supported yet.
 - **Voice notes** use Groq's free Whisper speech-to-text (`whisper-large-v3-turbo`, change with `GROQ_TRANSCRIBE_MODEL`), so they need `GROQ_API_KEY` even if you use Claude for chat. The recording is sent once to be transcribed and isn't stored. Each voice note counts as one request toward the daily limit.
 - **Read aloud** uses the browser's built-in voice, so it costs nothing.
+
+### Images (free, optional)
+
+Thinq creates images with **Cloudflare Workers AI** (FLUX.1 schnell) through a `create_image` tool. It works with either AI choice (Groq or Claude).
+
+1. Make a free account at <https://dash.cloudflare.com> → **AI → Workers AI → Use REST API**.
+2. Copy your **Account ID**, and click **Create a Workers AI API Token**.
+3. Put them in `.env` (or Render → Environment) as `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`.
+
+The free plan gives 10,000 "neurons" a day — about 130 images for the whole server — and resets at midnight UTC. Each person can also make `IMAGE_DAILY_LIMIT` images a day (default 10). Images are saved in the database so they stay in the conversation; only the owner can open them. Gemini's image models are better but have no free tier (about $0.03 per image).
 
 ## How accounts work
 
@@ -97,12 +108,12 @@ Notes:
 
 ```
 Browser ──▶ server.js ──▶ src/auth.js         sign-in, sessions, invite list
-                     ├──▶ src/agent.js         assistant: instructions + 8 tools ──▶ Groq or Claude
+                     ├──▶ src/agent.js         assistant: instructions + 9 tools ──▶ Groq or Claude
                      ├──▶ src/providers/       google.js (real Gmail/Calendar) or demo.js (sample data)
                      └──▶ src/store.js + db.js per-user data in Postgres (PGlite locally)
 ```
 
-- **Tools**: `search_inbox`, `read_email`, `list_events`, `find_free_time`, `draft_email`, `propose_event`, `remember`, `read_document`.
+- **Tools**: `search_inbox`, `read_email`, `list_events`, `find_free_time`, `draft_email`, `propose_event`, `remember`, `read_document`, `create_image`.
 - **Approvals**: `draft_email` and `propose_event` only queue an item. Sending happens in `server.js` when the person clicks — the AI has no way to send. Each approval can only be sent once, even on a double click.
 - **Isolation**: every database query is filtered by the signed-in person's ID; nobody can see or act on anyone else's conversations, approvals or connection.
 - **Sessions**: a random token in an HttpOnly cookie (the database stores only its hash); 30 days.

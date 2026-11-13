@@ -184,3 +184,16 @@ body{overflow:hidden;background:var(--panel)}
 .msg .tools button:hover{background:var(--panel);color:var(--ink)}
 .msg .tools button.speaking{color:var(--violet)}
 @media (hover:none){.msg .tools{opacity:1}}
+
+/* ---------- generated images ---------- */
+.gallery{display:grid;gap:10px;margin-top:12px;max-width:440px}
+.gallery.multi{grid-template-columns:1fr 1fr;max-width:560px}
+.gen{margin:0;border-radius:16px;overflow:hidden;background:var(--panel);border:1px solid var(--line)}
+.gen img{display:block;width:100%;aspect-ratio:1;object-fit:cover;background:linear-gradient(110deg,#f1eefc 30%,#faf8ff 50%,#f1eefc 70%) 0 0/200% 100%;animation:shimmer 1.4s linear infinite}
+.gen img[data-loaded]{animation:none;background:none}
+.gen figcaption{display:flex;align-items:center;gap:10px;padding:8px 10px;font-size:12px;color:var(--muted)}
+.gen figcaption span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gen .dl{display:inline-flex;align-items:center;gap:5px;flex:none;color:var(--ink-2);padding:4px 8px;border-radius:8px}
+.gen .dl:hover{background:#fff;color:var(--ink)}
+@keyframes shimmer{to{background-position:-200% 0}}
+@media (max-width:560px){.gallery.multi{grid-template-columns:1fr}}

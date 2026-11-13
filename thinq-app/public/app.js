@@ -140,6 +140,7 @@ async function openConversation(id) {
 
 const fileMeta = (d) => d.pages ? `${d.pages} page${d.pages === 1 ? "" : "s"}` : `${Math.max(1, Math.round((d.chars || 0) / 1000))}k characters`;
 const fileChip = (d) => `<span class="att">${icon("i-doc", 13)}<span class="nm" title="${esc(d.name)}">${esc(d.name)}</span><span class="meta">${fileMeta(d)}</span></span>`;
+const gallery = (imgs) => imgs?.length ? `<div class="gallery${imgs.length > 1 ? " multi" : ""}">${imgs.map((i) => `<figure class="gen"><a href="/api/images/${esc(i.id)}" target="_blank" rel="noopener" aria-label="Open image full size"><img src="/api/images/${esc(i.id)}" alt="${esc(i.prompt)}" loading="lazy"></a><figcaption><span title="${esc(i.prompt)}">${esc(i.prompt)}</span><a class="dl" href="/api/images/${esc(i.id)}?download=1" download>${icon("i-download", 12)}Download</a></figcaption></figure>`).join("")}</div>` : "";
 const toolsRow = () => `<div class="tools"><button type="button" data-speak>${icon("i-speaker", 13)}<span>Read aloud</span></button></div>`;
 
 function addMessage(role, text, extra = "", files = []) {
@@ -147,7 +148,7 @@ function addMessage(role, text, extra = "", files = []) {
   wrap.className = `msg ${role}`;
   wrap.innerHTML = role === "user"
     ? `<div class="stack">${files.length ? `<div class="files">${files.map(fileChip).join("")}</div>` : ""}<div class="body">${esc(text)}</div></div>`
-    : `<div class="av" aria-hidden="true">${icon("mark", 15)}</div><div class="body">${md(text)}${extra}${text && canSpeak ? toolsRow() : ""}</div>`;
+    : `<div class="av" aria-hidden="true">${icon("mark", 15)}</div><div class="body">${md(text)}${gallery(files.filter((f) => f.type === "image"))}${extra}${text && canSpeak ? toolsRow() : ""}</div>`;
   $("#messages").appendChild(wrap);
   scrollDown();
   return wrap;
@@ -205,7 +206,7 @@ function handleEvent(ev, node) {
     body.innerHTML = `<div class="status"><span class="spin"></span><span>${esc(ev.text)}…</span></div>`;
   } else if (ev.type === "reply") {
     const chips = (ev.approvals || []).filter(Boolean).map((a) => `<button class="chip" data-approval="${a.id}">${icon(a.kind === "email" ? "i-mail" : "i-cal", 12)}${esc(a.kind === "email" ? "Draft ready to review" : "Invite ready to review")}</button>`).join("");
-    body.innerHTML = md(ev.text) + (chips ? `<div class="queued">${chips}</div>` : "") + (canSpeak ? toolsRow() : "");
+    body.innerHTML = md(ev.text) + gallery(ev.images) + (chips ? `<div class="queued">${chips}</div>` : "") + (canSpeak ? toolsRow() : "");
     if (ev.approvals?.length) { showTab("approvals"); openPanel(false); }
   } else if (ev.type === "error") {
     node.classList.add("error");
@@ -455,6 +456,7 @@ $("#input").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shi
 const autosize = () => { const t = $("#input"); t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 200) + "px"; };
 $("#input").addEventListener("input", autosize);
 addEventListener("resize", autosize);
+$("#messages").addEventListener("load", (e) => { if (e.target.tagName === "IMG") e.target.dataset.loaded = ""; }, true);
 $("#suggestions").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) send(b.textContent); });
 $("#newChat").addEventListener("click", () => openConversation(null));
 $("#convos").addEventListener("click", (e) => { const a = e.target.closest("a[data-id]"); if (a) { e.preventDefault(); openConversation(a.dataset.id); } });
@@ -486,5 +488,6 @@ if (g) {
 await refresh();
 $("#fileInput").accept = state.documentTypes || "";
 $("#micBtn").hidden = !(state.voiceAvailable && canRecord());
+if (state.images?.available) $("#input").placeholder = "Ask Thinq anything, attach a document, or ask for an image…";
 await openConversation(location.hash.slice(1) || null);
 loadAgenda();

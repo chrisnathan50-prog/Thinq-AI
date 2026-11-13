@@ -17,6 +17,10 @@ services:
         value: groq
       - key: GROQ_API_KEY
         sync: false
+      - key: CLOUDFLARE_ACCOUNT_ID # optional: free image creation (Cloudflare Workers AI)
+        sync: false
+      - key: CLOUDFLARE_API_TOKEN
+        sync: false
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET

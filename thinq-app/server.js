@@ -17,6 +17,7 @@ import { googleConfigured, publicUrl, redirectUri } from "./src/providers/google
 import { attachUser, requireUser, mountAuth } from "./src/auth.js";
 import { extractDocument, DocumentError, ACCEPTED, MAX_UPLOAD_BYTES, partCount } from "./src/documents.js";
 import { transcribe, voiceAvailable, MAX_AUDIO_BYTES } from "./src/llm/transcribe.js";
+import { imagesAvailable, IMAGE_DAILY_LIMIT } from "./src/llm/images.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SITE_DIR = process.env.SITE_DIR || path.resolve(here, "..", "thinq-site");
@@ -72,6 +73,7 @@ api.get("/state", async (req, res) => {
     model: MODEL,
     usage: { today: await store.usageToday(req.user.id), limit: DAILY_LIMIT },
     voiceAvailable: voiceAvailable(),
+    images: { available: imagesAvailable(), today: await store.imagesToday(req.user.id), limit: IMAGE_DAILY_LIMIT },
     documentTypes: ACCEPTED,
     conversations: await store.listConversations(req.user.id),
     approvals: await store.listApprovals(req.user.id),
@@ -120,7 +122,7 @@ api.post("/chat", async (req, res) => {
     }
     // Save the turn only once it finished, so a failed turn can simply be retried.
     await store.appendMessage(req.user.id, conversationId, "user", text.trim(), attachments.map(({ id, name, pages, chars }) => ({ id, name, pages, chars })));
-    await store.appendMessage(req.user.id, conversationId, "assistant", reply.text);
+    await store.appendMessage(req.user.id, conversationId, "assistant", reply.text, reply.images?.length ? reply.images.map((i) => ({ type: "image", id: i.id, prompt: i.prompt })) : null);
     send({ ...reply, approvals: await Promise.all(reply.approvals.map((id) => store.getApproval(req.user.id, id))) });
   } catch (err) {
     console.error(err);
@@ -166,6 +168,15 @@ api.post("/documents", rawBody(MAX_UPLOAD_BYTES + 1024), async (req, res) => {
   }
 });
 api.delete("/documents/:id", async (req, res) => { await store.deleteDocument(req.user.id, req.params.id); res.json({ ok: true }); });
+
+// ---------- generated images ----------
+api.get("/images/:id", async (req, res) => {
+  const img = await store.getImage(req.user.id, req.params.id);
+  if (!img) return res.status(404).json({ error: "Not found" });
+  res.set({ "Content-Type": img.mime, "Cache-Control": "private, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff" });
+  if (req.query.download) res.attachment(`thinq-${req.params.id}.${img.mime.split("/")[1].replace("jpeg", "jpg")}`);
+  res.send(img.data);
+});
 
 // ---------- voice notes ----------
 api.post("/transcribe", rawBody(MAX_AUDIO_BYTES), async (req, res) => {

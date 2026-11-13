@@ -115,6 +115,16 @@ async function migrate() {
       text text not null,
       created_at timestamptz not null default now()
     );
+    create table if not exists images (
+      id text primary key,
+      user_id text not null references users(id) on delete cascade,
+      conversation_id text references conversations(id) on delete set null,
+      prompt text not null,
+      mime text not null,
+      data bytea not null,
+      created_at timestamptz not null default now()
+    );
+    create index if not exists images_user on images(user_id, created_at desc);
     alter table messages add column if not exists attachments jsonb;
     create index if not exists documents_conv on documents(conversation_id);
     create index if not exists conversations_user on conversations(user_id, created_at desc);
