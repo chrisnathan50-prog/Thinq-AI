@@ -34,7 +34,7 @@ export async function generateImage(prompt) {
     res = await fetch(url, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiToken()}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: String(prompt).slice(0, 2048), steps: STEPS, seed: Math.floor(Math.random() * 2 ** 31) }),
+      body: JSON.stringify({ prompt: String(prompt).slice(0, 2048), steps: STEPS }),
       signal: AbortSignal.timeout(60_000),
     });
   } catch (err) {
