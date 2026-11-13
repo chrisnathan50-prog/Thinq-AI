@@ -104,6 +104,19 @@ async function migrate() {
       requests integer not null default 0,
       primary key (user_id, day)
     );
+    create table if not exists documents (
+      id text primary key,
+      user_id text not null references users(id) on delete cascade,
+      conversation_id text references conversations(id) on delete set null,
+      name text not null,
+      size_bytes integer,
+      pages integer,
+      chars integer not null,
+      text text not null,
+      created_at timestamptz not null default now()
+    );
+    alter table messages add column if not exists attachments jsonb;
+    create index if not exists documents_conv on documents(conversation_id);
     create index if not exists conversations_user on conversations(user_id, created_at desc);
     create index if not exists messages_conv on messages(conversation_id, id);
     create index if not exists approvals_user on approvals(user_id, created_at desc);

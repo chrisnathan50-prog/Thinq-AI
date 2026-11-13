@@ -56,11 +56,12 @@ export async function createConversation(userId) {
 export async function getConversation(userId, conversationId) {
   const c = await one(`select * from conversations where id = $1 and user_id = $2`, [conversationId, userId]);
   if (!c) return null;
-  const msgs = await query(`select role, text, created_at from messages where conversation_id = $1 order by id`, [c.id]);
-  return { id: c.id, title: c.title, createdAt: iso(c.created_at), messages: msgs.map((m) => ({ role: m.role, text: m.text, at: iso(m.created_at) })) };
+  const msgs = await query(`select role, text, attachments, created_at from messages where conversation_id = $1 order by id`, [c.id]);
+  return { id: c.id, title: c.title, createdAt: iso(c.created_at), messages: msgs.map((m) => ({ role: m.role, text: m.text, attachments: m.attachments || [], at: iso(m.created_at) })) };
 }
-export async function appendMessage(userId, conversationId, role, text) {
-  await query(`insert into messages (conversation_id, role, text) select id, $3, $4 from conversations where id = $1 and user_id = $2`, [conversationId, userId, role, text]);
+export async function appendMessage(userId, conversationId, role, text, attachments = null) {
+  await query(`insert into messages (conversation_id, role, text, attachments) select id, $3, $4, $5 from conversations where id = $1 and user_id = $2`,
+    [conversationId, userId, role, text, attachments?.length ? JSON.stringify(attachments) : null]);
   if (role === "user") await query(`update conversations set title = $3 where id = $1 and user_id = $2 and title = 'New conversation'`, [conversationId, userId, text.slice(0, 60)]);
 }
 export async function listConversations(userId) {
@@ -116,3 +117,25 @@ export async function useRequest(userId, limit) {
   return { used: row.requests, allowed: !limit || row.requests <= limit };
 }
 export const usageToday = async (userId) => (await one(`select requests from usage_daily where user_id = $1 and day = current_date`, [userId]))?.requests ?? 0;
+
+// ---------- documents (extracted text only; the original file isn't kept) ----------
+const docOut = (d) => d && ({ id: d.id, name: d.name, pages: d.pages, chars: d.chars, sizeBytes: d.size_bytes, conversationId: d.conversation_id, createdAt: iso(d.created_at) });
+export async function addDocument(userId, { name, sizeBytes, pages, text }) {
+  return docOut(await one(`insert into documents (id, user_id, name, size_bytes, pages, chars, text) values ($1, $2, $3, $4, $5, $6, $7) returning *`,
+    [id("doc"), userId, name.slice(0, 200), sizeBytes, pages, text.length, text]));
+}
+export async function getDocumentText(userId, docId) {
+  return one(`select id, name, pages, chars, text from documents where id = $1 and user_id = $2`, [docId, userId]);
+}
+export async function ownedDocuments(userId, ids) {
+  if (!ids?.length) return [];
+  return (await query(`select * from documents where user_id = $1 and id = any($2::text[])`, [userId, ids])).map(docOut);
+}
+export async function attachDocuments(userId, conversationId, ids) {
+  if (!ids?.length) return;
+  await query(`update documents set conversation_id = $3 where user_id = $1 and id = any($2::text[]) and (conversation_id is null or conversation_id = $3)`, [userId, ids, conversationId]);
+}
+export async function conversationDocuments(userId, conversationId) {
+  return (await query(`select * from documents where user_id = $1 and conversation_id = $2 order by created_at`, [userId, conversationId])).map(docOut);
+}
+export const deleteDocument = (userId, docId) => query(`delete from documents where id = $1 and user_id = $2`, [docId, userId]);

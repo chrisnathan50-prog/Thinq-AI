@@ -131,19 +131,23 @@ async function openConversation(id) {
     const c = await api(`/api/conversations/${id}`);
     $("#title").textContent = c.title;
     $("#empty").hidden = c.messages.length > 0;
-    c.messages.forEach((m) => addMessage(m.role, m.text));
+    c.messages.forEach((m) => addMessage(m.role, m.text, "", m.attachments || []));
     history.replaceState(null, "", `#${id}`);
   } catch { conversationId = null; $("#empty").hidden = false; }
   renderConvos();
   closeDrawers();
 }
 
-function addMessage(role, text, extra = "") {
+const fileMeta = (d) => d.pages ? `${d.pages} page${d.pages === 1 ? "" : "s"}` : `${Math.max(1, Math.round((d.chars || 0) / 1000))}k characters`;
+const fileChip = (d) => `<span class="att">${icon("i-doc", 13)}<span class="nm" title="${esc(d.name)}">${esc(d.name)}</span><span class="meta">${fileMeta(d)}</span></span>`;
+const toolsRow = () => `<div class="tools"><button type="button" data-speak>${icon("i-speaker", 13)}<span>Read aloud</span></button></div>`;
+
+function addMessage(role, text, extra = "", files = []) {
   const wrap = document.createElement("div");
   wrap.className = `msg ${role}`;
   wrap.innerHTML = role === "user"
-    ? `<div class="body">${esc(text)}</div>`
-    : `<div class="av" aria-hidden="true">${icon("mark", 15)}</div><div class="body">${md(text)}${extra}</div>`;
+    ? `<div class="stack">${files.length ? `<div class="files">${files.map(fileChip).join("")}</div>` : ""}<div class="body">${esc(text)}</div></div>`
+    : `<div class="av" aria-hidden="true">${icon("mark", 15)}</div><div class="body">${md(text)}${extra}${text && canSpeak ? toolsRow() : ""}</div>`;
   $("#messages").appendChild(wrap);
   scrollDown();
   return wrap;
@@ -152,19 +156,26 @@ function addMessage(role, text, extra = "") {
 const scrollDown = () => { const m = $("#messages"); m.scrollTop = m.scrollHeight; };
 
 async function send(text) {
-  if (sending || !text.trim()) return;
+  if (sending) return;
+  if (pending.some((a) => a.status === "uploading")) return notice("Wait a moment — your document is still uploading.");
+  const files = pending.filter((a) => a.status === "ready");
+  if (!text.trim()) {
+    if (!files.length) return;
+    text = files.length === 1 ? "Please read the attached document and give me a short summary." : "Please read the attached documents and give me a short summary of each.";
+  }
+  pending = []; renderPending();
   sending = true; $("#sendBtn").disabled = true;
   $("#empty").hidden = true;
   if (!conversationId) {
     const c = await api("/api/conversations", { method: "POST" });
     conversationId = c.id; history.replaceState(null, "", `#${c.id}`);
   }
-  addMessage("user", text);
+  addMessage("user", text, "", files);
   const status = addMessage("assistant", "");
   status.querySelector(".body").innerHTML = `<div class="status"><span class="spin"></span><span>Thinking</span></div>`;
 
   try {
-    const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ conversationId, text, timeZone }) });
+    const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ conversationId, text, timeZone, attachments: files.map((f) => f.id) }) });
     if (!res.ok || !res.body) throw new Error((await res.json().catch(() => ({}))).error || "Request failed");
     const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = "";
     while (true) {
@@ -194,7 +205,7 @@ function handleEvent(ev, node) {
     body.innerHTML = `<div class="status"><span class="spin"></span><span>${esc(ev.text)}…</span></div>`;
   } else if (ev.type === "reply") {
     const chips = (ev.approvals || []).filter(Boolean).map((a) => `<button class="chip" data-approval="${a.id}">${icon(a.kind === "email" ? "i-mail" : "i-cal", 12)}${esc(a.kind === "email" ? "Draft ready to review" : "Invite ready to review")}</button>`).join("");
-    body.innerHTML = md(ev.text) + (chips ? `<div class="queued">${chips}</div>` : "");
+    body.innerHTML = md(ev.text) + (chips ? `<div class="queued">${chips}</div>` : "") + (canSpeak ? toolsRow() : "");
     if (ev.approvals?.length) { showTab("approvals"); openPanel(false); }
   } else if (ev.type === "error") {
     node.classList.add("error");
@@ -277,16 +288,173 @@ function showTab(tab) {
   if (tab === "agenda") loadAgenda();
 }
 
+// ---------------- documents ----------------
+const MAX_DOC_BYTES = 10 * 1024 * 1024;
+let pending = []; // documents attached to the message being written
+
+function renderPending() {
+  const box = $("#atts");
+  box.hidden = pending.length === 0;
+  box.innerHTML = pending.map((a) => `<span class="att${a.status === "error" ? " err" : ""}">${a.status === "uploading" ? `<span class="spin"></span>` : icon("i-doc", 13)}<span class="nm" title="${esc(a.name)}">${esc(a.name)}</span><span class="meta">${a.status === "uploading" ? "Reading…" : a.status === "error" ? esc(a.error) : fileMeta(a)}</span><button type="button" data-remove="${a.key}" aria-label="Remove ${esc(a.name)}">${icon("i-x", 11)}</button></span>`).join("");
+}
+
+async function addFiles(fileList) {
+  for (const file of fileList) {
+    if (pending.length >= 5) { notice("You can attach up to 5 documents to one message."); break; }
+    const item = { key: crypto.randomUUID(), name: file.name, status: "uploading" };
+    pending.push(item);
+    renderPending();
+    if (file.size > MAX_DOC_BYTES) { Object.assign(item, { status: "error", error: "Over 10 MB" }); renderPending(); continue; }
+    try {
+      const res = await fetch("/api/documents", { method: "POST", headers: { "Content-Type": "application/octet-stream", "X-Filename": encodeURIComponent(file.name) }, body: file });
+      if (res.status === 401) { location.href = "/login.html"; return; }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Couldn't read that file");
+      Object.assign(item, data, { status: "ready" });
+      if (data.truncated) notice(`“${file.name}” is very long, so Thinq kept the first part of it (about 100,000 words).`);
+    } catch (err) {
+      Object.assign(item, { status: "error", error: err.message });
+    }
+    if (!pending.includes(item) && item.id) fetch(`/api/documents/${item.id}`, { method: "DELETE" }).catch(() => {});
+    renderPending();
+  }
+  $("#input").focus();
+}
+
+$("#attachBtn").addEventListener("click", () => $("#fileInput").click());
+$("#fileInput").addEventListener("change", (e) => { addFiles([...e.target.files]); e.target.value = ""; });
+$("#atts").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-remove]"); if (!b) return;
+  const item = pending.find((a) => a.key === b.dataset.remove);
+  pending = pending.filter((a) => a !== item);
+  if (item?.id) fetch(`/api/documents/${item.id}`, { method: "DELETE" }).catch(() => {});
+  renderPending();
+});
+const composer = $("#composer");
+let dragDepth = 0;
+composer.addEventListener("dragenter", (e) => { if (!e.dataTransfer?.types.includes("Files")) return; e.preventDefault(); dragDepth++; composer.classList.add("dragging"); });
+composer.addEventListener("dragover", (e) => { if (e.dataTransfer?.types.includes("Files")) e.preventDefault(); });
+composer.addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth = 0; composer.classList.remove("dragging"); } });
+composer.addEventListener("drop", (e) => { e.preventDefault(); dragDepth = 0; composer.classList.remove("dragging"); if (e.dataTransfer.files.length) addFiles([...e.dataTransfer.files]); });
+$("#input").addEventListener("paste", (e) => { const f = [...(e.clipboardData?.files || [])]; if (f.length) { e.preventDefault(); addFiles(f); } });
+
+// ---------------- voice notes ----------------
+// Records in the browser, sends the audio once to be turned into text, and puts the text in the box so you can check it before sending.
+const MAX_REC_SECONDS = 120;
+let rec = null; // { recorder, stream, chunks, started, timer, cancelled }
+
+const canRecord = () => Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
+function setRecUI(mode) { // "off" | "recording" | "busy"
+  const on = mode !== "off";
+  $("#rec").hidden = !on; $("#input").hidden = on; $("#attachBtn").hidden = on;
+  $("#rec").classList.toggle("busy", mode === "busy");
+  $("#recCancel").hidden = mode === "busy";
+  $("#recLabel").textContent = mode === "busy" ? "Turning your voice note into text…" : "Recording";
+  $("#recTime").hidden = mode === "busy";
+  const mic = $("#micBtn");
+  mic.classList.toggle("on", mode === "recording");
+  mic.disabled = mode === "busy";
+  mic.innerHTML = icon(mode === "recording" ? "i-stop" : "i-mic", mode === "recording" ? 15 : 17);
+  mic.setAttribute("aria-label", mode === "recording" ? "Stop recording" : "Record a voice note");
+  $("#sendBtn").disabled = on || sending;
+}
+
+async function startRecording() {
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+  } catch (err) {
+    return notice(err.name === "NotAllowedError" ? "Thinq needs microphone access for voice notes. Allow it in your browser's address bar and try again." : "Couldn't find a microphone.");
+  }
+  const type = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"].find((t) => MediaRecorder.isTypeSupported?.(t));
+  const recorder = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+  rec = { recorder, stream, chunks: [], started: Date.now(), cancelled: false };
+  recorder.ondataavailable = (e) => { if (e.data.size) rec.chunks.push(e.data); };
+  recorder.onstop = finishRecording;
+  recorder.start(1000);
+  rec.timer = setInterval(() => {
+    const s = Math.floor((Date.now() - rec.started) / 1000);
+    $("#recTime").textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")} / 2:00`;
+    if (s >= MAX_REC_SECONDS) stopRecording();
+  }, 250);
+  $("#recTime").textContent = "0:00 / 2:00";
+  setRecUI("recording");
+}
+function stopRecording(cancel = false) {
+  if (!rec) return;
+  rec.cancelled = cancel;
+  clearInterval(rec.timer);
+  if (rec.recorder.state !== "inactive") rec.recorder.stop();
+}
+async function finishRecording() {
+  const { stream, chunks, recorder, cancelled, started } = rec;
+  rec = null;
+  stream.getTracks().forEach((t) => t.stop());
+  if (cancelled) return setRecUI("off");
+  if (Date.now() - started < 800) { setRecUI("off"); return notice("That was very short — hold the recording a little longer."); }
+  setRecUI("busy");
+  try {
+    const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+    const res = await fetch("/api/transcribe", { method: "POST", headers: { "Content-Type": blob.type }, body: blob });
+    if (res.status === 401) { location.href = "/login.html"; return; }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Couldn't turn that recording into text.");
+    const box = $("#input");
+    box.value = box.value.trim() ? `${box.value.trim()} ${data.text}` : data.text;
+    setRecUI("off");
+    autosize(); box.focus(); box.setSelectionRange(box.value.length, box.value.length);
+  } catch (err) {
+    setRecUI("off");
+    notice(err.message);
+  }
+}
+$("#micBtn").addEventListener("click", () => (rec ? stopRecording() : startRecording()));
+$("#recCancel").addEventListener("click", () => stopRecording(true));
+
+// ---------------- read aloud ----------------
+const canSpeak = "speechSynthesis" in window;
+let speakingBtn = null;
+function stopSpeaking() { if (!canSpeak) return; speechSynthesis.cancel(); speakingBtn?.classList.remove("speaking"); if (speakingBtn) speakingBtn.querySelector("span").textContent = "Read aloud"; speakingBtn = null; }
+$("#messages").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-speak]"); if (!b) return;
+  const was = speakingBtn === b;
+  stopSpeaking();
+  if (was) return;
+  const body = b.closest(".body").cloneNode(true);
+  body.querySelectorAll(".tools,.queued").forEach((n) => n.remove());
+  body.querySelectorAll("p,li,tr").forEach((n) => n.append(". "));
+  const text = body.textContent.replace(/\s*\.\s*\.\s*/g, ". ").replace(/\s+/g, " ").trim();
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = 1.03;
+  u.onend = u.onerror = () => { if (speakingBtn === b) stopSpeaking(); };
+  speakingBtn = b; b.classList.add("speaking"); b.querySelector("span").textContent = "Stop reading";
+  speechSynthesis.speak(u);
+});
+
+// Small message at the top of the chat for problems with uploads or recording.
+let noticeTimer;
+function notice(text) {
+  const banner = $("#banner");
+  banner.hidden = false; banner.className = "banner err"; banner.textContent = text;
+  clearTimeout(noticeTimer); noticeTimer = setTimeout(() => { banner.hidden = true; }, 7000);
+}
+
 // ---------------- drawers (narrow screens) ----------------
 const narrow = () => matchMedia("(max-width:1100px)").matches;
 function openPanel(force = true) { if (!narrow() && force !== true) return; if (narrow()) { $("#panel").classList.add("open"); $("#scrim").hidden = false; } }
 function closeDrawers() { $("#panel").classList.remove("open"); $("#sidebar").classList.remove("open"); $("#scrim").hidden = true; }
 
 // ---------------- wiring ----------------
-$("#composer").addEventListener("submit", (e) => { e.preventDefault(); const t = $("#input").value; $("#input").value = ""; autosize(); send(t); });
+$("#composer").addEventListener("submit", (e) => {
+  e.preventDefault();
+  if (rec) return;
+  if (pending.some((a) => a.status === "uploading")) return notice("Wait a moment — your document is still uploading.");
+  const t = $("#input").value; $("#input").value = ""; autosize(); send(t);
+});
 $("#input").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("#composer").requestSubmit(); } });
 const autosize = () => { const t = $("#input"); t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 200) + "px"; };
 $("#input").addEventListener("input", autosize);
+addEventListener("resize", autosize);
 $("#suggestions").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) send(b.textContent); });
 $("#newChat").addEventListener("click", () => openConversation(null));
 $("#convos").addEventListener("click", (e) => { const a = e.target.closest("a[data-id]"); if (a) { e.preventDefault(); openConversation(a.dataset.id); } });
@@ -316,5 +484,7 @@ if (g) {
 }
 
 await refresh();
+$("#fileInput").accept = state.documentTypes || "";
+$("#micBtn").hidden = !(state.voiceAvailable && canRecord());
 await openConversation(location.hash.slice(1) || null);
 loadAgenda();

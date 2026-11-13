@@ -64,7 +64,7 @@ body{overflow:hidden;background:var(--panel)}
 .suggestions button{font-size:13.5px;padding:9px 14px;border-radius:999px;background:#fff;border:1px solid var(--line);box-shadow:0 1px 2px rgba(0,0,0,.03);transition:border-color .2s,transform .2s var(--ease)}
 .suggestions button:hover{border-color:#d9d2f5;transform:translateY(-1px)}
 
-.composer{max-width:768px;width:calc(100% - 48px);margin:8px auto 0;display:flex;align-items:flex-end;gap:10px;padding:10px 10px 10px 18px;border-radius:22px;background:#fff;border:1px solid var(--line);box-shadow:0 1px 2px rgba(0,0,0,.04),0 18px 40px -24px rgba(60,30,120,.35);transition:border-color .2s,box-shadow .2s}
+.composer{position:relative;max-width:768px;width:calc(100% - 48px);margin:8px auto 0;display:grid;gap:8px;padding:10px;border-radius:22px;background:#fff;border:1px solid var(--line);box-shadow:0 1px 2px rgba(0,0,0,.04),0 18px 40px -24px rgba(60,30,120,.35);transition:border-color .2s,box-shadow .2s}
 .composer:focus-within{border-color:#c9bcff;box-shadow:0 0 0 4px rgba(157,135,255,.14),0 18px 40px -24px rgba(60,30,120,.35)}
 .composer textarea{flex:1;border:0;outline:0;resize:none;font:inherit;font-size:15px;line-height:1.5;max-height:200px;padding:6px 0;background:none;color:var(--ink)}
 .composer textarea::placeholder{color:var(--soft)}
@@ -145,3 +145,42 @@ body{overflow:hidden;background:var(--panel)}
 .account .who b{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .account .who small{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .conn .meta{color:var(--soft);font-size:12px;border-top:1px solid var(--line-2);padding-top:8px;margin-top:2px}
+
+/* ---------- attachments + voice ---------- */
+.composer .row{display:flex;align-items:flex-end;gap:6px}
+.composer textarea{padding:6px 4px}
+.tool{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;color:var(--muted);transition:background .2s,color .2s}
+.tool:hover{background:var(--panel);color:var(--ink)}
+.tool:disabled{opacity:.4;cursor:default;background:none}
+.tool.on{background:#fee2e2;color:#dc2626}
+.tool.on:hover{background:#fecaca;color:#b91c1c}
+.atts{display:flex;flex-wrap:wrap;gap:6px;padding:2px 2px 0}
+.att{display:inline-flex;align-items:center;gap:8px;max-width:100%;padding:6px 6px 6px 10px;border-radius:12px;background:var(--panel);border:1px solid var(--line);font-size:12.5px;color:var(--ink-2)}
+.att svg{flex:none;color:var(--violet)}
+.att .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+.att .meta{color:var(--muted);white-space:nowrap}
+.att.err{background:#fef2f2;border-color:#fecaca;color:#991b1b}
+.att.err .meta{color:#b91c1c}
+.att button{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;color:var(--soft)}
+.att button:hover{background:#fff;color:var(--ink)}
+.att .spin{width:12px;height:12px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--violet);animation:spin .8s linear infinite}
+.rec{flex:1;display:flex;align-items:center;gap:10px;height:36px;padding:0 4px;font-size:14px;color:var(--ink-2)}
+.rec[hidden]{display:none}
+.rec .dot{width:9px;height:9px;border-radius:50%;background:#dc2626;animation:pulse 1.2s ease-in-out infinite}
+.rec.busy .dot{background:var(--violet)}
+.rec .time{font-variant-numeric:tabular-nums;color:var(--muted)}
+.rec-cancel{margin-left:auto;font-size:13px;color:var(--muted);padding:6px 10px;border-radius:999px}
+.rec-cancel:hover{background:var(--panel);color:var(--ink)}
+@keyframes pulse{50%{opacity:.25}}
+.drop-hint{display:none;position:absolute;inset:0;border-radius:inherit;place-items:center;background:rgba(245,242,255,.94);border:2px dashed #b9a8ff;color:var(--violet);font-size:14px;font-weight:500;pointer-events:none}
+.composer.dragging .drop-hint{display:grid}
+.msg.user .stack{display:grid;justify-items:end;gap:6px;max-width:80%}
+.msg.user .stack .body{max-width:100%}
+.msg.user .files{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}
+.msg.user .files .att{background:#fff}
+.msg .tools{display:flex;gap:4px;margin-top:6px;opacity:0;transition:opacity .2s}
+.msg:hover .tools,.msg .tools:focus-within,.msg .tools .speaking{opacity:1}
+.msg .tools button{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);padding:4px 8px;border-radius:8px}
+.msg .tools button:hover{background:var(--panel);color:var(--ink)}
+.msg .tools button.speaking{color:var(--violet)}
+@media (hover:none){.msg .tools{opacity:1}}

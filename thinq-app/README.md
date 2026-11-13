@@ -17,6 +17,15 @@ One server runs everything:
 - "Draft replies to my unread emails"
 - "Find 30 minutes with Priya this week and send her an invite"
 - "Remember: sign my emails as Alex, and no meetings before 10am"
+- Attach a PDF, Word or text file (paperclip, drag-and-drop or paste) and ask "What are the key dates in this contract?"
+- Tap the microphone to record a voice note instead of typing (up to 2 minutes). It's turned into text you can check before sending.
+- Click **Read aloud** under any answer to hear it.
+
+### Documents and voice notes
+
+- **Documents**: up to 5 per message, 10 MB each (PDF with selectable text, .docx, .txt, .md, .csv, .json, .html). Thinq keeps only the text, not the file. Long documents are split into parts the AI reads one at a time with the `read_document` tool. Scanned PDFs (photos of pages) aren't supported yet.
+- **Voice notes** use Groq's free Whisper speech-to-text (`whisper-large-v3-turbo`, change with `GROQ_TRANSCRIBE_MODEL`), so they need `GROQ_API_KEY` even if you use Claude for chat. The recording is sent once to be transcribed and isn't stored. Each voice note counts as one request toward the daily limit.
+- **Read aloud** uses the browser's built-in voice, so it costs nothing.
 
 ## How accounts work
 
@@ -88,12 +97,12 @@ Notes:
 
 ```
 Browser ──▶ server.js ──▶ src/auth.js         sign-in, sessions, invite list
-                     ├──▶ src/agent.js         assistant: instructions + 7 tools ──▶ Groq or Claude
+                     ├──▶ src/agent.js         assistant: instructions + 8 tools ──▶ Groq or Claude
                      ├──▶ src/providers/       google.js (real Gmail/Calendar) or demo.js (sample data)
                      └──▶ src/store.js + db.js per-user data in Postgres (PGlite locally)
 ```
 
-- **Tools**: `search_inbox`, `read_email`, `list_events`, `find_free_time`, `draft_email`, `propose_event`, `remember`.
+- **Tools**: `search_inbox`, `read_email`, `list_events`, `find_free_time`, `draft_email`, `propose_event`, `remember`, `read_document`.
 - **Approvals**: `draft_email` and `propose_event` only queue an item. Sending happens in `server.js` when the person clicks — the AI has no way to send. Each approval can only be sent once, even on a double click.
 - **Isolation**: every database query is filtered by the signed-in person's ID; nobody can see or act on anyone else's conversations, approvals or connection.
 - **Sessions**: a random token in an HttpOnly cookie (the database stores only its hash); 30 days.

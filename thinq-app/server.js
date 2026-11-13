@@ -15,6 +15,8 @@ import { GroqError } from "./src/llm/groq.js";
 import { providerFor } from "./src/providers/index.js";
 import { googleConfigured, publicUrl, redirectUri } from "./src/providers/google.js";
 import { attachUser, requireUser, mountAuth } from "./src/auth.js";
+import { extractDocument, DocumentError, ACCEPTED, MAX_UPLOAD_BYTES, partCount } from "./src/documents.js";
+import { transcribe, voiceAvailable, MAX_AUDIO_BYTES } from "./src/llm/transcribe.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SITE_DIR = process.env.SITE_DIR || path.resolve(here, "..", "thinq-site");
@@ -69,6 +71,8 @@ api.get("/state", async (req, res) => {
     aiProvider: AI_PROVIDER,
     model: MODEL,
     usage: { today: await store.usageToday(req.user.id), limit: DAILY_LIMIT },
+    voiceAvailable: voiceAvailable(),
+    documentTypes: ACCEPTED,
     conversations: await store.listConversations(req.user.id),
     approvals: await store.listApprovals(req.user.id),
     notes: await store.listNotes(req.user.id),
@@ -85,11 +89,13 @@ api.get("/conversations/:id", async (req, res) => {
 const busy = new Set();
 api.post("/chat", async (req, res) => {
   const { conversationId, text } = req.body || {};
+  const attachmentIds = Array.isArray(req.body?.attachments) ? req.body.attachments.map(String).slice(0, 5) : [];
   const timeZone = validTz(req.body?.timeZone);
   const conversation = await store.getConversation(req.user.id, conversationId);
   if (!conversation) return res.status(404).json({ error: "Conversation not found" });
   if (typeof text !== "string" || !text.trim() || text.length > 8000) return res.status(400).json({ error: "Please type a message (up to 8,000 characters)." });
   if (busy.has(req.user.id)) return res.status(409).json({ error: "Thinq is still working on your last message." });
+  const attachments = await store.ownedDocuments(req.user.id, attachmentIds);
 
   res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive", "X-Accel-Buffering": "no" });
   const send = (event) => res.write(`data: ${JSON.stringify(event)}\n\n`);
@@ -107,12 +113,13 @@ api.post("/chat", async (req, res) => {
   busy.add(req.user.id);
   try {
     let reply;
-    for await (const event of runTurn({ user: req.user, conversationId, userText: text.trim(), timeZone })) {
+    await store.attachDocuments(req.user.id, conversationId, attachments.map((d) => d.id));
+    for await (const event of runTurn({ user: req.user, conversationId, userText: text.trim(), timeZone, attachments })) {
       if (event.type === "reply") reply = event;
       else send(event);
     }
     // Save the turn only once it finished, so a failed turn can simply be retried.
-    await store.appendMessage(req.user.id, conversationId, "user", text.trim());
+    await store.appendMessage(req.user.id, conversationId, "user", text.trim(), attachments.map(({ id, name, pages, chars }) => ({ id, name, pages, chars })));
     await store.appendMessage(req.user.id, conversationId, "assistant", reply.text);
     send({ ...reply, approvals: await Promise.all(reply.approvals.map((id) => store.getApproval(req.user.id, id))) });
   } catch (err) {
@@ -142,6 +149,40 @@ function friendlyError(err) {
   if (/invalid_grant|Google is not connected/i.test(String(err?.message))) return "Your Google connection has expired. Click “Connect Gmail & Calendar” in the sidebar to reconnect.";
   return "Something went wrong. Try again in a moment.";
 }
+
+// ---------- documents ----------
+const rawBody = (limit) => express.raw({ type: () => true, limit });
+api.post("/documents", rawBody(MAX_UPLOAD_BYTES + 1024), async (req, res) => {
+  const name = decodeURIComponent(String(req.get("x-filename") || "document")).replace(/[\\/\u0000-\u001f]/g, " ").trim() || "document";
+  try {
+    const out = await extractDocument(name, req.body);
+    const doc = await store.addDocument(req.user.id, { name, sizeBytes: req.body.length, pages: out.pages, text: out.text });
+    await store.logAction(req.user.id, "document_added", { id: doc.id, name, chars: out.chars });
+    res.json({ ...doc, parts: partCount(out.chars), truncated: out.truncated });
+  } catch (err) {
+    if (err instanceof DocumentError) return res.status(400).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: "Couldn't read that file. Try again or use a different format." });
+  }
+});
+api.delete("/documents/:id", async (req, res) => { await store.deleteDocument(req.user.id, req.params.id); res.json({ ok: true }); });
+
+// ---------- voice notes ----------
+api.post("/transcribe", rawBody(MAX_AUDIO_BYTES), async (req, res) => {
+  if (!voiceAvailable()) return res.status(400).json({ error: "Voice notes aren't set up on this server (it needs GROQ_API_KEY)." });
+  if (!req.body?.length || req.body.length < 1000) return res.status(400).json({ error: "That recording was too short. Hold on a little longer and try again." });
+  const usage = await store.useRequest(req.user.id, DAILY_LIMIT);
+  if (!usage.allowed) return res.status(429).json({ error: `You've used today's ${DAILY_LIMIT} requests. Your limit resets tomorrow.` });
+  try {
+    const text = await transcribe(req.body, req.get("content-type"));
+    if (!text) return res.status(400).json({ error: "Couldn't hear any speech in that recording. Try again a little closer to the microphone." });
+    await store.logAction(req.user.id, "voice_note", { chars: text.length });
+    res.json({ text });
+  } catch (err) {
+    console.error(err);
+    res.status(err.status === 429 ? 429 : 500).json({ error: err.status === 429 ? "Voice transcription is busy (free-tier limit). Wait a minute and try again." : friendlyError(err) });
+  }
+});
 
 // ---------- approvals ----------
 api.patch("/approvals/:id", async (req, res) => {
@@ -195,6 +236,10 @@ api.get("/agenda", async (req, res) => {
 
 api.delete("/notes/:id", async (req, res) => { await store.deleteNote(req.user.id, req.params.id); res.json({ ok: true }); });
 
+api.use((err, req, res, next) => {
+  if (err?.type === "entity.too.large") return res.status(413).json({ error: "That file is too big. Documents can be up to 10 MB and voice notes about 15 minutes." });
+  next(err);
+});
 app.use("/api", api);
 
 // ---------- the website ----------
