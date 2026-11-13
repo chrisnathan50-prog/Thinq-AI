@@ -6,7 +6,9 @@ export const IMAGE_MODEL = process.env.CLOUDFLARE_IMAGE_MODEL || "@cf/black-fore
 export const IMAGE_DAILY_LIMIT = Number(process.env.IMAGE_DAILY_LIMIT || 10); // per person per day
 const STEPS = Math.min(8, Math.max(1, Number(process.env.IMAGE_STEPS || 6))); // more steps = more detail, more neurons
 
-export const imagesAvailable = () => Boolean(process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN);
+const accountId = () => String(process.env.CLOUDFLARE_ACCOUNT_ID || "").trim();
+const apiToken = () => String(process.env.CLOUDFLARE_API_TOKEN || "").trim().replace(/^Bearer\s+/i, "");
+export const imagesAvailable = () => Boolean(accountId() && apiToken());
 
 export class ImageError extends Error {
   constructor(message, { status = 0, quota = false } = {}) { super(message); this.status = status; this.quota = quota; }
@@ -17,21 +19,23 @@ const mimeOf = (buf) =>
 
 export async function generateImage(prompt) {
   if (!imagesAvailable()) throw new ImageError("Image creation isn't set up on this server.");
-  const url = `${BASE_URL}/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/ai/run/${IMAGE_MODEL}`;
+  const url = `${BASE_URL}/accounts/${accountId()}/ai/run/${IMAGE_MODEL}`;
   let res;
   try {
     res = await fetch(url, {
       method: "POST",
-      headers: { Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${apiToken()}`, "Content-Type": "application/json" },
       body: JSON.stringify({ prompt: String(prompt).slice(0, 2048), steps: STEPS, seed: Math.floor(Math.random() * 2 ** 31) }),
       signal: AbortSignal.timeout(60_000),
     });
   } catch (err) {
+    console.warn(`[images] request failed: ${err.name}: ${err.message}`);
     throw new ImageError(`Couldn't reach the image service (${err.name === "TimeoutError" ? "it took too long" : err.message}).`);
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data.success === false || !data.result?.image) {
     const msg = (data.errors || []).map((e) => e.message).join("; ") || `HTTP ${res.status}`;
+    console.warn(`[images] Cloudflare returned ${res.status}: ${msg}`);
     const quota = res.status === 429 || /neuron|quota|limit|exceeded/i.test(msg);
     if (quota) throw new ImageError("The free image allowance for today is used up. It resets at midnight UTC.", { status: 429, quota: true });
     if (res.status === 401 || res.status === 403) throw new ImageError("The image service rejected Thinq's Cloudflare key.", { status: res.status });
