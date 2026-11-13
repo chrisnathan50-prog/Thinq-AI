@@ -152,3 +152,20 @@ export async function getImage(userId, imageId) {
 }
 export const imagesToday = async (userId) =>
   (await one(`select count(*)::int as n from images where user_id = $1 and created_at >= current_date`, [userId])).n;
+
+// ---------- deleting chats (also removes the documents and images that belong to them) ----------
+export async function deleteConversation(userId, conversationId) {
+  const owned = await one(`select id from conversations where id = $1 and user_id = $2`, [conversationId, userId]);
+  if (!owned) return false;
+  await query(`delete from images where user_id = $1 and conversation_id = $2`, [userId, conversationId]);
+  await query(`delete from documents where user_id = $1 and conversation_id = $2`, [userId, conversationId]);
+  await query(`delete from conversations where id = $1 and user_id = $2`, [conversationId, userId]);
+  return true;
+}
+export async function deleteAllConversations(userId) {
+  const n = (await one(`select count(*)::int as n from conversations where user_id = $1`, [userId])).n;
+  await query(`delete from images where user_id = $1`, [userId]);
+  await query(`delete from documents where user_id = $1`, [userId]);
+  await query(`delete from conversations where user_id = $1`, [userId]);
+  return n;
+}

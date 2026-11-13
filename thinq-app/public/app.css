@@ -197,3 +197,22 @@ body{overflow:hidden;background:var(--panel)}
 .gen .dl:hover{background:#fff;color:var(--ink)}
 @keyframes shimmer{to{background-position:-200% 0}}
 @media (max-width:560px){.gallery.multi{grid-template-columns:1fr}}
+
+/* ---------- chat list delete + account menu ---------- */
+.convos{grid-template-columns:minmax(0,1fr)}
+.convos .convo{position:relative;display:flex;align-items:center;min-width:0;border-radius:12px}
+.convos .convo a{flex:1;min-width:0;padding-right:36px}
+.convos .del{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:var(--soft);opacity:0;transition:opacity .15s,background .15s,color .15s}
+.convos .convo:hover .del,.convos .del:focus-visible,.convos .convo[data-current] .del{opacity:1}
+.convos .del:hover{background:#fee2e2;color:#dc2626}
+@media (hover:none){.convos .del{opacity:1}}
+.convos .none{font-size:12.5px;color:var(--soft);padding:6px 12px}
+.account{position:relative}
+.acct-menu{position:absolute;right:0;bottom:calc(100% + 6px);z-index:20;min-width:190px;padding:6px;border-radius:14px;background:#fff;border:1px solid var(--line);box-shadow:0 12px 32px -12px rgba(0,0,0,.25);display:grid;gap:2px}
+.acct-menu button{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;font-size:13.5px;color:var(--ink-2);text-align:left}
+.acct-menu button:hover{background:var(--panel);color:var(--ink)}
+.acct-menu button.danger{color:#b91c1c}
+.acct-menu button.danger:hover{background:#fef2f2;color:#991b1b}
+.suggestions.loading{pointer-events:none}
+.suggestions .sk{display:inline-block;height:38px;width:170px;border-radius:999px;background:linear-gradient(110deg,#efedf5 30%,#f8f7fb 50%,#efedf5 70%) 0 0/200% 100%;animation:shimmer 1.4s linear infinite}
+.suggestions .sk:nth-child(2){width:210px}.suggestions .sk:nth-child(3){width:240px}.suggestions .sk:nth-child(4){width:190px}

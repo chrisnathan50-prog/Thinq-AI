@@ -18,6 +18,7 @@ import { attachUser, requireUser, mountAuth } from "./src/auth.js";
 import { extractDocument, DocumentError, ACCEPTED, MAX_UPLOAD_BYTES, partCount } from "./src/documents.js";
 import { transcribe, voiceAvailable, MAX_AUDIO_BYTES } from "./src/llm/transcribe.js";
 import { imagesAvailable, IMAGE_DAILY_LIMIT } from "./src/llm/images.js";
+import { suggestionsFor, forgetSuggestions } from "./src/suggestions.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SITE_DIR = process.env.SITE_DIR || path.resolve(here, "..", "thinq-site");
@@ -82,6 +83,24 @@ api.get("/state", async (req, res) => {
 });
 
 api.post("/conversations", async (req, res) => res.json(await store.createConversation(req.user.id)));
+api.delete("/conversations/:id", async (req, res) => {
+  const ok = await store.deleteConversation(req.user.id, req.params.id);
+  if (ok) await store.logAction(req.user.id, "conversation_deleted", { id: req.params.id });
+  ok ? res.json({ ok: true }) : res.status(404).json({ error: "Not found" });
+});
+api.delete("/conversations", async (req, res) => {
+  const n = await store.deleteAllConversations(req.user.id);
+  await store.logAction(req.user.id, "all_conversations_deleted", { count: n });
+  res.json({ ok: true, deleted: n });
+});
+api.get("/suggestions", async (req, res) => {
+  try {
+    res.json({ suggestions: await suggestionsFor(req.user, validTz(req.query.tz)) });
+  } catch (err) {
+    console.error(err);
+    res.json({ suggestions: [] });
+  }
+});
 api.get("/conversations/:id", async (req, res) => {
   const c = await store.getConversation(req.user.id, req.params.id);
   c ? res.json(c) : res.status(404).json({ error: "Not found" });
@@ -128,6 +147,7 @@ api.post("/chat", async (req, res) => {
     console.error(err);
     send({ type: "error", text: friendlyError(err) });
   } finally {
+    forgetSuggestions(req.user.id); // the inbox/calendar may have changed during this turn
     busy.delete(req.user.id);
     res.end();
   }

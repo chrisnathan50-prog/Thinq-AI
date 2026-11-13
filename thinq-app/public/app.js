@@ -72,10 +72,28 @@ function renderAccount() {
   $("#account").innerHTML = `
     ${u.picture ? `<img class="avatar" src="${esc(u.picture)}" alt="" referrerpolicy="no-referrer">` : `<span class="avatar">${initial}</span>`}
     <span class="who"><b>${esc(u.name || "You")}</b><small>${esc(u.email || "")}</small></span>
-    <button class="btn ghost sm" id="logout">Log out</button>`;
+    <button class="icon-btn" id="acctBtn" aria-label="Account options" aria-haspopup="menu" aria-expanded="false">${icon("i-more", 16)}</button>
+    <div class="acct-menu" id="acctMenu" role="menu" hidden>
+      <button role="menuitem" class="danger" id="deleteAll">${icon("i-trash", 14)}Delete all chats</button>
+      <button role="menuitem" id="logout">${icon("i-logout", 14)}Log out</button>
+    </div>`;
+  const menu = $("#acctMenu"), btn = $("#acctBtn");
+  const setMenu = (open) => { menu.hidden = !open; btn.setAttribute("aria-expanded", String(open)); };
+  btn.addEventListener("click", (e) => { e.stopPropagation(); setMenu(menu.hidden); });
   $("#logout").addEventListener("click", async () => {
     await fetch("/auth/logout", { method: "POST" }).catch(() => {});
     location.href = "/";
+  });
+  $("#deleteAll").addEventListener("click", async () => {
+    setMenu(false);
+    const n = state.conversations.length;
+    if (!n) return notice("You don't have any chats yet.", "ok");
+    if (!confirm(`Delete all ${n} chat${n > 1 ? "s" : ""}? Their messages, attached documents and images will be removed for good. Drafts waiting in Approvals stay.`)) return;
+    try {
+      const r = await api("/api/conversations", { method: "DELETE" });
+      await openConversation(null); await refresh();
+      notice(`Deleted ${r.deleted} chat${r.deleted === 1 ? "" : "s"}.`, "ok");
+    } catch (err) { notice(err.message); }
   });
 }
 
@@ -115,8 +133,22 @@ function renderNotes() {
 function renderConvos() {
   const list = state.conversations;
   $("#convos").innerHTML = list.length
-    ? `<div class="label">Recent</div>` + list.map((c) => `<a href="#${c.id}" data-id="${c.id}" ${c.id === conversationId ? 'aria-current="true"' : ""}>${esc(c.title)}</a>`).join("")
-    : "";
+    ? `<div class="label">Recent</div>` + list.map((c) => `<div class="convo"${c.id === conversationId ? ' data-current' : ""}><a href="#${c.id}" data-id="${c.id}" ${c.id === conversationId ? 'aria-current="true"' : ""} title="${esc(c.title)}">${esc(c.title)}</a><button class="del" data-del="${c.id}" aria-label="Delete “${esc(c.title)}”" title="Delete chat">${icon("i-trash", 14)}</button></div>`).join("")
+    : `<p class="none">Your chats will appear here.</p>`;
+}
+
+// ---------------- starter suggestions (personal: from your inbox, calendar and memory) ----------------
+const FALLBACK = ["Plan my day", "What needs a reply from me?", "Draft replies to my unread emails", "What's on my calendar tomorrow?"];
+let suggestionsReq = 0;
+async function loadSuggestions() {
+  const box = $("#suggestions"), mine = ++suggestionsReq;
+  if (!box.querySelector("button")) { box.classList.add("loading"); box.setAttribute("aria-busy", "true"); }
+  let list = [];
+  try { list = (await api(`/api/suggestions?tz=${encodeURIComponent(timeZone)}`)).suggestions.map((s) => s.text); } catch {}
+  if (mine !== suggestionsReq) return;
+  if (!list.length) list = FALLBACK;
+  box.classList.remove("loading"); box.removeAttribute("aria-busy");
+  box.innerHTML = list.map((t) => `<button>${esc(t)}</button>`).join("");
 }
 
 // ---------------- conversations ----------------
@@ -125,6 +157,7 @@ async function openConversation(id) {
   $("#messages").querySelectorAll(".msg").forEach((m) => m.remove());
   if (!id) {
     $("#empty").hidden = false; $("#title").textContent = "New conversation";
+    loadSuggestions();
     history.replaceState(null, "", location.pathname); renderConvos(); return;
   }
   try {
@@ -434,9 +467,9 @@ $("#messages").addEventListener("click", (e) => {
 
 // Small message at the top of the chat for problems with uploads or recording.
 let noticeTimer;
-function notice(text) {
+function notice(text, kind = "err") {
   const banner = $("#banner");
-  banner.hidden = false; banner.className = "banner err"; banner.textContent = text;
+  banner.hidden = false; banner.className = `banner ${kind}`; banner.textContent = text;
   clearTimeout(noticeTimer); noticeTimer = setTimeout(() => { banner.hidden = true; }, 7000);
 }
 
@@ -459,7 +492,19 @@ addEventListener("resize", autosize);
 $("#messages").addEventListener("load", (e) => { if (e.target.tagName === "IMG") e.target.dataset.loaded = ""; }, true);
 $("#suggestions").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) send(b.textContent); });
 $("#newChat").addEventListener("click", () => openConversation(null));
-$("#convos").addEventListener("click", (e) => { const a = e.target.closest("a[data-id]"); if (a) { e.preventDefault(); openConversation(a.dataset.id); } });
+$("#convos").addEventListener("click", async (e) => {
+  const d = e.target.closest("[data-del]");
+  if (!d) return;
+  e.preventDefault(); e.stopPropagation();
+  const c = state.conversations.find((x) => x.id === d.dataset.del);
+  if (!confirm(`Delete “${c?.title || "this chat"}”? Its messages, attached documents and images will be removed for good.`)) return;
+  try {
+    await api(`/api/conversations/${d.dataset.del}`, { method: "DELETE" });
+    if (d.dataset.del === conversationId) await openConversation(null);
+    await refresh();
+  } catch (err) { notice(err.message); }
+});
+$("#convos").addEventListener("click", (e) => { if (e.target.closest("[data-del]")) return; const a = e.target.closest("a[data-id]"); if (a) { e.preventDefault(); openConversation(a.dataset.id); } });
 $("#notes").addEventListener("click", async (e) => { const b = e.target.closest("[data-note]"); if (b) { await api(`/api/notes/${b.dataset.note}`, { method: "DELETE" }); refresh(); } });
 $("#messages").addEventListener("click", (e) => { const c = e.target.closest("[data-approval]"); if (!c) return; showTab("approvals"); openPanel(true); const el = document.querySelector(`.apv[data-id="${c.dataset.approval}"]`); el?.scrollIntoView({ block: "center", behavior: "smooth" }); el?.classList.add("flash"); setTimeout(() => el?.classList.remove("flash"), 1500); });
 document.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
@@ -467,7 +512,9 @@ $("#openPanel").addEventListener("click", () => openPanel(true));
 $("#closePanel").addEventListener("click", closeDrawers);
 $("#openSide").addEventListener("click", () => { $("#sidebar").classList.add("open"); $("#scrim").hidden = false; });
 $("#scrim").addEventListener("click", closeDrawers);
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawers(); });
+const closeAcctMenu = () => { const m = $("#acctMenu"); if (m && !m.hidden) { m.hidden = true; $("#acctBtn")?.setAttribute("aria-expanded", "false"); } };
+document.addEventListener("click", (e) => { if (!e.target.closest("#acctMenu, #acctBtn")) closeAcctMenu(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeDrawers(); closeAcctMenu(); } });
 
 // Google sign-in result banner
 const g = new URLSearchParams(location.search).get("google");

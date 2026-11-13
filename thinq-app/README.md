@@ -45,7 +45,8 @@ The free plan gives 10,000 "neurons" a day — about 130 images for the whole se
 3. **Connect Gmail & Calendar** — a button in the app's sidebar asks Google for mail and calendar access. Each person's Google access is stored **encrypted** and is only ever used for that person.
 4. **Invite-only** — only emails on the `ALLOWED_EMAILS` list can sign in (emails or whole `@domains`). Remove someone from the list and they're signed out.
 5. **Daily limit** — each person gets `DAILY_REQUEST_LIMIT` AI requests a day (default 60), so nobody can use up the shared AI quota.
-6. **Log out** — bottom of the sidebar.
+6. **Log out / delete chats** — the ⋯ menu next to your name has *Log out* and *Delete all chats*. Hover a chat in the list for its trash button. Deleting a chat also removes its attached documents and images; drafts waiting in Approvals stay.
+7. **Personal starter questions** — a new chat suggests questions built from your own inbox, calendar and saved preferences (your next meeting, who's waiting on a reply, unread count, time of day). They come straight from your data, without an AI call, and refresh every few minutes.
 
 ## Run it on your computer
 
