@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tester requests — Thinq AI</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app/base.css">
+<link rel="stylesheet" href="/app/app.css">
+</head>
+<body class="admin">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="mark" viewBox="0 0 24 24"><g fill="currentColor"><circle cx="12" cy="3" r="2"/><circle cx="12" cy="21" r="2"/><circle cx="3" cy="12" r="2"/><circle cx="21" cy="12" r="2"/><circle cx="5.6" cy="5.6" r="1.7"/><circle cx="18.4" cy="5.6" r="1.7"/><circle cx="5.6" cy="18.4" r="1.7"/><circle cx="18.4" cy="18.4" r="1.7"/><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="7.5" r="1.5"/><circle cx="12" cy="16.5" r="1.5"/><circle cx="7.5" cy="12" r="1.5"/><circle cx="16.5" cy="12" r="1.5"/></g></symbol>
+  <symbol id="i-back" viewBox="0 0 16 16"><path d="M10 3.5 5.5 8l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 16 16"><rect x="5" y="5" width="8.5" height="8.5" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M3 10.5V3.6A1.1 1.1 0 0 1 4.1 2.5H11" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+</svg>
+
+<main class="admin-wrap">
+  <header class="admin-head">
+    <a class="back" href="/app"><svg width="14" height="14"><use href="#i-back"/></svg>Back to Thinq</a>
+    <h1>Tester requests</h1>
+    <p>People who asked to test Thinq from the website's <a class="link" href="/testers.html" target="_blank" rel="noopener">Help Us Test</a> page. Approving someone lets them log in.</p>
+  </header>
+
+  <div class="banner" id="googleNote">
+    <b>One more step for each approved tester:</b> while your Google sign-in is in <i>Testing</i>, Google only lets people on its <b>Test users</b> list log in (up to 100).
+    After approving, copy their email and add it in <a class="link" id="googleLink" href="https://console.cloud.google.com/auth/audience" target="_blank" rel="noopener">Google Cloud → Google Auth Platform → Audience → Test users</a>.
+  </div>
+  <div class="banner ok" id="flash" hidden></div>
+
+  <div class="segmented" role="tablist" id="filters">
+    <button role="tab" aria-selected="true" data-filter="pending">Waiting <span class="badge" id="nPending" hidden></span></button>
+    <button role="tab" aria-selected="false" data-filter="approved">Approved</button>
+    <button role="tab" aria-selected="false" data-filter="declined">Declined</button>
+    <button role="tab" aria-selected="false" data-filter="all">All</button>
+  </div>
+  <div class="tester-list" id="list" aria-live="polite"></div>
+</main>
+
+<script src="/app/admin.js" type="module"></script>
+</body>
+</html>

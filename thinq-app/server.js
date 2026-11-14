@@ -23,6 +23,7 @@ import { friendlyError } from "./src/errors.js";
 import { chatTurn, TurnError, busy, DAILY_LIMIT } from "./src/turns.js";
 import { approveItem, declineItem } from "./src/approvals.js";
 import { mountWhatsApp, whatsappConfigured, whatsappNumber, linkUrl } from "./src/whatsapp.js";
+import { mountTesters, loadApprovedTesters, isAdmin } from "./src/testers.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SITE_DIR = process.env.SITE_DIR || path.resolve(here, "..", "thinq-site");
@@ -30,6 +31,7 @@ const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1");
 
 await initDb();
+await loadApprovedTesters();
 
 const app = express();
 app.set("trust proxy", 1); // behind Render's proxy, so secure cookies work
@@ -55,11 +57,13 @@ app.get("/healthz", (req, res) => res.json({ ok: true }));
 mountWhatsApp(app); // Meta calls this directly - no Thinq sign-in
 app.use(attachUser);
 mountAuth(app);
+mountTesters(app); // website tester form + admin tester list
 
 const validTz = (tz) => { try { new Intl.DateTimeFormat("en-US", { timeZone: tz }); return tz; } catch { return "UTC"; } };
 
 // ---------- the app (signed in only) ----------
 app.get(["/app", "/app/"], requireUser, (req, res) => res.sendFile(path.join(here, "public", "index.html")));
+app.get("/app/admin", requireUser, (req, res) => (isAdmin(req.user.email) ? res.sendFile(path.join(here, "public", "admin.html")) : res.redirect("/app")));
 app.use("/app", express.static(path.join(here, "public"), { index: false }));
 
 // ---------- app state ----------
@@ -79,6 +83,7 @@ api.get("/state", async (req, res) => {
     model: MODEL,
     usage: { today: await store.usageToday(req.user.id), limit: DAILY_LIMIT },
     voiceAvailable: voiceAvailable(),
+    admin: isAdmin(req.user.email) ? { pendingTesters: (await store.listTesters()).filter((t) => t.status === "pending").length } : null,
     speechAvailable: speechAvailable(),
     whatsapp: await whatsappState(req.user.id),
     images: { available: imagesAvailable(), today: await store.imagesToday(req.user.id), limit: IMAGE_DAILY_LIMIT },
@@ -279,7 +284,7 @@ app.listen(PORT, HOST, () => {
   console.log(`  Website: ${fs.existsSync(SITE_DIR) ? SITE_DIR : "not found (app only)"}`);
   console.log(`  AI: ${AI_PROVIDER === "groq" ? "Groq" : "Anthropic"} (${MODEL})${hasApiKey() ? "" : ` - ⚠ ${apiKeyName()} missing`}`);
   console.log(`  Google sign-in: ${googleConfigured() ? `on (redirect URI: ${redirectUri()})` : "⚠ not configured"}`);
-  console.log(`  Invite list: ${process.env.ALLOWED_EMAILS ? process.env.ALLOWED_EMAILS : process.env.NODE_ENV === "production" ? "⚠ empty - nobody can sign in" : "not set (anyone can sign in locally)"}`);
+  console.log(`  Invite list: ${process.env.ALLOWED_EMAILS || "(none)"} · admins: ${process.env.ADMIN_EMAILS || "⚠ none - set ADMIN_EMAILS to review tester requests"} · plus testers approved in the app`);
   console.log(`  WhatsApp: ${whatsappConfigured() ? `on (+${whatsappNumber() || "number not set"})` : "off"}`);
   console.log(`  Daily limit: ${DAILY_LIMIT || "none"} AI requests per person\n`);
 });

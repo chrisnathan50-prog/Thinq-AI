@@ -149,6 +149,40 @@ $$("form[data-demo]").forEach(form => form.addEventListener("submit", e => {
   form.reset?.();
 }));
 
+/* ---------- Help us test: tester sign-up form ---------- */
+$$("form[data-testers]").forEach(form => form.addEventListener("submit", async e => {
+  e.preventDefault();
+  const note = $(".form-note", form), btn = $("button[type=submit]", form);
+  const show = (text, bad) => { note.textContent = text; note.classList.toggle("err", !!bad); note.hidden = false; note.focus?.(); };
+  const data = Object.fromEntries(new FormData(form));
+  if (!/^\S+@\S+\.\S+$/.test(data.email || "")) return show("Please enter the Google email address you'll sign in with.", true);
+  if (!form.agree.checked) return show("Please tick the box to confirm you understand Thinq is still being tested.", true);
+  btn.disabled = true; const label = btn.textContent; btn.textContent = "Sending…";
+  try {
+    const res = await fetch("/public/testers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: data.name, email: data.email, useCase: data.useCase, website: data.website }) });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(out.error || "Something went wrong. Please try again.");
+    show(out.message || "Thanks! You're on the list.");
+    btn.textContent = out.status === "approved" ? "You already have access" : "You're on the list";
+    if (out.status === "approved") { const a = document.createElement("a"); a.href = "login.html"; a.className = "btn sm"; a.textContent = "Log in"; note.after(a); }
+    form.reset();
+  } catch (err) {
+    show(err.message || "Couldn't send that. Please try again in a moment.", true);
+    btn.disabled = false; btn.textContent = label;
+  }
+}));
+
+/* "Prefer email?" links: filled in from the server's CONTACT_EMAIL setting, hidden if it isn't set */
+const contactLinks = $$("[data-contact-email]");
+if (contactLinks.length) fetch("/public/config").then(r => (r.ok ? r.json() : null)).then(cfg => {
+  if (!cfg?.contactEmail) return;
+  contactLinks.forEach(a => {
+    a.href = `mailto:${cfg.contactEmail}?subject=${encodeURIComponent("I'd like to help test Thinq")}&body=${encodeURIComponent("Hi! I'd like to help test Thinq.\n\nName:\nGoogle email I'll sign in with:\nWhat I'd use it for:\n")}`;
+    const label = $("[data-contact-label]", a); if (label) label.textContent = cfg.contactEmail;
+    a.hidden = false;
+  });
+}).catch(() => {});
+
 /* ---------- Auth: sign in / create account ---------- */
 const auth = $("[data-mode]");
 if (auth) {
@@ -183,7 +217,7 @@ $$(".subscribe").forEach(f => f.addEventListener("submit", e => { e.preventDefau
   const err = new URLSearchParams(location.search).get("error");
   if (alertEl && err) {
     const msgs = {
-      not_invited: ["err", "Thinq is invite-only for now, and this Google account isn't on the list yet. Ask us for an invite, or try another account."],
+      not_invited: ["err", "Thinq is invite-only for now, and this Google account isn't on the list yet. Request a tester spot (link below), or try another account."],
       not_configured: ["", "Sign-in isn't set up on this server yet."],
       access_denied: ["", "Sign-in was cancelled. You can try again whenever you're ready."],
       expired: ["", "That sign-in took too long. Please try again."],

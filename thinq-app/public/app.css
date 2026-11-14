@@ -223,3 +223,32 @@ body{overflow:hidden;background:var(--panel)}
 .wa-actions .btn svg{flex:none}
 .wa-code{font-size:24px;font-weight:600;letter-spacing:.12em;font-variant-numeric:tabular-nums;text-align:center;padding:8px;border-radius:12px;background:var(--panel);border:1px dashed var(--line);user-select:all}
 .conn .meta{font-size:12px}
+
+/* ---------- admin page (tester requests) ---------- */
+body.admin{overflow:auto;background:var(--panel)}
+.admin-wrap{max-width:860px;margin:0 auto;padding:28px 20px 80px;display:grid;gap:18px}
+.admin-head{display:grid;gap:8px}
+.admin-head .back{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;color:var(--muted);justify-self:start}
+.admin-head .back:hover{color:var(--ink)}
+.admin-head h1{font-size:28px;font-weight:500;letter-spacing:-.02em}
+.admin-head p{color:var(--muted);font-size:14.5px}
+.admin-wrap .banner{margin:0;line-height:1.55}
+.admin-wrap .segmented{justify-self:start}
+.tester-list{display:grid;gap:10px}
+.tester{background:#fff;border:1px solid var(--line);border-radius:18px;padding:16px 18px;display:grid;gap:10px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+.tester .who{display:grid;gap:2px}
+.tester .who b{font-weight:500;font-size:15px}
+.tester .email{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--ink-2);word-break:break-all}
+.tester small{color:var(--muted);font-size:12.5px}
+.tester .use{font-size:14px;color:var(--ink-2);background:var(--panel);border-radius:12px;padding:10px 12px;white-space:pre-wrap}
+.tester .actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.tester .status{font-size:12px;font-weight:500;padding:4px 10px;border-radius:999px;background:#fff7e6;color:#7a4b00;margin-right:auto}
+.tester.approved .status{background:#f0fbf4;color:#14662f}
+.tester.declined .status{background:#f4f4f6;color:var(--muted)}
+.mini{display:inline-flex;align-items:center;gap:4px;font-size:12px;padding:3px 8px;border-radius:8px;color:var(--muted);border:1px solid var(--line);background:#fff}
+.mini:hover{color:var(--ink)}
+.mini.done{color:#14662f;border-color:#cdeed8}
+.tester-list .none{color:var(--muted);text-align:center;padding:48px 12px;font-size:14px}
+.acct-menu a{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;font-size:13.5px;color:var(--ink-2)}
+.acct-menu a:hover{background:var(--panel);color:var(--ink)}
+.acct-menu .badge{margin-left:auto}

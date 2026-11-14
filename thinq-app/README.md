@@ -33,6 +33,17 @@ One server runs everything:
 
   Each read is capped at `SPEECH_MAX_CHARS` (2,500 by default) and counts toward the daily request limit. Replaying the same message doesn't cost again.
 
+### Finding testers ("Help Us Test")
+
+The website has a **Help Us Test** page (`/testers.html`, linked from the home page, footer and login page). Visitors leave their name, Google email and what they'd use Thinq for; requests are saved in the database.
+
+- Set `ADMIN_EMAILS` to your own address. Admins can always sign in and see **Tester requests** in the ⋯ menu (or go to `/app/admin`).
+- **Approve** lets that person sign in right away — no need to edit `ALLOWED_EMAILS`. **Remove access** signs them out.
+- If you've connected Gmail, approving also puts a ready-to-send "You're in" email in your Approvals panel, and you get a heads-up email in your inbox for each new request.
+- While your Google sign-in is in *Testing*, also add each approved tester's Gmail under Google Cloud → Google Auth Platform → **Audience → Test users** (up to 100). The admin page links there and has a copy button.
+- Optional `CONTACT_EMAIL` shows a "Prefer email?" link on the page. It's public, so use an address you're happy to share.
+- The form has spam protection (hidden field + 5 requests per hour per visitor).
+
 ### WhatsApp (optional)
 
 People can chat with Thinq on WhatsApp through Meta's official **WhatsApp Cloud API**. Each person links their number once: in the app, *Connect WhatsApp* shows a 6-digit code that they send to Thinq's WhatsApp number. After that they can:

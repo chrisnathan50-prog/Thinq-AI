@@ -580,3 +580,15 @@ footer.site{margin-top:136px;position:relative;overflow:hidden}
 .auth-points li{padding-left:22px;position:relative}
 .auth-points li::before{content:"";position:absolute;left:0;top:3px;width:14px;height:14px;border-radius:50%;background:#efeaff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 8.2 7 10.5l4.5-5' fill='none' stroke='%237a5cff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/100% no-repeat}
 .nav-right .btn.app-open{gap:8px}
+
+/* ---------- Help us test ---------- */
+.hp{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
+.form-note.err{background:#fef2f2;color:#991b1b;border-color:#fbd5d5}
+.tester-perks{list-style:none;display:grid;gap:6px;margin-top:8px;font-size:14px;color:var(--ink-2)}
+.tester-perks li{display:flex;gap:8px;align-items:flex-start}
+.tester-perks li::before{content:"";flex:none;width:6px;height:6px;margin-top:8px;border-radius:50%;background:var(--violet,#7c5cff)}
+.ways > div{display:flex;gap:14px;align-items:center;padding:14px;border-radius:var(--radius-md)}
+.tester-asks{grid-template-columns:repeat(3,1fr);gap:16px;margin-top:32px}
+.tester-asks > div{align-items:flex-start;background:#fff;border:1px solid var(--line);padding:20px}
+@media (max-width:900px){.tester-asks{grid-template-columns:1fr}}
+.hero .btn + .btn,.cta .btn + .btn{margin-left:10px}

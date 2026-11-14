@@ -28,14 +28,23 @@ function setCookie(res, name, value, { maxAgeMs, clear } = {}) {
 }
 
 // ---------- invite list ----------
-// ALLOWED_EMAILS: comma-separated emails and/or "@company.com" domains, or "*" for anyone.
-// If it's not set: anyone can sign in locally, nobody in production (so a fresh deploy is never open to the world).
+// Who can sign in:
+//   - ALLOWED_EMAILS: comma-separated emails and/or "@company.com" domains, or "*" for anyone;
+//   - ADMIN_EMAILS: the people who run Thinq (they also see tester requests);
+//   - testers an admin approved in the app (kept in the database, cached here).
+// With none of these set: anyone can sign in locally, nobody in production (a fresh deploy is never open to the world).
+const listFrom = (name) => (process.env[name] || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+const approvedTesters = new Set();
+export const setApprovedTesters = (emails) => { approvedTesters.clear(); emails.forEach((e) => approvedTesters.add(String(e).toLowerCase())); };
+export const allowTester = (email) => approvedTesters.add(String(email).toLowerCase());
+export const disallowTester = (email) => approvedTesters.delete(String(email).toLowerCase());
+export const isAdmin = (email) => listFrom("ADMIN_EMAILS").includes(String(email || "").toLowerCase());
+
 export function isAllowed(email) {
-  const raw = (process.env.ALLOWED_EMAILS || "").trim();
-  if (!raw) return !production();
-  const list = raw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const list = listFrom("ALLOWED_EMAILS");
   const e = String(email || "").toLowerCase();
-  return list.includes("*") || list.includes(e) || list.some((x) => x.startsWith("@") && e.endsWith(x));
+  if (!list.length && !listFrom("ADMIN_EMAILS").length && !approvedTesters.size) return !production();
+  return list.includes("*") || list.includes(e) || list.some((x) => x.startsWith("@") && e.endsWith(x)) || isAdmin(e) || approvedTesters.has(e);
 }
 
 // ---------- middleware ----------
@@ -50,6 +59,10 @@ export async function attachUser(req, res, next) {
     req.user = null;
   }
   next();
+}
+export function requireAdmin(req, res, next) {
+  if (req.user && isAdmin(req.user.email)) return next();
+  return res.status(403).json({ error: "Only Thinq's admins can see this." });
 }
 export function requireUser(req, res, next) {
   if (req.user) return next();

@@ -143,6 +143,16 @@ async function migrate() {
       message_id text primary key,
       at timestamptz not null default now()
     );
+    create table if not exists testers (
+      id text primary key,
+      email text not null unique,
+      name text,
+      use_case text,
+      status text not null default 'pending',
+      created_at timestamptz not null default now(),
+      decided_at timestamptz,
+      decided_by text
+    );
     alter table messages add column if not exists attachments jsonb;
     create index if not exists documents_conv on documents(conversation_id);
     create index if not exists conversations_user on conversations(user_id, created_at desc);

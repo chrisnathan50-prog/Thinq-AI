@@ -74,6 +74,7 @@ function renderAccount() {
     <span class="who"><b>${esc(u.name || "You")}</b><small>${esc(u.email || "")}</small></span>
     <button class="icon-btn" id="acctBtn" aria-label="Account options" aria-haspopup="menu" aria-expanded="false">${icon("i-more", 16)}</button>
     <div class="acct-menu" id="acctMenu" role="menu" hidden>
+      ${state.admin ? `<a role="menuitem" href="/app/admin">${icon("i-check", 14)}Tester requests${state.admin.pendingTesters ? `<span class="badge">${state.admin.pendingTesters}</span>` : ""}</a>` : ""}
       <button role="menuitem" class="danger" id="deleteAll">${icon("i-trash", 14)}Delete all chats</button>
       <button role="menuitem" id="logout">${icon("i-logout", 14)}Log out</button>
     </div>`;

@@ -195,3 +195,18 @@ export async function firstTimeWhatsAppMessage(messageId) { // Meta can deliver 
 }
 export const setConversationTitle = (userId, conversationId, title) =>
   query(`update conversations set title = $3 where id = $1 and user_id = $2`, [conversationId, userId, title]);
+
+// ---------- tester requests (from the website's "Help us test" form) ----------
+const testerOut = (t) => t && ({ id: t.id, email: t.email, name: t.name, useCase: t.use_case, status: t.status, createdAt: iso(t.created_at), decidedAt: iso(t.decided_at), decidedBy: t.decided_by });
+export async function addTesterRequest({ email, name, useCase }) {
+  const existing = await one(`select * from testers where email = $1`, [email]);
+  if (existing) return { tester: testerOut(existing), existed: true };
+  const t = await one(`insert into testers (id, email, name, use_case) values ($1, $2, $3, $4) returning *`, [id("tst"), email, name, useCase]);
+  return { tester: testerOut(t), existed: false };
+}
+export const listTesters = async () => (await query(`select * from testers order by (status = 'pending') desc, created_at desc limit 500`)).map(testerOut);
+export const approvedTesterEmails = async () => (await query(`select email from testers where status = 'approved'`)).map((r) => r.email);
+export const setTesterStatus = async (testerId, status, by) =>
+  testerOut(await one(`update testers set status = $2, decided_at = now(), decided_by = $3 where id = $1 returning *`, [testerId, status, by]));
+export const deleteTester = (testerId) => query(`delete from testers where id = $1`, [testerId]);
+export const findUserByEmail = (email) => one(`select * from users where lower(email) = lower($1)`, [email]);

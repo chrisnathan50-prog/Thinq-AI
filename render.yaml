@@ -41,6 +41,10 @@ services:
         sync: false
       - key: ALLOWED_EMAILS # who can sign in: emails and/or @domains, comma-separated
         sync: false
+      - key: ADMIN_EMAILS # who runs Thinq: can sign in and approves tester requests at /app/admin
+        sync: false
+      - key: CONTACT_EMAIL # optional: shown as "Prefer email?" on the website's Help Us Test page
+        sync: false
       - key: TOKEN_ENCRYPTION_KEY # encrypts stored Google tokens - Render generates it; never change it later
         generateValue: true
       - key: DAILY_REQUEST_LIMIT
