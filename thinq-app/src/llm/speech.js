@@ -27,6 +27,12 @@ export function trimForSpeech(text) {
 // Returns a fetch Response whose body is MP3 audio, so the server can stream it straight to the browser.
 export async function synthesize(text) {
   if (!speechAvailable()) throw new SpeechError("Natural voices aren't set up on this server.");
+  // Real ElevenLabs keys start with "sk_". Anything else (often the key's ID, copied from the list of keys)
+  // is a setup mistake - say so without calling ElevenLabs or echoing the value.
+  if (!apiKey().startsWith("sk_")) {
+    console.warn("[speech] setup problem: ELEVENLABS_API_KEY doesn't start with sk_ (it may be the key's ID instead of the key)");
+    throw new SpeechError("ELEVENLABS_API_KEY isn't a valid ElevenLabs key. Real keys start with \"sk_\" and are shown only once, when the key is created.", { status: 401 });
+  }
   let res;
   try {
     res = await fetch(`${BASE_URL}/text-to-speech/${encodeURIComponent(VOICE_ID)}/stream?output_format=mp3_44100_64`, {
