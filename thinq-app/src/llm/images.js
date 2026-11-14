@@ -22,6 +22,11 @@ const mimeOf = (buf) =>
 const tokenLooksValid = () => /^[A-Za-z0-9_-]{20,}$/.test(apiToken());
 const accountLooksValid = () => /^[a-f0-9]{32}$/i.test(accountId());
 
+// Shared with Read aloud (speech.js), which uses the same Cloudflare account for its free voice.
+export const cloudflareReady = () => imagesAvailable() && tokenLooksValid() && accountLooksValid();
+export const cloudflareRunUrl = (model) => `${BASE_URL}/accounts/${accountId()}/ai/run/${model}`;
+export const cloudflareToken = () => apiToken();
+
 export async function generateImage(prompt) {
   if (!imagesAvailable()) throw new ImageError("Image creation isn't set up on this server.");
   if (!tokenLooksValid() || !accountLooksValid()) {

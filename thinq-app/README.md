@@ -26,7 +26,12 @@ One server runs everything:
 
 - **Documents**: up to 5 per message, 10 MB each (PDF with selectable text, .docx, .txt, .md, .csv, .json, .html). Thinq keeps only the text, not the file. Long documents are split into parts the AI reads one at a time with the `read_document` tool. Scanned PDFs (photos of pages) aren't supported yet.
 - **Voice notes** use Groq's free Whisper speech-to-text (`whisper-large-v3-turbo`, change with `GROQ_TRANSCRIBE_MODEL`), so they need `GROQ_API_KEY` even if you use Claude for chat. The recording is sent once to be transcribed and isn't stored. Each voice note counts as one request toward the daily limit.
-- **Read aloud** uses the browser's built-in voice, which costs nothing. For natural-sounding voices, set `ELEVENLABS_API_KEY` (from elevenlabs.io → Developers → API Keys). Change the voice with `ELEVENLABS_VOICE_ID`. ElevenLabs bills per character, so each read is capped at `SPEECH_MAX_CHARS` (2,500 by default) and counts toward the daily request limit. Replaying the same message doesn't cost again. If ElevenLabs fails or runs out of credits, Read aloud falls back to the browser voice.
+- **Read aloud** tries three voices in order:
+  1. **ElevenLabs** (most natural) when `ELEVENLABS_API_KEY` is set. Get the key at elevenlabs.io → Developers → API Keys; it starts with `sk_`. Change the voice with `ELEVENLABS_VOICE_ID`. ElevenLabs bills per character.
+  2. **Cloudflare MeloTTS** (free) when the Cloudflare image settings are set, or when ElevenLabs is out of credits. It shares the free daily Cloudflare allowance with images but uses very little of it. Turn it off with `SPEECH_FREE_VOICE=off`, or use only it with `SPEECH_PROVIDER=cloudflare`.
+  3. **The browser's built-in voice** when neither is available.
+
+  Each read is capped at `SPEECH_MAX_CHARS` (2,500 by default) and counts toward the daily request limit. Replaying the same message doesn't cost again.
 
 ### WhatsApp (optional)
 

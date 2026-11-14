@@ -199,19 +199,20 @@ api.post("/transcribe", rawBody(MAX_AUDIO_BYTES), async (req, res) => {
   }
 });
 
-// ---------- read aloud (ElevenLabs) ----------
+// ---------- read aloud (ElevenLabs, then Cloudflare's free voice) ----------
 // The browser falls back to its built-in voice whenever this returns an error.
 api.post("/speak", async (req, res) => {
-  if (!speechAvailable()) return res.status(400).json({ error: "Natural voices aren't set up on this server." });
+  if (!speechAvailable()) return res.status(400).json({ error: "Read aloud voices aren't set up on this server." });
   const text = trimForSpeech(req.body?.text);
   if (!text) return res.status(400).json({ error: "Nothing to read." });
   const usage = await store.useRequest(req.user.id, DAILY_LIMIT);
   if (!usage.allowed) return res.status(429).json({ error: `You've used today's ${DAILY_LIMIT} requests. Your limit resets tomorrow.` });
   try {
-    const audio = await synthesize(text);
-    await store.logAction(req.user.id, "read_aloud", { chars: text.length });
-    res.set({ "Content-Type": "audio/mpeg", "Cache-Control": "no-store" });
-    Readable.fromWeb(audio.body).on("error", () => res.destroy()).pipe(res);
+    const { voice, body } = await synthesize(text);
+    await store.logAction(req.user.id, "read_aloud", { chars: text.length, voice });
+    res.set({ "Content-Type": "audio/mpeg", "Cache-Control": "no-store", "X-Thinq-Voice": voice });
+    if (Buffer.isBuffer(body)) return res.send(body);
+    Readable.fromWeb(body).on("error", () => res.destroy()).pipe(res);
   } catch (err) {
     res.status(err.status === 429 ? 429 : 502).json({ error: err.message, quota: Boolean(err.quota) });
   }

@@ -494,8 +494,8 @@ $("#micBtn").addEventListener("click", () => (rec ? stopRecording() : startRecor
 $("#recCancel").addEventListener("click", () => stopRecording(true));
 
 // ---------------- read aloud ----------------
-// Uses ElevenLabs' natural voice through the server when it's set up (state.speechAvailable), and the browser's
-// built-in voice otherwise - or whenever the natural voice fails, so Read aloud always works.
+// Uses the server's voices when they're set up (state.speechAvailable): ElevenLabs, or Cloudflare's free voice when
+// ElevenLabs is out of credits. Falls back to the browser's built-in voice whenever the server can't make audio.
 const canSpeak = "speechSynthesis" in window;
 const canRead = () => canSpeak || Boolean(state?.speechAvailable);
 const SILENT = "data:audio/wav;base64,UklGRnQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YVAAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==";
@@ -561,7 +561,7 @@ $("#messages").addEventListener("click", async (e) => {
     await player.play();
   } catch (err) {
     if (err.name === "AbortError" || speakingBtn !== b) return;
-    if (err.quota) notice("The natural voice is out of credits for now, so Thinq is using your device's voice instead.", "info");
+    if (err.quota) notice("Thinq's voices are used up for today, so it's using your device's voice instead.", "info");
     else console.warn("Read aloud:", err.message);
     player.onended = player.onerror = null;
     speakWithBrowser(b, text);
