@@ -21,6 +21,7 @@ export async function chatTurn({ user, conversationId, text, timeZone, attachmen
   try {
     let reply;
     await store.attachDocuments(user.id, conversationId, attachments.map((d) => d.id));
+    store.logAction(user.id, "turn", { channel }).catch(() => {}); // counts app vs WhatsApp use in admin analytics
     for await (const event of runTurn({ user, conversationId, userText: text, timeZone, attachments, channel })) {
       if (event.type === "reply") reply = event;
       else if (event.type === "status") onStatus(event.text);

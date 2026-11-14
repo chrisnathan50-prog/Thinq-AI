@@ -33,6 +33,15 @@ One server runs everything:
 
   Each read is capped at `SPEECH_MAX_CHARS` (2,500 by default) and counts toward the daily request limit. Replaying the same message doesn't cost again.
 
+### Admin dashboard
+
+Admins (`ADMIN_EMAILS`) get **Admin dashboard** in the ⋯ menu (`/app/admin`):
+
+- **Analytics** for the last 7, 30 or 90 days: people, active today / last 7 days, AI requests, Gmail and WhatsApp connections; charts of active people and AI requests per day; which features get used; app vs WhatsApp; and a sortable table of every person (joined, last active, active days, requests, chats, emails/invites sent, most-used feature).
+- **Tester requests** (below).
+
+It shows activity counts only — never anyone's messages, emails or files. Days are UTC. Requests per day come from the daily usage counter, so they stay accurate even after people delete chats; the app-vs-WhatsApp split counts from when this dashboard was added.
+
 ### Finding testers ("Help Us Test")
 
 The website has a **Help Us Test** page (`/testers.html`, linked from the home page, footer and login page). Visitors leave their name, Google email and what they'd use Thinq for; requests are saved in the database.

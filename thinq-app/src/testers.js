@@ -6,6 +6,7 @@ import * as store from "./store.js";
 import { requireUser, requireAdmin, isAdmin, allowTester, disallowTester, setApprovedTesters } from "./auth.js";
 import { providerFor } from "./providers/index.js";
 import { publicUrl } from "./providers/google.js";
+import { analytics } from "./analytics.js";
 
 const EMAIL = /^[^\s@<>()",;:]{1,64}@[a-z0-9-]+(\.[a-z0-9-]+)+$/i;
 const contactEmail = () => (process.env.CONTACT_EMAIL || "").trim() || null;
@@ -74,6 +75,11 @@ export function mountTesters(app) {
   // ---- admin (signed-in admins only) ----
   const admin = express.Router();
   admin.use(requireUser, requireAdmin);
+
+  admin.get("/analytics", async (req, res) => {
+    try { res.json(await analytics(req.query.days)); }
+    catch (err) { console.error(err); res.status(500).json({ error: "Couldn't load analytics." }); }
+  });
 
   admin.get("/testers", async (req, res) => res.json({ testers: await store.listTesters(), googleConsole: "https://console.cloud.google.com/auth/audience" }));
 
