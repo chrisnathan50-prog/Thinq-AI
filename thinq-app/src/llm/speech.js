@@ -50,5 +50,7 @@ export async function synthesize(text) {
   if (res.status === 401 || /invalid_api_key|unauthorized/i.test(status)) throw new SpeechError("The server's ElevenLabs key was rejected.", { status: 401 });
   if (res.status === 404 || /voice_not_found/i.test(status)) throw new SpeechError("The ElevenLabs voice isn't available (check ELEVENLABS_VOICE_ID).", { status: 404 });
   if (res.status === 429) throw new SpeechError("The natural voice is busy. Try again in a moment.", { status: 429 });
-  throw new SpeechError(`ElevenLabs returned an error (${res.status}).`, { status: res.status });
+  // Include ElevenLabs' short reason code (never the key) so the site owner can see what to fix.
+  const reason = [status, String(detail.message || "").slice(0, 160)].filter(Boolean).join(": ");
+  throw new SpeechError(`ElevenLabs returned an error (${res.status}${reason ? ` - ${reason}` : ""}).`, { status: res.status });
 }
