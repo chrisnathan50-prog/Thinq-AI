@@ -153,6 +153,42 @@ async function migrate() {
       decided_at timestamptz,
       decided_by text
     );
+    create table if not exists wa_sync_sessions (
+      user_id text primary key references users(id) on delete cascade,
+      status text not null default 'off',
+      phone text,
+      name text,
+      linked_at timestamptz,
+      updated_at timestamptz not null default now()
+    );
+    create table if not exists wa_sync_auth (
+      user_id text not null references users(id) on delete cascade,
+      key text not null,
+      value_enc text not null,
+      primary key (user_id, key)
+    );
+    create table if not exists wa_chats (
+      user_id text not null references users(id) on delete cascade,
+      jid text not null,
+      name text,
+      is_group boolean not null default false,
+      last_at timestamptz,
+      primary key (user_id, jid)
+    );
+    create table if not exists wa_messages (
+      user_id text not null references users(id) on delete cascade,
+      jid text not null,
+      msg_id text not null,
+      from_me boolean not null default false,
+      sender text,
+      sender_jid text,
+      text text not null,
+      at timestamptz not null,
+      primary key (user_id, jid, msg_id)
+    );
+    create index if not exists wa_messages_user_at on wa_messages(user_id, at desc);
+    create index if not exists wa_messages_chat_at on wa_messages(user_id, jid, at desc);
+    create index if not exists wa_chats_user_last on wa_chats(user_id, last_at desc);
     alter table messages add column if not exists attachments jsonb;
     create index if not exists documents_conv on documents(conversation_id);
     create index if not exists conversations_user on conversations(user_id, created_at desc);

@@ -24,6 +24,7 @@ import { chatTurn, TurnError, busy, DAILY_LIMIT } from "./src/turns.js";
 import { approveItem, declineItem } from "./src/approvals.js";
 import { mountWhatsApp, whatsappConfigured, whatsappNumber, linkUrl } from "./src/whatsapp.js";
 import { mountTesters, loadApprovedTesters, isAdmin } from "./src/testers.js";
+import { syncAvailable, syncState, startSync, cancelSync, disconnectSync, resumeAllSyncs } from "./src/whatsapp-sync.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SITE_DIR = process.env.SITE_DIR || path.resolve(here, "..", "thinq-site");
@@ -86,6 +87,7 @@ api.get("/state", async (req, res) => {
     admin: isAdmin(req.user.email) ? { pendingTesters: (await store.listTesters()).filter((t) => t.status === "pending").length } : null,
     speechAvailable: speechAvailable(),
     whatsapp: await whatsappState(req.user.id),
+    whatsappSync: await syncState(req.user.id),
     images: { available: imagesAvailable(), today: await store.imagesToday(req.user.id), limit: IMAGE_DAILY_LIMIT },
     documentTypes: ACCEPTED,
     conversations: await store.listConversations(req.user.id),
@@ -175,6 +177,25 @@ api.post("/whatsapp/code", async (req, res) => {
 api.delete("/whatsapp", async (req, res) => {
   await store.unlinkWhatsApp(req.user.id);
   await store.logAction(req.user.id, "whatsapp_unlinked", {});
+  res.json({ ok: true });
+});
+
+// ---------- WhatsApp chat sync (Thinq reads your own chats as a linked device) ----------
+api.get("/whatsapp-sync", async (req, res) => res.json(await syncState(req.user.id)));
+api.post("/whatsapp-sync", async (req, res) => {
+  if (req.body?.accept !== true) return res.status(400).json({ error: "Please confirm you understand the risks first." });
+  try {
+    await store.logAction(req.user.id, "whatsapp_sync_started", { method: req.body?.phone ? "code" : "qr" });
+    res.json(await startSync(req.user.id, { phone: req.body?.phone }));
+  } catch (err) {
+    console.error("[wa-sync] start failed:", err.message);
+    res.status(400).json({ error: err.message || "Couldn't start WhatsApp linking. Try again." });
+  }
+});
+api.post("/whatsapp-sync/cancel", async (req, res) => { await cancelSync(req.user.id); res.json(await syncState(req.user.id)); });
+api.delete("/whatsapp-sync", async (req, res) => {
+  await disconnectSync(req.user.id);
+  await store.logAction(req.user.id, "whatsapp_sync_disconnected", {});
   res.json({ ok: true });
 });
 
@@ -279,6 +300,8 @@ if (fs.existsSync(SITE_DIR)) {
   app.get("/", (req, res) => res.redirect(req.user ? "/app" : "/auth/google/login"));
 }
 
+const resumed = await resumeAllSyncs().catch((e) => { console.warn("[wa-sync] resume failed:", e.message); return 0; });
+
 app.listen(PORT, HOST, () => {
   console.log(`\n  Thinq is running at ${publicUrl()}`);
   console.log(`  Website: ${fs.existsSync(SITE_DIR) ? SITE_DIR : "not found (app only)"}`);
@@ -286,5 +309,6 @@ app.listen(PORT, HOST, () => {
   console.log(`  Google sign-in: ${googleConfigured() ? `on (redirect URI: ${redirectUri()})` : "⚠ not configured"}`);
   console.log(`  Invite list: ${process.env.ALLOWED_EMAILS || "(none)"} · admins: ${process.env.ADMIN_EMAILS || "⚠ none - set ADMIN_EMAILS to review tester requests"} · plus testers approved in the app`);
   console.log(`  WhatsApp: ${whatsappConfigured() ? `on (+${whatsappNumber() || "number not set"})` : "off"}`);
+  console.log(`  WhatsApp chat sync: ${syncAvailable() ? `on (${resumed || 0} linked account${resumed === 1 ? "" : "s"} reconnecting)` : "off"}`);
   console.log(`  Daily limit: ${DAILY_LIMIT || "none"} AI requests per person\n`);
 });

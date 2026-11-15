@@ -64,7 +64,7 @@ People can chat with Thinq on WhatsApp through Meta's official **WhatsApp Cloud 
 - approve drafts and invites with **Send / Discard** buttons — still nothing is sent without a tap;
 - send *new* to start a fresh conversation, *help* for tips.
 
-Thinq never reads anyone's WhatsApp chats on its own — only what people send or forward to it.
+This bot only sees what people send or forward to it. Reading people's own chats is a separate opt-in feature: see *WhatsApp chat sync* below.
 
 **Setup** (about 30 minutes, free to start):
 
@@ -78,6 +78,17 @@ Thinq never reads anyone's WhatsApp chats on its own — only what people send o
 For real use: add your own phone number (one not already on WhatsApp) in WhatsApp → API Setup, and replace the 24-hour token with a permanent **System User** token (Business settings → Users → System users → Generate token with `whatsapp_business_messaging` and `whatsapp_business_management`).
 
 Cost: messages people send are free; each Thinq number gets 1,000 free replies a month, then roughly a cent each depending on the country. Thinq can only reply within 24 hours of someone's last message (it never messages people first).
+
+### WhatsApp chat sync (unofficial, opt-in)
+
+People can let Thinq read their **own** WhatsApp chats, so they can ask "what did I miss on WhatsApp today?", "what did Sam say about Friday?" or "summarize the Family group this week", the same way Thinq reads Gmail and Calendar. It works without the Meta setup above.
+
+In the app, **Link WhatsApp chats** shows a warning, then a QR code to scan in WhatsApp → *Settings → Linked devices → Link a device*. People using Thinq on their phone choose *I'm on my phone* and get a pairing code to type instead. Thinq then shows up as a linked device, like WhatsApp Web.
+
+- **Read-only.** Thinq saves the text of new and recent messages (photos, voice notes etc. show as `[photo]`, `[voice note]`) and has three assistant tools: `whatsapp_recent_chats`, `search_whatsapp` and `read_whatsapp_chat`. It never sends, reacts, marks messages as read or shows the person as online.
+- **Stored:** the linked-device keys (encrypted with `TOKEN_ENCRYPTION_KEY`) and message text from the last `WA_SYNC_KEEP_DAYS` days (default 90). **Disconnect & delete** logs Thinq out of WhatsApp and deletes everything.
+- **Risks.** WhatsApp has no official API for this, so it uses the unofficial [Baileys](https://github.com/WhiskeySockets/Baileys) library. It isn't allowed by WhatsApp's terms: **WhatsApp can restrict or ban numbers that use it**, and a WhatsApp update can break it. The app tells people this before they link. Turn the feature off with `WHATSAPP_SYNC=off`.
+- **Hosting:** the server keeps one live connection per linked person. On Render's free plan the server sleeps when idle, so messages that arrive while it sleeps can be missed (WhatsApp sends some recent history again when it reconnects). For reliable sync, use an always-on plan.
 
 ### Images (free, optional)
 

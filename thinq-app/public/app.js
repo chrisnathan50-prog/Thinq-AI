@@ -56,7 +56,7 @@ async function api(path, opts = {}) {
 // ---------------- state ----------------
 async function refresh() {
   state = await api("/api/state");
-  renderAccount(); renderConn(); renderWhatsApp(); renderNotes(); renderConvos(); renderApprovals(); renderGreeting();
+  renderAccount(); renderConn(); renderWhatsApp(); renderWaSync(); renderNotes(); renderConvos(); renderApprovals(); renderGreeting();
 }
 
 function renderGreeting() {
@@ -168,6 +168,96 @@ function renderWhatsApp() {
         else renderWhatsApp();
       }, 4000);
     } catch (err) { notice(err.message); }
+  });
+}
+
+// ---------------- WhatsApp chat sync (Thinq reads your chats as a linked device) ----------------
+let waSyncStep = null; // null | "warn" | "phone"
+let waSyncPoll = null;
+function waSyncWatch() {
+  clearInterval(waSyncPoll);
+  waSyncPoll = setInterval(async () => {
+    const s = await api("/api/whatsapp-sync").catch(() => null);
+    if (!s) return;
+    const wasConnected = state.whatsappSync?.status === "connected";
+    state.whatsappSync = s;
+    if (!["starting", "waiting", "reconnecting"].includes(s.status) && !(s.status === "connected" && s.messages === 0)) clearInterval(waSyncPoll);
+    if (s.status === "connected" && !wasConnected) notice("WhatsApp linked. Your recent chats are syncing - this can take a few minutes.", "ok");
+    renderWaSync();
+  }, 3000);
+}
+function renderWaSync() {
+  const box = $("#wasync"), s = state.whatsappSync || {};
+  box.hidden = !s.available;
+  if (!s.available) return;
+  const head = (dot, title) => `<div class="row">${dot ? `<span class="dot ${dot}"></span>` : icon("i-wa", 15)}<b>${title}</b></div>`;
+
+  if (s.status === "connected" || s.status === "reconnecting") {
+    const last = s.lastMessageAt ? new Date(s.lastMessageAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : null;
+    box.innerHTML = `${head(s.status === "connected" ? "live" : "demo", s.status === "connected" ? "WhatsApp chats synced" : "WhatsApp chats reconnecting…")}
+      <p>${s.phone ? `${esc(s.phone)} · ` : ""}${s.messages ? `${s.chats} chats, ${s.messages.toLocaleString()} messages${last ? `, latest ${esc(last)}` : ""}` : "Syncing your recent chats…"}. Ask things like “what did I miss on WhatsApp today?”</p>
+      <p class="meta">Thinq only reads. Messages older than ${s.keepDays} days are deleted.</p>
+      <div class="wa-actions"><button class="btn ghost sm" id="waSyncOff">Disconnect & delete</button></div>`;
+    $("#waSyncOff").addEventListener("click", async () => {
+      if (!confirm("Disconnect WhatsApp chats? Thinq is logged out of your WhatsApp and every synced message is deleted from Thinq.")) return;
+      try { await api("/api/whatsapp-sync", { method: "DELETE" }); await refresh(); notice("WhatsApp chats disconnected and deleted.", "ok"); } catch (err) { notice(err.message); }
+    });
+    if (s.messages === 0 || s.status === "reconnecting") waSyncWatch();
+    return;
+  }
+
+  if (s.status === "starting" || s.status === "waiting") {
+    box.innerHTML = `${head("demo", "Link WhatsApp chats")}
+      ${s.pairingCode
+        ? `<p>On your phone: WhatsApp → <b>Settings → Linked devices → Link a device → Link with phone number instead</b>, then enter:</p><div class="wa-code" aria-label="Pairing code">${esc(s.pairingCode.replace(/^(.{4})(.{4})$/, "$1-$2"))}</div>`
+        : s.qr
+          ? `<p>On your phone: WhatsApp → <b>Settings → Linked devices → Link a device</b>, then scan:</p><img class="wa-qr" src="${esc(s.qr)}" alt="WhatsApp link QR code" width="200" height="200">`
+          : `<p>Getting a code from WhatsApp…</p>`}
+      <div class="wa-actions"><button class="btn ghost sm" id="waSyncCancel">Cancel</button></div>
+      <p class="meta">${s.pairingCode ? "" : "The code refreshes by itself. "}This box updates once it's linked.</p>`;
+    $("#waSyncCancel").addEventListener("click", async () => {
+      clearInterval(waSyncPoll);
+      state.whatsappSync = await api("/api/whatsapp-sync/cancel", { method: "POST" }).catch(() => s);
+      waSyncStep = null; renderWaSync();
+    });
+    waSyncWatch();
+    return;
+  }
+
+  if (waSyncStep === "warn" || waSyncStep === "phone") {
+    box.innerHTML = `${head("off", "Before you link")}
+      <p>WhatsApp has no official way for apps to read your chats, so Thinq links as a device on your account, like WhatsApp Web. This isn't allowed by WhatsApp's terms: <b>WhatsApp could restrict or ban your number</b>, and it may stop working after a WhatsApp update.</p>
+      <p>Thinq will store the text of your messages from the last ${s.keepDays} days so it can search them. It never sends anything. You can disconnect and delete everything at any time.</p>
+      ${waSyncStep === "phone" ? `<label class="meta" for="waSyncPhone">Your WhatsApp number, with country code</label><input class="input" id="waSyncPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+44 7700 900123">` : ""}
+      <div class="wa-actions">
+        ${waSyncStep === "phone"
+          ? `<button class="btn sm" id="waSyncGo" data-mode="phone">Get pairing code</button><button class="btn ghost sm" id="waSyncQr">Use a QR code</button>`
+          : `<button class="btn sm" id="waSyncGo" data-mode="qr">I understand, show QR code</button><button class="btn ghost sm" id="waSyncPhoneBtn">I'm on my phone</button>`}
+        <button class="btn ghost sm" id="waSyncBack">Not now</button>
+      </div>`;
+    $("#waSyncBack").addEventListener("click", () => { waSyncStep = null; renderWaSync(); });
+    $("#waSyncPhoneBtn")?.addEventListener("click", () => { waSyncStep = "phone"; renderWaSync(); $("#waSyncPhone")?.focus(); });
+    $("#waSyncQr")?.addEventListener("click", () => { waSyncStep = "warn"; renderWaSync(); });
+    $("#waSyncGo").addEventListener("click", async (e) => {
+      const phone = e.currentTarget.dataset.mode === "phone" ? $("#waSyncPhone").value.trim() : undefined;
+      if (phone === "") return notice("Enter your WhatsApp number first.");
+      e.currentTarget.disabled = true;
+      try {
+        state.whatsappSync = await api("/api/whatsapp-sync", { method: "POST", body: JSON.stringify({ accept: true, phone }) });
+        waSyncStep = null; renderWaSync();
+      } catch (err) { notice(err.message); e.currentTarget.disabled = false; }
+    });
+    return;
+  }
+
+  const why = { logged_out: "WhatsApp chats were unlinked from your phone.", blocked: "WhatsApp blocked the link. Your number may be restricted.", expired: "The code expired before it was scanned." }[s.status];
+  box.innerHTML = `${head(why ? "off" : null, "WhatsApp chats")}
+    <p>${why ? `${esc(why)} ` : ""}Let Thinq read your own WhatsApp chats, so you can ask “what did I miss?” or “what did Sam say about Friday?”</p>
+    <div class="wa-actions"><button class="btn sm" id="waSyncStart">${why ? "Link again" : "Link WhatsApp chats"}</button>${s.messages ? `<button class="btn ghost sm" id="waSyncDel">Delete synced messages</button>` : ""}</div>`;
+  $("#waSyncStart").addEventListener("click", () => { waSyncStep = "warn"; renderWaSync(); });
+  $("#waSyncDel")?.addEventListener("click", async () => {
+    if (!confirm("Delete all synced WhatsApp messages from Thinq?")) return;
+    await api("/api/whatsapp-sync", { method: "DELETE" }).catch((err) => notice(err.message)); refresh();
   });
 }
 

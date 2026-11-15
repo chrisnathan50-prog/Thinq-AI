@@ -220,6 +220,9 @@ body{overflow:hidden;background:var(--panel)}
 /* ---------- WhatsApp card ---------- */
 .conn.wa .row svg{color:#16a34a}
 .wa-actions{display:flex;flex-wrap:wrap;gap:8px}
+.wa-qr{display:block;width:200px;height:200px;margin:2px auto;border-radius:12px;background:#fff;border:1px solid var(--line);image-rendering:pixelated}
+.conn .input{width:100%;font:inherit;font-size:14px;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:#fff;color:inherit}
+.conn .input:focus{outline:2px solid var(--violet);outline-offset:1px}
 .wa-actions .btn svg{flex:none}
 .wa-code{font-size:24px;font-weight:600;letter-spacing:.12em;font-variant-numeric:tabular-nums;text-align:center;padding:8px;border-radius:12px;background:var(--panel);border:1px dashed var(--line);user-select:all}
 .conn .meta{font-size:12px}
