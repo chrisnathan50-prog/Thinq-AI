@@ -90,6 +90,27 @@ In the app, **Link WhatsApp chats** shows a warning, then a QR code to scan in W
 - **Risks.** WhatsApp has no official API for this, so it uses the unofficial [Baileys](https://github.com/WhiskeySockets/Baileys) library. It isn't allowed by WhatsApp's terms: **WhatsApp can restrict or ban numbers that use it**, and a WhatsApp update can break it. The app tells people this before they link. Turn the feature off with `WHATSAPP_SYNC=off`.
 - **Hosting:** the server keeps one live connection per linked person. On Render's free plan the server sleeps when idle, so messages that arrive while it sleeps can be missed (WhatsApp sends some recent history again when it reconnects). For reliable sync, use an always-on plan.
 
+### Meeting notes (free, optional)
+
+Thinq can send a notetaker into **Google Meet, Zoom and Microsoft Teams** calls. It joins as "*Name*'s Thinq Notetaker", posts a message in the meeting chat so everyone knows they're being transcribed, and afterwards Thinq saves the transcript (split by speaker) and writes notes: summary, decisions, action items with owners, open questions. People can then ask "what did we agree with Priya?" or "draft the follow-up email", and every meeting is listed under **Connections → Meeting notes**.
+
+- **Sending it:** paste a meeting link in *Meeting notes*, or ask Thinq ("send the notetaker to my 3pm"). When Thinq suggests it, it waits in Approvals until you tap *Send notetaker*.
+- **Auto-join** (optional, per person): sends the notetaker to every calendar meeting that has a Meet, Zoom or Teams link, a minute before it starts.
+- **Free transcription:** the notetaker reads the meeting's own live captions, so there is no transcription bill and no audio or video is recorded. Captions are a little less accurate than a paid speech-to-text service. To use one instead, set `ATTENDEE_TRANSCRIPTION` to Attendee's transcription settings as JSON, e.g. `{"deepgram":{"language":"en-US"}}` (Deepgram gives $200 of free credit), and add that provider's key in Attendee.
+- **Privacy:** once Thinq has the transcript, it asks Attendee to delete its copy. Deleting a meeting in Thinq deletes its notes and transcript.
+- **Limits:** someone in the meeting may have to let the notetaker in from the waiting room, and meetings restricted to one company's accounts may not let it in at all. Thinq shows why when it couldn't join.
+
+**Setup.** The notetaker is [Attendee](https://github.com/attendee-labs/attendee), an open-source meeting-bot server you host yourself. Each bot is a real browser, so it needs an always-on machine with about 2 GB of memory per meeting happening at the same time — Render's free plan is too small. A free option:
+
+1. Create an **Oracle Cloud "Always Free"** account and an *Ampere A1* VM (up to 4 CPUs / 24 GB free) with Ubuntu. Open ports 80 and 443.
+2. Point a domain or subdomain (e.g. `bots.yourdomain.com`) at the VM — Attendee's webhooks and Google Meet need HTTPS.
+3. On the VM: install Docker, then follow Attendee's self-hosting guide (`docker compose` with Postgres and Redis), and put Caddy or nginx in front of it for HTTPS.
+4. Open Attendee in a browser, create an account, and copy an **API key** from *API Keys*.
+5. In Render → Environment add `ATTENDEE_URL` (e.g. `https://bots.yourdomain.com`) and `ATTENDEE_API_KEY`. Optional: `MEETINGS_LANGUAGE` (caption language, default `en-US`).
+6. Zoom meetings also need Zoom OAuth credentials in Attendee's *Settings* (see Attendee's Zoom guide). Meet and Teams work without them.
+
+Thinq tells Attendee to call `https://YOUR-APP/webhooks/attendee` when a bot changes state; Thinq treats that only as a hint and re-checks the bot through the API, and also checks active meetings every minute, so nothing is lost while the Render server is asleep.
+
 ### Images (free, optional)
 
 Thinq creates images with **Cloudflare Workers AI** (FLUX.1 schnell) through a `create_image` tool. It works with either AI choice (Groq or Claude).

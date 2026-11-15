@@ -189,6 +189,33 @@ async function migrate() {
     create index if not exists wa_messages_user_at on wa_messages(user_id, at desc);
     create index if not exists wa_messages_chat_at on wa_messages(user_id, jid, at desc);
     create index if not exists wa_chats_user_last on wa_chats(user_id, last_at desc);
+    create table if not exists meetings (
+      id text primary key,
+      user_id text not null references users(id) on delete cascade,
+      bot_id text unique,
+      meeting_url text not null,
+      platform text,
+      title text,
+      calendar_event_id text,
+      join_at timestamptz,
+      status text not null,
+      bot_state text,
+      error text,
+      transcript text,
+      summary text,
+      started_at timestamptz,
+      ended_at timestamptz,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(),
+      unique (user_id, calendar_event_id)
+    );
+    create index if not exists meetings_user on meetings(user_id, join_at desc);
+    create index if not exists meetings_status on meetings(status);
+    create table if not exists meeting_prefs (
+      user_id text primary key references users(id) on delete cascade,
+      auto_join boolean not null default false,
+      updated_at timestamptz not null default now()
+    );
     alter table messages add column if not exists attachments jsonb;
     create index if not exists documents_conv on documents(conversation_id);
     create index if not exists conversations_user on conversations(user_id, created_at desc);

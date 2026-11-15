@@ -56,7 +56,7 @@ async function api(path, opts = {}) {
 // ---------------- state ----------------
 async function refresh() {
   state = await api("/api/state");
-  renderAccount(); renderConn(); renderWhatsApp(); renderWaSync(); renderNotes(); renderConvos(); renderApprovals(); renderGreeting();
+  renderAccount(); renderConn(); renderWhatsApp(); renderWaSync(); renderMeetings(); renderNotes(); renderConvos(); renderApprovals(); renderGreeting();
 }
 
 function renderGreeting() {
@@ -98,27 +98,75 @@ function renderAccount() {
   });
 }
 
+// ---------------- connections: a compact list in the sidebar; details open in a dialog ----------------
+// Each row: [icon] Name / one-word status, and a coloured dot. The cards with buttons, codes and
+// explanations (renderConn, renderWaSync, renderWhatsApp) draw into panes inside #connDialog.
+function connRows() {
+  const rows = [];
+  rows.push(state.mode === "google"
+    ? { pane: "google", icon: "i-mail", name: "Gmail & Calendar", status: "Connected", dot: "live" }
+    : { pane: "google", icon: "i-mail", name: "Gmail & Calendar", status: "Demo inbox", dot: "demo" });
+  const s = state.whatsappSync || {};
+  if (s.available) {
+    const st = { connected: ["Synced", "live"], reconnecting: ["Reconnecting…", "demo"], starting: ["Linking…", "demo"], waiting: ["Waiting for scan", "demo"],
+      logged_out: ["Unlinked", "off"], blocked: ["Blocked", "off"], expired: ["Not linked", null] }[s.status] || ["Not linked", null];
+    rows.push({ pane: "wasync", icon: "i-wa", name: "WhatsApp chats", status: st[0], dot: st[1] });
+  }
+  const mt = state.meetings || {};
+  if (mt.available) {
+    const live = (mt.meetings || []).find((m) => ["joining", "waiting_room", "recording"].includes(m.status));
+    const next = (mt.meetings || []).find((m) => m.status === "scheduled");
+    rows.push({ pane: "meetings", icon: "i-video", name: "Meeting notes",
+      status: live ? (live.status === "recording" ? "Taking notes now" : "Joining a call…") : mt.autoJoin ? "Auto-join on" : next ? "Next one scheduled" : "Paste a link to start",
+      dot: live ? "live" : mt.autoJoin || next ? "live" : null });
+  }
+  const wa = state.whatsapp || {};
+  if (wa.available) rows.push({ pane: "wa", icon: "i-wa", name: "Thinq on WhatsApp", status: wa.linked ? "Connected" : waPending ? "Waiting for code" : "Not connected", dot: wa.linked ? "live" : waPending ? "demo" : null });
+  return rows;
+}
+
+function renderLinks() {
+  if (!state) return;
+  const left = state.usage?.limit ? Math.max(0, state.usage.limit - state.usage.today) : null;
+  const foot = !state.hasApiKey
+    ? `<p class="links-foot warn"><span class="dot off"></span>AI not set up: the server needs <code>${esc(state.apiKeyName)}</code></p>`
+    : `<p class="links-foot">${state.aiProvider === "groq" ? "Groq (free tier)" : "Claude"}${left !== null ? ` · ${left} of ${state.usage.limit} left today` : ""}</p>`;
+  $("#links").innerHTML = `<h3 class="links-head">Connections</h3>
+    <ul>${connRows().map((r) => `<li><button type="button" class="link-row" data-pane="${r.pane}" aria-haspopup="dialog">
+      <span class="link-ic">${icon(r.icon, 14)}</span>
+      <span class="link-txt"><b>${esc(r.name)}</b><small>${esc(r.status)}</small></span>
+      ${r.dot ? `<span class="dot ${r.dot}" aria-hidden="true"></span>` : `<span class="link-add" aria-hidden="true">${icon("i-plus", 12)}</span>`}
+    </button></li>`).join("")}</ul>${foot}`;
+}
+
+const connTitles = { google: "Gmail & Calendar", wasync: "WhatsApp chats", wa: "Thinq on WhatsApp", meetings: "Meeting notes" };
+function openConn(pane) {
+  const dlg = $("#connDialog");
+  $("#connDialogTitle").textContent = connTitles[pane] || "Connection";
+  dlg.querySelectorAll("[data-pane]").forEach((el) => { el.hidden = el.dataset.pane !== pane; });
+  if (!dlg.open) dlg.showModal();
+}
+$("#links").addEventListener("click", (e) => { const b = e.target.closest(".link-row"); if (b) openConn(b.dataset.pane); });
+$("#connDialogClose").addEventListener("click", () => $("#connDialog").close());
+$("#connDialog").addEventListener("click", (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); }); // click outside
+
 function renderConn() {
   const c = $("#conn");
   let html = "";
   if (state.mode === "google") {
-    html += `<div class="row"><span class="dot live"></span><b>Gmail & Calendar connected</b></div><p>${esc(state.profile?.email)}</p><button class="btn ghost sm" id="disconnect">Disconnect</button>`;
+    html += `<div class="row"><span class="dot live"></span><b>Connected</b></div><p>${esc(state.profile?.email)}. Thinq can read and search your email and calendar, and drafts emails and invites for you to approve.</p><button class="btn ghost sm" id="disconnect">Disconnect</button>`;
   } else {
     html += `<div class="row"><span class="dot demo"></span><b>Demo mode</b></div><p>You're using a sample inbox and calendar. Nothing is really sent.</p>`;
     html += state.googleConfigured
       ? `<a class="btn sm" href="/auth/google/connect">Connect Gmail & Calendar</a>`
       : `<p>Connecting real accounts isn't set up on this server yet.</p>`;
   }
-  if (!state.hasApiKey) {
-    html += `<div class="row"><span class="dot off"></span><b>AI not set up yet</b></div><p>The server needs <code>${esc(state.apiKeyName)}</code>. See the README.</p>`;
-  } else {
-    const left = state.usage?.limit ? Math.max(0, state.usage.limit - state.usage.today) : null;
-    html += `<p class="meta">AI: ${state.aiProvider === "groq" ? "Groq (free tier)" : "Claude"}${left !== null ? ` · ${left} of ${state.usage.limit} requests left today` : ""}</p>`;
-  }
   c.innerHTML = html;
+  renderLinks();
   $("#disconnect")?.addEventListener("click", async () => {
     if (!confirm("Disconnect your Google account? Thinq will lose access to your Gmail and Calendar and switch back to the demo inbox.")) return;
     await api("/auth/google/disconnect", { method: "POST" });
+    $("#connDialog").close();
     await refresh(); loadAgenda();
   });
 }
@@ -128,7 +176,7 @@ let waPending = null; // { code, url, until } while waiting for the person to se
 let waPoll = null;
 function renderWhatsApp() {
   const box = $("#wa"), wa = state.whatsapp || {};
-  box.hidden = !wa.available;
+  renderLinks();
   if (!wa.available) return;
   if (wa.linked) {
     waPending = null; clearInterval(waPoll);
@@ -151,7 +199,7 @@ function renderWhatsApp() {
     $("#waCancel").addEventListener("click", () => { waPending = null; clearInterval(waPoll); renderWhatsApp(); });
     return;
   }
-  box.innerHTML = `<div class="row">${icon("i-wa", 15)}<b>WhatsApp</b></div>
+  box.innerHTML = `<div class="row"><span class="dot none"></span><b>Not connected</b></div>
     <p>Chat with Thinq from WhatsApp: voice notes, files, forwarded messages and chat exports.</p>
     <button class="btn sm" id="waConnect">Connect WhatsApp</button>`;
   $("#waConnect").addEventListener("click", async () => {
@@ -188,13 +236,13 @@ function waSyncWatch() {
 }
 function renderWaSync() {
   const box = $("#wasync"), s = state.whatsappSync || {};
-  box.hidden = !s.available;
+  renderLinks();
   if (!s.available) return;
   const head = (dot, title) => `<div class="row">${dot ? `<span class="dot ${dot}"></span>` : icon("i-wa", 15)}<b>${title}</b></div>`;
 
   if (s.status === "connected" || s.status === "reconnecting") {
     const last = s.lastMessageAt ? new Date(s.lastMessageAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : null;
-    box.innerHTML = `${head(s.status === "connected" ? "live" : "demo", s.status === "connected" ? "WhatsApp chats synced" : "WhatsApp chats reconnecting…")}
+    box.innerHTML = `${head(s.status === "connected" ? "live" : "demo", s.status === "connected" ? "Synced" : "Reconnecting…")}
       <p>${s.phone ? `${esc(s.phone)} · ` : ""}${s.messages ? `${s.chats} chats, ${s.messages.toLocaleString()} messages${last ? `, latest ${esc(last)}` : ""}` : "Syncing your recent chats…"}. Ask things like “what did I miss on WhatsApp today?”</p>
       <p class="meta">Thinq only sends messages you approve. Messages older than ${s.keepDays} days are deleted.</p>
       <div class="wa-actions"><button class="btn ghost sm" id="waSyncOff">Disconnect & delete</button></div>`;
@@ -207,7 +255,7 @@ function renderWaSync() {
   }
 
   if (s.status === "starting" || s.status === "waiting") {
-    box.innerHTML = `${head("demo", "Link WhatsApp chats")}
+    box.innerHTML = `${head("demo", "Waiting for your phone")}
       ${s.pairingCode
         ? `<p>On your phone: WhatsApp → <b>Settings → Linked devices → Link a device → Link with phone number instead</b>, then enter:</p><div class="wa-code" aria-label="Pairing code">${esc(s.pairingCode.replace(/^(.{4})(.{4})$/, "$1-$2"))}</div>`
         : s.qr
@@ -251,7 +299,7 @@ function renderWaSync() {
   }
 
   const why = { logged_out: "WhatsApp chats were unlinked from your phone.", blocked: "WhatsApp blocked the link. Your number may be restricted.", expired: "The code expired before it was scanned." }[s.status];
-  box.innerHTML = `${head(why ? "off" : null, "WhatsApp chats")}
+  box.innerHTML = `${head(why ? "off" : "none", why ? "Not linked" : "Not linked yet")}
     <p>${why ? `${esc(why)} ` : ""}Let Thinq read your own WhatsApp chats, so you can ask “what did I miss?” or “what did Sam say about Friday?”</p>
     <div class="wa-actions"><button class="btn sm" id="waSyncStart">${why ? "Link again" : "Link WhatsApp chats"}</button>${s.messages ? `<button class="btn ghost sm" id="waSyncDel">Delete synced messages</button>` : ""}</div>`;
   $("#waSyncStart").addEventListener("click", () => { waSyncStep = "warn"; renderWaSync(); });
@@ -260,6 +308,99 @@ function renderWaSync() {
     await api("/api/whatsapp-sync", { method: "DELETE" }).catch((err) => notice(err.message)); refresh();
   });
 }
+
+// ---------------- meeting notes (Thinq's notetaker joins Meet / Zoom / Teams calls) ----------------
+const MEET_STATUS = {
+  creating: ["Starting…", "demo"], scheduled: ["Scheduled", "demo"], joining: ["Joining…", "demo"], waiting_room: ["Waiting to be let in", "demo"],
+  recording: ["Taking notes", "live"], processing: ["Finishing up…", "demo"], summarizing: ["Writing notes…", "demo"],
+  done: ["Notes ready", "live"], no_notes: ["No notes", "off"], failed: ["Didn't join", "off"], cancelled: ["Cancelled", "none"],
+};
+const ACTIVE_MEET = ["creating", "scheduled", "joining", "waiting_room", "recording", "processing", "summarizing"];
+let meetPoll = null, meetOpen = null; // meetOpen: id of the meeting whose notes are shown
+function meetWatch() {
+  clearInterval(meetPoll);
+  if (!(state.meetings?.meetings || []).some((m) => ACTIVE_MEET.includes(m.status) && m.status !== "scheduled")) return;
+  meetPoll = setInterval(async () => {
+    const s = await api("/api/meetings").catch(() => null);
+    if (!s) return;
+    const before = Object.fromEntries((state.meetings?.meetings || []).map((m) => [m.id, m.status]));
+    state.meetings = s; renderMeetings();
+    const ready = s.meetings.find((m) => m.status === "done" && before[m.id] && before[m.id] !== "done");
+    if (ready) notice(`Notes from “${ready.title}” are ready. Open Meeting notes to read them, or ask Thinq about it.`, "ok");
+  }, 8000);
+}
+function renderMeetings() {
+  const box = $("#meet"), s = state.meetings || {};
+  renderLinks();
+  if (!s.available) return;
+  const list = s.meetings || [];
+  const when = (m) => new Date(m.startedAt || m.joinAt || m.createdAt).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  const item = (m) => {
+    const [label, dot] = MEET_STATUS[m.status] || [m.status, "none"];
+    const canStop = ["scheduled", "joining", "waiting_room", "recording"].includes(m.status);
+    return `<li class="meet-item" data-id="${m.id}">
+      <div class="meet-row">
+        <span class="meet-txt"><b>${esc(m.title)}</b><small>${esc(when(m))} · ${esc(m.platform)}</small></span>
+        <span class="meet-status"><span class="dot ${dot}"></span>${esc(label)}</span>
+      </div>
+      ${m.error ? `<p class="meet-err">${esc(m.error)}</p>` : ""}
+      <div class="meet-actions">
+        ${m.hasNotes || m.hasTranscript ? `<button class="btn ghost sm" data-meet="open">${meetOpen === m.id ? "Hide notes" : "View notes"}</button>` : ""}
+        ${m.hasTranscript && !m.hasNotes && m.status === "done" ? `<button class="btn ghost sm" data-meet="summarize">Write notes again</button>` : ""}
+        ${canStop ? `<button class="btn ghost sm" data-meet="stop">${m.status === "scheduled" ? "Cancel" : "Remove from call"}</button>` : ""}
+        ${!canStop && !ACTIVE_MEET.includes(m.status) ? `<button class="btn ghost sm icon-only" data-meet="delete" aria-label="Delete this meeting's notes">${icon("i-trash", 13)}</button>` : ""}
+      </div>
+      ${meetOpen === m.id ? `<div class="meet-notes" id="meetNotes">Loading…</div>` : ""}
+    </li>`;
+  };
+  box.innerHTML = `
+    <p>Thinq joins your call as a participant called <b>“${esc((state.user?.name || "Your").split(" ")[0])}'s Thinq Notetaker”</b>, says hello in the chat so everyone knows, and gives you notes with decisions and action items afterwards.</p>
+    <form class="meet-form" id="meetForm">
+      <input class="input" id="meetUrl" type="url" inputmode="url" placeholder="Paste a Google Meet, Zoom or Teams link" aria-label="Meeting link" required>
+      <button class="btn sm" type="submit">Send notetaker</button>
+    </form>
+    ${state.mode === "google" ? `<label class="meet-toggle"><input type="checkbox" id="meetAuto" ${s.autoJoin ? "checked" : ""}><span><b>Join my calendar meetings automatically</b><small>Any meeting with a Meet, Zoom or Teams link. You can remove it from any call.</small></span></label>` : `<p class="meta">Connect Gmail & Calendar to have the notetaker join your meetings automatically.</p>`}
+    ${list.length ? `<ul class="meet-list">${list.map(item).join("")}</ul>` : `<p class="meta">No meetings yet.</p>`}
+    <p class="meta">Notes come from the meeting's live captions. Only you can see them. Tell people in the call they're being transcribed.</p>`;
+
+  $("#meetForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = e.currentTarget.querySelector("button"); btn.disabled = true; btn.textContent = "Sending…";
+    try {
+      await api("/api/meetings", { method: "POST", body: JSON.stringify({ meetingUrl: $("#meetUrl").value.trim() }) });
+      state.meetings = await api("/api/meetings"); renderMeetings(); meetWatch();
+      notice("The notetaker is on its way. If the meeting has a waiting room, let it in.", "ok");
+    } catch (err) { notice(err.message); btn.disabled = false; btn.textContent = "Send notetaker"; }
+  });
+  $("#meetAuto")?.addEventListener("change", async (e) => {
+    try { state.meetings = await api("/api/meetings/settings", { method: "PUT", body: JSON.stringify({ autoJoin: e.target.checked }) }); renderMeetings(); }
+    catch (err) { notice(err.message); e.target.checked = !e.target.checked; }
+  });
+  if (meetOpen) loadMeetNotes(meetOpen);
+  meetWatch();
+}
+async function loadMeetNotes(id) {
+  try {
+    const m = await api(`/api/meetings/${id}`);
+    const el = $("#meetNotes"); if (!el) return;
+    el.innerHTML = (m.summary ? md(m.summary) : `<p class="meta">${m.status === "summarizing" ? "Writing the notes…" : "No notes yet."}</p>`)
+      + (m.transcript ? `<details class="meet-transcript"><summary>Full transcript</summary><pre>${esc(m.transcript)}</pre></details>` : "");
+  } catch (err) { notice(err.message); }
+}
+$("#meet").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-meet]"); if (!b) return;
+  const id = b.closest(".meet-item").dataset.id, act = b.dataset.meet;
+  try {
+    if (act === "open") { meetOpen = meetOpen === id ? null : id; return renderMeetings(); }
+    if (act === "stop" && !confirm(b.textContent === "Cancel" ? "Cancel the notetaker for this meeting?" : "Remove the notetaker from the call? Notes for what was said so far will still be written.")) return;
+    if (act === "delete" && !confirm("Delete this meeting's notes and transcript from Thinq?")) return;
+    b.disabled = true;
+    if (act === "stop") await api(`/api/meetings/${id}/stop`, { method: "POST" });
+    if (act === "summarize") await api(`/api/meetings/${id}/summarize`, { method: "POST" });
+    if (act === "delete") { await api(`/api/meetings/${id}`, { method: "DELETE" }); if (meetOpen === id) meetOpen = null; }
+    state.meetings = await api("/api/meetings"); renderMeetings();
+  } catch (err) { notice(err.message); b.disabled = false; }
+});
 
 function renderNotes() {
   const notes = state.notes;
@@ -377,7 +518,7 @@ function handleEvent(ev, node) {
   if (ev.type === "status") {
     body.innerHTML = `<div class="status"><span class="spin"></span><span>${esc(ev.text)}…</span></div>`;
   } else if (ev.type === "reply") {
-    const chipFor = { email: ["i-mail", "Draft ready to review"], event: ["i-cal", "Invite ready to review"], whatsapp: ["i-wa", "WhatsApp message ready to review"] };
+    const chipFor = { email: ["i-mail", "Draft ready to review"], event: ["i-cal", "Invite ready to review"], whatsapp: ["i-wa", "WhatsApp message ready to review"], notetaker: ["i-video", "Notetaker ready to send"] };
     const chips = (ev.approvals || []).filter(Boolean).map((a) => { const [ic, label] = chipFor[a.kind] || chipFor.event; return `<button class="chip" data-approval="${a.id}">${icon(ic, 12)}${esc(label)}</button>`; }).join("");
     body.innerHTML = md(ev.text) + gallery(ev.images) + (chips ? `<div class="queued">${chips}</div>` : "") + (canRead() ? toolsRow() : "");
     if (ev.approvals?.length) { showTab("approvals"); openPanel(false); }
@@ -408,11 +549,15 @@ function fmtWhen(iso, tz = timeZone) {
 }
 
 function card(a) {
-  const p = a.payload, isEmail = a.kind === "email", isWa = a.kind === "whatsapp", open = a.status === "pending" || a.status === "sending";
+  const p = a.payload, isEmail = a.kind === "email", isWa = a.kind === "whatsapp", isNote = a.kind === "notetaker", open = a.status === "pending" || a.status === "sending";
   const editable = isEmail || isWa;
-  const head = `<div class="kind">${icon(isEmail ? "i-mail" : isWa ? "i-wa" : "i-cal")}${isEmail ? (p.replyToId ? "Reply" : "New email") : isWa ? "WhatsApp message" : "Calendar invite"}${!open ? ` · ${a.status === "done" ? (editable ? "Sent" : "Added") : "Declined"}` : ""}</div>`;
+  const kindIcon = isEmail ? "i-mail" : isWa ? "i-wa" : isNote ? "i-video" : "i-cal";
+  const kindName = isEmail ? (p.replyToId ? "Reply" : "New email") : isWa ? "WhatsApp message" : isNote ? "Meeting notetaker" : "Calendar invite";
+  const head = `<div class="kind">${icon(kindIcon)}${kindName}${!open ? ` · ${a.status === "done" ? (editable || isNote ? "Sent" : "Added") : "Declined"}` : ""}</div>`;
   let main;
-  if (isWa) {
+  if (isNote) {
+    main = `<dl><dt>Meeting</dt><dd>${esc(p.title)}</dd><dt>Joins</dt><dd>${p.joinAt ? esc(fmtWhen(p.joinAt)) : "Right away"}</dd><dt>Link</dt><dd>${esc(p.meetingUrl.replace(/^https:\/\//, "").slice(0, 48))}</dd></dl>`;
+  } else if (isWa) {
     main = `<dl><dt>To</dt><dd>${esc(p.chat)}${p.group ? " (group)" : ""}</dd></dl>${editing.has(a.id) ? `<textarea data-field="text">${esc(p.text)}</textarea>` : `<div class="text">${esc(p.text)}</div>`}`;
   } else if (isEmail && editing.has(a.id)) {
     main = `<label>To<input data-field="to" value="${esc(p.to.join(", "))}"></label>
@@ -425,7 +570,7 @@ function card(a) {
   }
   let actions = "";
   if (open && editing.has(a.id)) actions = `<button class="btn sm" data-act="save">Save changes</button><button class="btn ghost sm" data-act="cancel">Cancel</button>`;
-  else if (open) actions = `<button class="btn sm" data-act="approve" ${a.status === "sending" ? "disabled" : ""}>${a.status === "sending" ? "Sending…" : editable ? "Send" : "Add to calendar"}</button>${editable ? `<button class="btn ghost sm" data-act="edit">Edit</button>` : ""}<button class="btn ghost sm" data-act="decline">Decline</button>`;
+  else if (open) actions = `<button class="btn sm" data-act="approve" ${a.status === "sending" ? "disabled" : ""}>${a.status === "sending" ? "Sending…" : editable ? "Send" : isNote ? "Send notetaker" : "Add to calendar"}</button>${editable ? `<button class="btn ghost sm" data-act="edit">Edit</button>` : ""}<button class="btn ghost sm" data-act="decline">Decline</button>`;
   const result = a.status === "done" && a.result?.note ? `<p class="result">${esc(a.result.note)}</p>` : a.status === "done" && a.result?.link ? `<p class="result"><a class="link" href="${esc(a.result.link)}" target="_blank" rel="noopener">Open in Google Calendar</a></p>` : "";
   return `<article class="apv ${open ? "" : "done"}" data-id="${a.id}">${head}${main}${a.error && open ? `<p class="err">Last attempt failed: ${esc(a.error)}</p>` : ""}${result}${actions ? `<div class="actions">${actions}</div>` : ""}</article>`;
 }
@@ -669,6 +814,15 @@ $("#messages").addEventListener("click", async (e) => {
 // Small message at the top of the chat for problems with uploads or recording.
 let noticeTimer;
 function notice(text, kind = "err") {
+  // While a connection dialog is open, show the message inside it (the page banner is hidden behind it).
+  const dlg = $("#connDialog");
+  if (dlg?.open) {
+    let msg = dlg.querySelector(".dlg-msg");
+    if (!msg) { msg = document.createElement("p"); dlg.querySelector(".conn-dialog-head").after(msg); }
+    msg.className = `dlg-msg banner ${kind}`; msg.textContent = text; msg.hidden = false;
+    clearTimeout(msg._t); msg._t = setTimeout(() => { msg.hidden = true; }, 7000);
+    return;
+  }
   const banner = $("#banner");
   banner.hidden = false; banner.className = `banner ${kind}`; banner.textContent = text;
   clearTimeout(noticeTimer); noticeTimer = setTimeout(() => { banner.hidden = true; }, 7000);

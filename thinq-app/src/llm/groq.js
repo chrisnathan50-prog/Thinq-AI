@@ -74,6 +74,16 @@ async function runOne(call, byName) {
   }
 }
 
+// One plain request and answer, no tools (used for meeting summaries).
+export async function groqComplete({ system, prompt, maxTokens = 4000 }) {
+  const data = await chat({
+    model: GROQ_MODEL,
+    messages: [{ role: "system", content: system }, { role: "user", content: prompt }],
+    max_completion_tokens: maxTokens,
+  });
+  return String(data.choices?.[0]?.message?.content || "").trim();
+}
+
 /**
  * Yields { type: "tool", name } as tools run, then { type: "final", text }.
  */

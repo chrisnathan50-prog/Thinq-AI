@@ -21,6 +21,37 @@ body{overflow:hidden;background:var(--panel)}
 .conn b{font-weight:500}
 .conn p{color:var(--muted);font-size:12.5px;line-height:1.45}
 .conn .btn{justify-self:start}
+/* Connections: one compact list; each row opens its details in #connDialog */
+.links{border-radius:16px;background:#fff;border:1px solid var(--line);padding:6px;font-size:13px}
+.links-head{font-size:11.5px;font-weight:500;letter-spacing:.02em;text-transform:uppercase;color:var(--soft);padding:6px 8px 4px}
+.links ul{list-style:none;display:grid;gap:1px}
+.link-row{display:flex;align-items:center;gap:10px;width:100%;padding:7px 8px;border-radius:10px;background:none;border:0;font:inherit;color:inherit;text-align:left;cursor:pointer;transition:background .15s}
+.link-row:hover{background:rgba(0,0,0,.04)}
+.link-row:focus-visible{outline:2px solid var(--violet);outline-offset:-2px}
+.link-ic{flex:none;width:26px;height:26px;border-radius:8px;display:grid;place-items:center;background:var(--panel);border:1px solid var(--line);color:var(--ink-2)}
+.link-txt{flex:1;min-width:0;display:grid;line-height:1.25}
+.link-txt b{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.link-txt small{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.links .dot,.links-foot .dot{width:7px;height:7px;border-radius:50%;flex:none;margin-right:4px}
+.links .dot.live{background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.16)}
+.links .dot.demo{background:#f5a524;box-shadow:0 0 0 3px rgba(245,165,36,.16)}
+.links .dot.off{background:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,.14)}
+.link-add{flex:none;color:var(--soft);display:grid;place-items:center;margin-right:2px}
+.link-row:hover .link-add{color:var(--ink)}
+.links-foot{display:flex;align-items:center;gap:4px;margin:4px 8px 4px;padding-top:8px;border-top:1px solid var(--line-2, var(--line));font-size:11.5px;color:var(--soft)}
+.links-foot.warn{color:#991b1b}
+.links-foot code{font-size:11px}
+
+.conn-dialog{width:min(400px,calc(100vw - 32px));max-height:calc(100dvh - 48px);margin:auto;padding:0;border:1px solid var(--line);border-radius:20px;background:#fff;color:var(--ink);box-shadow:0 24px 60px -20px rgba(20,16,40,.35)}
+.conn-dialog::backdrop{background:rgba(20,16,40,.28);backdrop-filter:blur(2px)}
+.conn-dialog[open]{animation:dlg-in .18s var(--ease, ease-out)}
+@keyframes dlg-in{from{opacity:0;transform:translateY(6px) scale(.98)}}
+.conn-dialog-head{display:flex;align-items:center;justify-content:space-between;padding:16px 16px 0 20px}
+.conn-dialog-head h2{font-size:16px;font-weight:500;letter-spacing:-.015em}
+.conn-dialog .conn{border:0;border-radius:0;padding:12px 20px 20px;gap:10px;background:none}
+.conn-dialog .conn p{font-size:13px}
+.conn-dialog .wa-qr{width:220px;height:220px}
+
 .memory{padding:10px 14px;border-radius:16px;background:#fff;border:1px solid var(--line);font-size:13px}
 .memory summary{cursor:pointer;font-weight:500;list-style:none;display:flex;justify-content:space-between}
 .memory summary::-webkit-details-marker{display:none}
@@ -326,3 +357,37 @@ table.people .tag{display:inline-block;font-size:11.5px;padding:2px 8px;border-r
 table.people .muted{color:var(--soft);font-size:12px}
 @media (max-width:1000px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.dash-grid{grid-template-columns:1fr}}
 @media (max-width:560px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.barlist li{grid-template-columns:110px 1fr 60px}}
+.conn .dot.none{background:#c9c6d3;box-shadow:0 0 0 3px rgba(150,145,170,.15)}
+
+/* Meeting notes pane (inside #connDialog) */
+.conn-dialog .dlg-msg{margin:10px 20px 0;font-size:13px}
+.meet-form{display:flex;gap:8px}
+.meet-form .input{flex:1;min-width:0}
+.meet-form .btn{flex:none}
+.meet-toggle{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:12px;background:var(--panel);border:1px solid var(--line);cursor:pointer}
+.meet-toggle input{margin-top:3px;accent-color:var(--violet)}
+.meet-toggle span{display:grid;gap:2px}
+.meet-toggle b{font-weight:500;font-size:13px}
+.meet-toggle small{font-size:12px;color:var(--muted);line-height:1.4}
+.meet-list{list-style:none;display:grid;gap:8px;max-height:42dvh;overflow:auto;margin:0 -4px;padding:0 4px}
+.meet-item{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:6px}
+.meet-row{display:flex;align-items:flex-start;gap:10px}
+.meet-txt{flex:1;min-width:0;display:grid;line-height:1.3}
+.meet-txt b{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meet-txt small{font-size:11.5px;color:var(--muted)}
+.meet-status{flex:none;display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);padding-top:2px}
+.meet-status .dot{width:7px;height:7px;border-radius:50%}
+.meet-err{font-size:12px;color:#991b1b}
+.meet-actions{display:flex;flex-wrap:wrap;gap:6px}
+.meet-actions:empty{display:none}
+.meet-actions .icon-only{padding-inline:9px;margin-left:auto}
+.meet-notes{font-size:13px;line-height:1.55;color:var(--ink);border-top:1px solid var(--line);padding-top:8px;display:grid;gap:6px}
+.meet-notes ul{margin-left:18px;display:grid;gap:3px}
+.meet-notes strong{font-weight:500}
+.meet-transcript summary{cursor:pointer;font-size:12.5px;color:var(--muted)}
+.meet-transcript pre{white-space:pre-wrap;font:12px/1.5 inherit;max-height:240px;overflow:auto;background:var(--panel);border-radius:10px;padding:8px 10px;margin-top:6px}
+.conn-dialog .meet .dot.none{background:#c9c6d3}
+.conn-dialog .meet .dot.live{background:#22c55e}
+.conn-dialog .meet .dot.demo{background:#f5a524}
+.conn-dialog .meet .dot.off{background:#ef4444}
+.conn-dialog:has(.meet:not([hidden])){width:min(480px,calc(100vw - 32px))}

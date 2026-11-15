@@ -4,8 +4,9 @@ import * as store from "./store.js";
 import { providerFor } from "./providers/index.js";
 import { friendlyError } from "./errors.js";
 import { sendToChat } from "./whatsapp-sync.js";
+import { sendNotetaker } from "./meetings.js";
 
-const SENT_LOG = { email: "email_sent", event: "event_created", whatsapp: "whatsapp_sent" };
+const SENT_LOG = { email: "email_sent", event: "event_created", whatsapp: "whatsapp_sent", notetaker: "notetaker_approved" };
 
 export async function approveItem(user, approvalId, via = "app") {
   const a = await store.claimApproval(user.id, approvalId);
@@ -15,6 +16,10 @@ export async function approveItem(user, approvalId, via = "app") {
     if (a.kind === "whatsapp") {
       result = await sendToChat(user.id, a.payload.jid, a.payload.text);
       mode = "whatsapp";
+    } else if (a.kind === "notetaker") {
+      const m = await sendNotetaker(user, a.payload);
+      result = { meetingId: m.id, note: m.status === "scheduled" ? "Thinq's notetaker will join a minute before it starts." : "Thinq's notetaker is joining now." };
+      mode = "meetings";
     } else {
       const p = await providerFor(user);
       result = a.kind === "email" ? await p.sendEmail(a.payload) : await p.createEvent(a.payload);

@@ -35,6 +35,10 @@ services:
         sync: false
       - key: WHATSAPP_SYNC # "off" disables reading people's own WhatsApp chats (unofficial linked-device sync)
         value: "on"
+      - key: ATTENDEE_URL # optional: meeting notes - your self-hosted Attendee server (see thinq-app/README.md)
+        sync: false
+      - key: ATTENDEE_API_KEY
+        sync: false
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET

@@ -2,6 +2,7 @@
 // The user approves access on Google's own page. Tokens are stored encrypted, per user (see store.js).
 import { google } from "googleapis";
 import * as store from "../store.js";
+import { findMeetingUrl } from "../meetings.js";
 
 // Step 1 - signing in to Thinq needs only basic profile access.
 export const SIGNIN_SCOPES = ["openid", "email", "profile"];
@@ -151,6 +152,8 @@ export function createGoogleProvider(userId, user) {
       allDay: Boolean(e.start.date),
       attendees: (e.attendees || []).map((a) => a.email),
       location: e.location || "",
+      meetingUrl: e.hangoutLink || (e.conferenceData?.entryPoints || []).find((p) => p.entryPointType === "video")?.uri || findMeetingUrl(e.location, e.description),
+      declined: (e.attendees || []).some((a) => a.self && a.responseStatus === "declined"),
     }));
   },
 

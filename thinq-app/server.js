@@ -25,6 +25,7 @@ import { approveItem, declineItem } from "./src/approvals.js";
 import { mountWhatsApp, whatsappConfigured, whatsappNumber, linkUrl } from "./src/whatsapp.js";
 import { mountTesters, loadApprovedTesters, isAdmin } from "./src/testers.js";
 import { syncAvailable, syncState, startSync, cancelSync, disconnectSync, resumeAllSyncs } from "./src/whatsapp-sync.js";
+import * as meetings from "./src/meetings.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SITE_DIR = process.env.SITE_DIR || path.resolve(here, "..", "thinq-site");
@@ -56,6 +57,7 @@ app.use((req, res, next) => {
 
 app.get("/healthz", (req, res) => res.json({ ok: true }));
 mountWhatsApp(app); // Meta calls this directly - no Thinq sign-in
+meetings.mountMeetings(app); // Attendee (the meeting notetaker) calls this - no Thinq sign-in
 app.use(attachUser);
 mountAuth(app);
 mountTesters(app); // website tester form + admin tester list
@@ -88,6 +90,7 @@ api.get("/state", async (req, res) => {
     speechAvailable: speechAvailable(),
     whatsapp: await whatsappState(req.user.id),
     whatsappSync: await syncState(req.user.id),
+    meetings: await meetingsState(req.user.id),
     images: { available: imagesAvailable(), today: await store.imagesToday(req.user.id), limit: IMAGE_DAILY_LIMIT },
     documentTypes: ACCEPTED,
     conversations: await store.listConversations(req.user.id),
@@ -199,6 +202,43 @@ api.delete("/whatsapp-sync", async (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------- meeting notes (Thinq's notetaker bot in Meet / Zoom / Teams calls) ----------
+async function meetingsState(userId) {
+  if (!meetings.meetingsConfigured()) return { available: false };
+  return { available: true, ...(await meetings.getPrefs(userId)), meetings: await meetings.listMeetings(userId, 12) };
+}
+const meetingErr = (res, err) => {
+  if (!err?.userFacing) console.error("[meetings]", err);
+  res.status(400).json({ error: err?.userFacing ? err.message : "Something went wrong with the notetaker. Try again." });
+};
+api.get("/meetings", async (req, res) => res.json(await meetingsState(req.user.id)));
+api.get("/meetings/:id", async (req, res) => {
+  const m = await meetings.getMeeting(req.user.id, req.params.id);
+  m ? res.json(m) : res.status(404).json({ error: "Not found" });
+});
+api.post("/meetings", async (req, res) => {
+  try { res.json(await meetings.sendNotetaker(req.user, { meetingUrl: String(req.body?.meetingUrl || ""), title: req.body?.title })); }
+  catch (err) { meetingErr(res, err); }
+});
+api.post("/meetings/:id/stop", async (req, res) => {
+  try { res.json(await meetings.stopNotetaker(req.user.id, req.params.id)); } catch (err) { meetingErr(res, err); }
+});
+api.post("/meetings/:id/summarize", async (req, res) => {
+  const m = await meetings.getMeeting(req.user.id, req.params.id);
+  if (!m?.hasTranscript) return res.status(404).json({ error: "No transcript to summarize." });
+  meetings.summarize(m.id).catch(() => {});
+  res.json({ ok: true });
+});
+api.delete("/meetings/:id", async (req, res) => {
+  (await meetings.deleteMeeting(req.user.id, req.params.id)) ? res.json({ ok: true }) : res.status(404).json({ error: "Not found" });
+});
+api.put("/meetings/settings", async (req, res) => {
+  if (!meetings.meetingsConfigured()) return res.status(400).json({ error: "Meeting notes aren't set up on this server yet." });
+  await meetings.setPrefs(req.user.id, { autoJoin: req.body?.autoJoin === true });
+  await store.logAction(req.user.id, "meetings_auto_join", { on: req.body?.autoJoin === true });
+  res.json(await meetingsState(req.user.id));
+});
+
 // ---------- generated images ----------
 api.get("/images/:id", async (req, res) => {
   const img = await store.getImage(req.user.id, req.params.id);
@@ -305,6 +345,7 @@ if (fs.existsSync(SITE_DIR)) {
   app.get("/", (req, res) => res.redirect(req.user ? "/app" : "/auth/google/login"));
 }
 
+meetings.startMeetingWorkers();
 const resumed = await resumeAllSyncs().catch((e) => { console.warn("[wa-sync] resume failed:", e.message); return 0; });
 
 app.listen(PORT, HOST, () => {
@@ -315,5 +356,6 @@ app.listen(PORT, HOST, () => {
   console.log(`  Invite list: ${process.env.ALLOWED_EMAILS || "(none)"} · admins: ${process.env.ADMIN_EMAILS || "⚠ none - set ADMIN_EMAILS to review tester requests"} · plus testers approved in the app`);
   console.log(`  WhatsApp: ${whatsappConfigured() ? `on (+${whatsappNumber() || "number not set"})` : "off"}`);
   console.log(`  WhatsApp chat sync: ${syncAvailable() ? `on (${resumed || 0} linked account${resumed === 1 ? "" : "s"} reconnecting)` : "off"}`);
+  console.log(`  Meeting notes: ${meetings.meetingsConfigured() ? `on (notetaker at ${process.env.ATTENDEE_URL})` : "off (set ATTENDEE_URL and ATTENDEE_API_KEY)"}`);
   console.log(`  Daily limit: ${DAILY_LIMIT || "none"} AI requests per person\n`);
 });
