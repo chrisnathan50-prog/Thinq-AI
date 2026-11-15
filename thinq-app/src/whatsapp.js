@@ -77,6 +77,8 @@ async function sendApproval(to, a, timeZone) {
   const when = (iso) => new Date(iso).toLocaleString("en-US", { timeZone, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
   const body = a.kind === "email"
     ? `✉️ *Draft email* (not sent yet)\nTo: ${p.to.join(", ")}${p.cc?.length ? `\nCc: ${p.cc.join(", ")}` : ""}\nSubject: ${p.subject}\n\n${p.body}`
+    : a.kind === "whatsapp"
+    ? `💬 *Draft WhatsApp message* (not sent yet)\nTo: ${p.chat}${p.group ? " (group)" : ""}\n\n${p.text}`
     : `📅 *Invite* (not sent yet)\n${p.title}\n${when(p.start)} – ${new Date(p.end).toLocaleTimeString("en-US", { timeZone, hour: "numeric", minute: "2-digit" })}${p.attendees?.length ? `\nGuests: ${p.attendees.join(", ")}` : ""}`;
   await sendMessage(to, {
     type: "interactive",
@@ -85,7 +87,7 @@ async function sendApproval(to, a, timeZone) {
       body: { text: clip(body, 1000) },
       footer: { text: "Or edit it in the Thinq app first" },
       action: { buttons: [
-        { type: "reply", reply: { id: `ok:${a.id}`, title: a.kind === "email" ? "Send" : "Send invite" } },
+        { type: "reply", reply: { id: `ok:${a.id}`, title: a.kind === "event" ? "Send invite" : "Send" } },
         { type: "reply", reply: { id: `no:${a.id}`, title: "Discard" } },
       ] },
     },
@@ -192,7 +194,7 @@ export async function handleMessage(msg, profileName) {
       const out = await approveItem(user, approvalId, "whatsapp");
       if (!out.ok) return sendText(from, out.status === 404 ? "That one was already handled." : out.error);
       const demo = out.approval.mode === "demo" ? " (demo mode - nothing really went out)" : "";
-      return sendText(from, out.approval.kind === "email" ? `✅ Sent${demo}.` : `✅ Added to your calendar and invites sent${demo}.`);
+      return sendText(from, out.approval.kind === "whatsapp" ? `✅ Sent to ${out.approval.payload.chat}.` : out.approval.kind === "email" ? `✅ Sent${demo}.` : `✅ Added to your calendar and invites sent${demo}.`);
     }
     if (action === "no") {
       const out = await declineItem(user, approvalId, "whatsapp");

@@ -4,6 +4,7 @@ import { GroqError } from "./llm/groq.js";
 import { MODEL } from "./agent.js";
 
 export function friendlyError(err) {
+  if (err?.userFacing) return err.message;
   if (err instanceof GroqError) {
     if (err.status === 401) return "The server's Groq API key was rejected. The site owner needs to check GROQ_API_KEY.";
     if (err.status === 429) return "Thinq's AI is busy (free-tier limit reached). Wait a minute and try again.";

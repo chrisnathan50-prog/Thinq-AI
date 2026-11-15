@@ -3,15 +3,25 @@
 import * as store from "./store.js";
 import { providerFor } from "./providers/index.js";
 import { friendlyError } from "./errors.js";
+import { sendToChat } from "./whatsapp-sync.js";
+
+const SENT_LOG = { email: "email_sent", event: "event_created", whatsapp: "whatsapp_sent" };
 
 export async function approveItem(user, approvalId, via = "app") {
   const a = await store.claimApproval(user.id, approvalId);
   if (!a) return { ok: false, status: 404, error: "This item is no longer waiting for approval." };
   try {
-    const p = await providerFor(user);
-    const result = a.kind === "email" ? await p.sendEmail(a.payload) : await p.createEvent(a.payload);
-    await store.logAction(user.id, a.kind === "email" ? "email_sent" : "event_created", { approvalId: a.id, summary: a.summary, mode: p.mode, via });
-    return { ok: true, approval: await store.updateApproval(user.id, a.id, { status: "done", result, mode: p.mode }) };
+    let result, mode;
+    if (a.kind === "whatsapp") {
+      result = await sendToChat(user.id, a.payload.jid, a.payload.text);
+      mode = "whatsapp";
+    } else {
+      const p = await providerFor(user);
+      result = a.kind === "email" ? await p.sendEmail(a.payload) : await p.createEvent(a.payload);
+      mode = p.mode;
+    }
+    await store.logAction(user.id, SENT_LOG[a.kind] || "approved", { approvalId: a.id, summary: a.summary, mode, via });
+    return { ok: true, approval: await store.updateApproval(user.id, a.id, { status: "done", result, mode }) };
   } catch (err) {
     console.error(err);
     await store.updateApproval(user.id, a.id, { status: "pending", error: String(err.message || err).slice(0, 300) });

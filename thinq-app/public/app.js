@@ -196,7 +196,7 @@ function renderWaSync() {
     const last = s.lastMessageAt ? new Date(s.lastMessageAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : null;
     box.innerHTML = `${head(s.status === "connected" ? "live" : "demo", s.status === "connected" ? "WhatsApp chats synced" : "WhatsApp chats reconnecting…")}
       <p>${s.phone ? `${esc(s.phone)} · ` : ""}${s.messages ? `${s.chats} chats, ${s.messages.toLocaleString()} messages${last ? `, latest ${esc(last)}` : ""}` : "Syncing your recent chats…"}. Ask things like “what did I miss on WhatsApp today?”</p>
-      <p class="meta">Thinq only reads. Messages older than ${s.keepDays} days are deleted.</p>
+      <p class="meta">Thinq only sends messages you approve. Messages older than ${s.keepDays} days are deleted.</p>
       <div class="wa-actions"><button class="btn ghost sm" id="waSyncOff">Disconnect & delete</button></div>`;
     $("#waSyncOff").addEventListener("click", async () => {
       if (!confirm("Disconnect WhatsApp chats? Thinq is logged out of your WhatsApp and every synced message is deleted from Thinq.")) return;
@@ -227,7 +227,7 @@ function renderWaSync() {
   if (waSyncStep === "warn" || waSyncStep === "phone") {
     box.innerHTML = `${head("off", "Before you link")}
       <p>WhatsApp has no official way for apps to read your chats, so Thinq links as a device on your account, like WhatsApp Web. This isn't allowed by WhatsApp's terms: <b>WhatsApp could restrict or ban your number</b>, and it may stop working after a WhatsApp update.</p>
-      <p>Thinq will store the text of your messages from the last ${s.keepDays} days so it can search them. It never sends anything. You can disconnect and delete everything at any time.</p>
+      <p>Thinq will store the text of your messages from the last ${s.keepDays} days so it can search them. It only sends a message when you tap Send on a draft. You can disconnect and delete everything at any time.</p>
       ${waSyncStep === "phone" ? `<label class="meta" for="waSyncPhone">Your WhatsApp number, with country code</label><input class="input" id="waSyncPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+44 7700 900123">` : ""}
       <div class="wa-actions">
         ${waSyncStep === "phone"
@@ -377,7 +377,8 @@ function handleEvent(ev, node) {
   if (ev.type === "status") {
     body.innerHTML = `<div class="status"><span class="spin"></span><span>${esc(ev.text)}…</span></div>`;
   } else if (ev.type === "reply") {
-    const chips = (ev.approvals || []).filter(Boolean).map((a) => `<button class="chip" data-approval="${a.id}">${icon(a.kind === "email" ? "i-mail" : "i-cal", 12)}${esc(a.kind === "email" ? "Draft ready to review" : "Invite ready to review")}</button>`).join("");
+    const chipFor = { email: ["i-mail", "Draft ready to review"], event: ["i-cal", "Invite ready to review"], whatsapp: ["i-wa", "WhatsApp message ready to review"] };
+    const chips = (ev.approvals || []).filter(Boolean).map((a) => { const [ic, label] = chipFor[a.kind] || chipFor.event; return `<button class="chip" data-approval="${a.id}">${icon(ic, 12)}${esc(label)}</button>`; }).join("");
     body.innerHTML = md(ev.text) + gallery(ev.images) + (chips ? `<div class="queued">${chips}</div>` : "") + (canRead() ? toolsRow() : "");
     if (ev.approvals?.length) { showTab("approvals"); openPanel(false); }
   } else if (ev.type === "error") {
@@ -396,7 +397,7 @@ function renderApprovals() {
   const past = all.filter((a) => a.status === "done" || a.status === "declined").slice(0, 8);
   for (const id of ["#badge", "#badgeTop"]) { $(id).hidden = !pending.length; $(id).textContent = pending.length; }
   const body = $("#tab-approvals");
-  if (!all.length) { body.innerHTML = `<p class="none">When Thinq drafts an email or a meeting invite, it waits here for you. Nothing is sent until you approve it.</p>`; return; }
+  if (!all.length) { body.innerHTML = `<p class="none">When Thinq drafts an email, a WhatsApp message or a meeting invite, it waits here for you. Nothing is sent until you approve it.</p>`; return; }
   body.innerHTML =
     (pending.length ? pending.map(card).join("") : `<p class="none">You're all caught up.</p>`) +
     (past.length ? `<h3>Recent</h3>` + past.map(card).join("") : "");
@@ -407,10 +408,13 @@ function fmtWhen(iso, tz = timeZone) {
 }
 
 function card(a) {
-  const p = a.payload, isEmail = a.kind === "email", open = a.status === "pending" || a.status === "sending";
-  const head = `<div class="kind">${icon(isEmail ? "i-mail" : "i-cal")}${isEmail ? (p.replyToId ? "Reply" : "New email") : "Calendar invite"}${!open ? ` · ${a.status === "done" ? (isEmail ? "Sent" : "Added") : "Declined"}` : ""}</div>`;
+  const p = a.payload, isEmail = a.kind === "email", isWa = a.kind === "whatsapp", open = a.status === "pending" || a.status === "sending";
+  const editable = isEmail || isWa;
+  const head = `<div class="kind">${icon(isEmail ? "i-mail" : isWa ? "i-wa" : "i-cal")}${isEmail ? (p.replyToId ? "Reply" : "New email") : isWa ? "WhatsApp message" : "Calendar invite"}${!open ? ` · ${a.status === "done" ? (editable ? "Sent" : "Added") : "Declined"}` : ""}</div>`;
   let main;
-  if (isEmail && editing.has(a.id)) {
+  if (isWa) {
+    main = `<dl><dt>To</dt><dd>${esc(p.chat)}${p.group ? " (group)" : ""}</dd></dl>${editing.has(a.id) ? `<textarea data-field="text">${esc(p.text)}</textarea>` : `<div class="text">${esc(p.text)}</div>`}`;
+  } else if (isEmail && editing.has(a.id)) {
     main = `<label>To<input data-field="to" value="${esc(p.to.join(", "))}"></label>
       <label>Subject<input data-field="subject" value="${esc(p.subject)}"></label>
       <textarea data-field="body">${esc(p.body)}</textarea>`;
@@ -421,7 +425,7 @@ function card(a) {
   }
   let actions = "";
   if (open && editing.has(a.id)) actions = `<button class="btn sm" data-act="save">Save changes</button><button class="btn ghost sm" data-act="cancel">Cancel</button>`;
-  else if (open) actions = `<button class="btn sm" data-act="approve" ${a.status === "sending" ? "disabled" : ""}>${a.status === "sending" ? "Sending…" : isEmail ? "Send" : "Add to calendar"}</button>${isEmail ? `<button class="btn ghost sm" data-act="edit">Edit</button>` : ""}<button class="btn ghost sm" data-act="decline">Decline</button>`;
+  else if (open) actions = `<button class="btn sm" data-act="approve" ${a.status === "sending" ? "disabled" : ""}>${a.status === "sending" ? "Sending…" : editable ? "Send" : "Add to calendar"}</button>${editable ? `<button class="btn ghost sm" data-act="edit">Edit</button>` : ""}<button class="btn ghost sm" data-act="decline">Decline</button>`;
   const result = a.status === "done" && a.result?.note ? `<p class="result">${esc(a.result.note)}</p>` : a.status === "done" && a.result?.link ? `<p class="result"><a class="link" href="${esc(a.result.link)}" target="_blank" rel="noopener">Open in Google Calendar</a></p>` : "";
   return `<article class="apv ${open ? "" : "done"}" data-id="${a.id}">${head}${main}${a.error && open ? `<p class="err">Last attempt failed: ${esc(a.error)}</p>` : ""}${result}${actions ? `<div class="actions">${actions}</div>` : ""}</article>`;
 }
@@ -434,7 +438,10 @@ $("#tab-approvals").addEventListener("click", async (e) => {
     if (act === "cancel") { editing.delete(id); renderApprovals(); return; }
     if (act === "save") {
       const val = (f) => cardEl.querySelector(`[data-field="${f}"]`).value;
-      await api(`/api/approvals/${id}`, { method: "PATCH", body: JSON.stringify({ to: val("to").split(",").map((s) => s.trim()).filter(Boolean), subject: val("subject"), body: val("body") }) });
+      const edits = cardEl.querySelector('[data-field="text"]')
+        ? { text: val("text") }
+        : { to: val("to").split(",").map((s) => s.trim()).filter(Boolean), subject: val("subject"), body: val("body") };
+      await api(`/api/approvals/${id}`, { method: "PATCH", body: JSON.stringify(edits) });
       editing.delete(id);
     }
     if (act === "approve") { btn.disabled = true; btn.textContent = "Sending…"; await api(`/api/approvals/${id}/approve`, { method: "POST" }); loadAgenda(); }

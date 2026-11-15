@@ -248,8 +248,13 @@ api.post("/speak", async (req, res) => {
 api.patch("/approvals/:id", async (req, res) => {
   const a = await store.getApproval(req.user.id, req.params.id);
   if (!a || a.status !== "pending") return res.status(404).json({ error: "Nothing to edit" });
-  if (a.kind !== "email") return res.status(400).json({ error: "Only email drafts can be edited here" });
   const b = req.body || {};
+  if (a.kind === "whatsapp") {
+    const text = typeof b.text === "string" ? b.text.trim().slice(0, 4000) : "";
+    if (!text) return res.status(400).json({ error: "The message can't be empty." });
+    return res.json(await store.updateApproval(req.user.id, a.id, { payload: { ...a.payload, text } }));
+  }
+  if (a.kind !== "email") return res.status(400).json({ error: "Only email and WhatsApp drafts can be edited here" });
   const edits = {};
   if (Array.isArray(b.to)) edits.to = b.to.map(String).map((s) => s.trim()).filter(Boolean);
   if (Array.isArray(b.cc)) edits.cc = b.cc.map(String).map((s) => s.trim()).filter(Boolean);

@@ -3,8 +3,9 @@
 //
 // WhatsApp has no official API for reading someone's personal chats, so this links Thinq to the person's
 // account as a "linked device" (like WhatsApp Web), using the unofficial Baileys library. The person scans a
-// QR code (or types a pairing code) in WhatsApp → Linked devices. Thinq only READS: it never sends, reacts,
-// marks as read or shows "online" from their account.
+// QR code (or types a pairing code) in WhatsApp → Linked devices. Thinq reads their chats, and sends a text
+// message only when the person taps Send on a draft (see sendToChat). It never reacts, marks as read or shows
+// "online" from their account.
 //
 // Unofficial means: it isn't allowed by WhatsApp's Terms, WhatsApp can restrict or ban numbers that use it,
 // and a WhatsApp update can break it. The app tells people this before they link.
@@ -160,6 +161,7 @@ export async function saveChatNames(userId, list) {
 }
 
 // ---------- one live connection per person ----------
+const sentCache = new Map(); // message id -> content of messages Thinq sent (for WhatsApp's resend requests)
 const live = new Map(); // userId -> { sock, status, qr, pairingCode, phone, stopped, retries, names, startedAt }
 
 async function setSession(userId, fields) {
@@ -188,7 +190,8 @@ async function connect(userId, { pairPhone } = {}) {
     syncFullHistory: false, // recent history only; new messages arrive live
     emitOwnEvents: false,
     generateHighQualityLinkPreview: false,
-    getMessage: async () => undefined,
+    // WhatsApp asks for a sent message again if a recipient's phone couldn't decrypt it.
+    getMessage: async (key) => sentCache.get(key.id),
   });
   entry.sock = sock;
 
@@ -380,17 +383,45 @@ export async function searchMessages(userId, { text, chat, sinceDays, limit = 30
   return { messages: rows.map((r) => ({ ...chatOut(r), sender: r.sender, at: r.at, text: r.text })) };
 }
 
-export async function readChat(userId, { chat, sinceDays, limit = 80 }) {
+// One chat from a name, part of a name, phone number or chat id - or an error to show the assistant.
+export async function resolveChat(userId, chat) {
   const chats = await findChats(userId, chat);
   if (!chats.length) return { error: `No WhatsApp chat matches "${chat}". Use whatsapp_recent_chats to see chat names.` };
-  if (chats.length > 1 && !chats.some((c) => (c.name || "").toLowerCase() === String(chat).toLowerCase())) {
+  const exact = chats.find((x) => (x.name || "").toLowerCase() === String(chat).toLowerCase() || x.jid === chat);
+  if (chats.length > 1 && !exact) {
     return { error: `Several chats match "${chat}": ${chats.map((c) => chatOut(c).chat).join("; ")}. Ask the user which one, or use its exact name.` };
   }
-  const c = chats.find((x) => (x.name || "").toLowerCase() === String(chat).toLowerCase()) || chats[0];
+  const c = exact || chats[0];
+  return { jid: c.jid, ...chatOut(c) };
+}
+
+export async function readChat(userId, { chat, sinceDays, limit = 80 }) {
+  const r = await resolveChat(userId, chat);
+  if (r.error) return r;
+  const c = { jid: r.jid, name: r.chat, is_group: r.group };
   const params = [userId, c.jid, Math.min(limit, 200)];
   if (sinceDays) params.push(String(sinceDays));
   const rows = await query(
     `select * from (select sender, text, at from wa_messages where user_id = $1 and jid = $2
        ${sinceDays ? "and at > now() - ($4 || ' days')::interval" : ""} order by at desc limit $3) t order by at`, params);
   return { chat: chatOut(c), messages: rows };
+}
+
+// ---------- sending (only ever called after the person taps Send on a draft) ----------
+class SyncError extends Error { userFacing = true; }
+
+export async function sendToChat(userId, jid, text) {
+  const entry = live.get(userId);
+  if (!entry?.sock || entry.status !== "connected") {
+    throw new SyncError("Your WhatsApp isn't connected to Thinq right now. Check the WhatsApp chats card in the sidebar, then try again.");
+  }
+  const known = await one(`select 1 from wa_chats where user_id = $1 and jid = $2`, [userId, jid]);
+  if (!known) throw new SyncError("That WhatsApp chat isn't in your synced chats any more.");
+  const sent = await entry.sock.sendMessage(jid, { text: String(text).slice(0, 4000) });
+  if (sent?.key?.id) {
+    sentCache.set(sent.key.id, sent.message);
+    if (sentCache.size > 200) sentCache.delete(sentCache.keys().next().value);
+    await saveMessages(userId, [sent], entry.names).catch(() => {});
+  }
+  return { id: sent?.key?.id || null, note: "Sent on WhatsApp." };
 }
