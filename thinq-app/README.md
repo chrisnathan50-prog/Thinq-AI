@@ -90,9 +90,19 @@ In the app, **Link WhatsApp chats** shows a warning, then a QR code to scan in W
 - **Risks.** WhatsApp has no official API for this, so it uses the unofficial [Baileys](https://github.com/WhiskeySockets/Baileys) library. It isn't allowed by WhatsApp's terms: **WhatsApp can restrict or ban numbers that use it**, and a WhatsApp update can break it. The app tells people this before they link. Turn the feature off with `WHATSAPP_SYNC=off`.
 - **Hosting:** the server keeps one live connection per linked person. On Render's free plan the server sleeps when idle, so messages that arrive while it sleeps can be missed (WhatsApp sends some recent history again when it reconnects). For reliable sync, use an always-on plan.
 
-### Meeting notes (free, optional)
+### Meeting notes (free)
 
-Thinq can send a notetaker into **Google Meet, Zoom and Microsoft Teams** calls. It joins as "*Name*'s Thinq Notetaker", posts a message in the meeting chat so everyone knows they're being transcribed, and afterwards Thinq saves the transcript (split by speaker) and writes notes: summary, decisions, action items with owners, open questions. People can then ask "what did we agree with Priya?" or "draft the follow-up email", and every meeting is listed under **Connections → Meeting notes**.
+**Record a meeting** in the browser and Thinq writes the notes: summary, decisions, action items, open questions and key points. It's in **Connections → Meeting notes** and needs only `GROQ_API_KEY` (Groq's free Whisper does the transcription).
+
+- **What's recorded:** the microphone, and on desktop Chrome or Edge, optionally a meeting tab's sound too (Google Meet, Zoom or Teams open in the browser). Chrome asks which tab to share; pick the meeting and keep *Share tab audio* on. That way the other people in the call are heard even with headphones. Phones and Safari record the microphone only.
+- **How it works:** the browser sends the audio in 5-minute pieces, and each piece is transcribed as soon as it arrives. The audio is deleted once it's turned into text; only the transcript and notes are kept. Long meetings (up to 4 hours) work, and if the tab closes mid-meeting, whatever was already sent still becomes notes after about 12 minutes.
+- **Afterwards:** the meeting appears in Meeting notes (View notes, full transcript, delete), and people can ask Thinq about it ("what did we decide about the launch date?", "draft the follow-up email").
+- **Limits:** recorded transcripts have no speaker names, so the notes only name an action's owner when the words make it clear. Groq's free tier transcribes about 2 hours of audio per hour; pieces that hit the limit are retried automatically. Each person can record up to `RECORDINGS_PER_DAY` meetings a day (default 10).
+- **Consent:** the app reminds people to tell everyone in the meeting they're being recorded.
+
+#### Optional: a notetaker bot that joins calls
+
+Thinq can also send a notetaker bot into **Google Meet, Zoom and Microsoft Teams** calls. It joins as "*Name*'s Thinq Notetaker", posts a message in the meeting chat so everyone knows they're being transcribed, and Thinq saves the transcript split by speaker. This needs a self-hosted Attendee server (below); without `ATTENDEE_URL` the bot options stay hidden.
 
 - **Sending it:** paste a meeting link in *Meeting notes*, or ask Thinq ("send the notetaker to my 3pm"). When Thinq suggests it, it waits in Approvals until you tap *Send notetaker*.
 - **Auto-join** (optional, per person): sends the notetaker to every calendar meeting that has a Meet, Zoom or Teams link, a minute before it starts.

@@ -26,6 +26,7 @@ import { mountWhatsApp, whatsappConfigured, whatsappNumber, linkUrl } from "./sr
 import { mountTesters, loadApprovedTesters, isAdmin } from "./src/testers.js";
 import { syncAvailable, syncState, startSync, cancelSync, disconnectSync, resumeAllSyncs } from "./src/whatsapp-sync.js";
 import * as meetings from "./src/meetings.js";
+import * as recordings from "./src/recordings.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SITE_DIR = process.env.SITE_DIR || path.resolve(here, "..", "thinq-site");
@@ -203,10 +204,30 @@ api.delete("/whatsapp-sync", async (req, res) => {
 });
 
 // ---------- meeting notes (Thinq's notetaker bot in Meet / Zoom / Teams calls) ----------
+// Meeting notes come from two places: recordings made in the browser (needs GROQ_API_KEY), and the optional
+// notetaker bot (needs an Attendee server: ATTENDEE_URL + ATTENDEE_API_KEY).
 async function meetingsState(userId) {
-  if (!meetings.meetingsConfigured()) return { available: false };
-  return { available: true, ...(await meetings.getPrefs(userId)), meetings: await meetings.listMeetings(userId, 12) };
+  const bot = meetings.meetingsConfigured(), record = recordings.recordingAvailable();
+  if (!bot && !record) return { available: false };
+  return { available: true, bot, record, ...(bot ? await meetings.getPrefs(userId) : { autoJoin: false }), meetings: await meetings.listMeetings(userId, 12) };
 }
+api.post("/recordings", async (req, res) => {
+  try { res.json(await recordings.startRecording(req.user.id, { title: req.body?.title, withTab: req.body?.withTab === true })); }
+  catch (err) { meetingErr(res, err); }
+});
+api.post("/recordings/:id/segments", rawBody(recordings.MAX_SEGMENT_BYTES + 1024), async (req, res) => {
+  try {
+    res.json(await recordings.addSegment(req.user.id, req.params.id, {
+      n: Number(req.query.n), offsetMs: Number(req.query.offset) || 0, mime: req.get("content-type"), audio: req.body,
+    }));
+  } catch (err) { meetingErr(res, err); }
+});
+api.post("/recordings/:id/finish", async (req, res) => {
+  try { res.json(await recordings.finishRecording(req.user.id, req.params.id)); } catch (err) { meetingErr(res, err); }
+});
+api.delete("/recordings/:id", async (req, res) => {
+  (await recordings.cancelRecording(req.user.id, req.params.id)) ? res.json({ ok: true }) : res.status(404).json({ error: "Not found" });
+});
 const meetingErr = (res, err) => {
   if (!err?.userFacing) console.error("[meetings]", err);
   res.status(400).json({ error: err?.userFacing ? err.message : "Something went wrong with the notetaker. Try again." });
@@ -346,6 +367,7 @@ if (fs.existsSync(SITE_DIR)) {
 }
 
 meetings.startMeetingWorkers();
+recordings.startRecordingWorker();
 const resumed = await resumeAllSyncs().catch((e) => { console.warn("[wa-sync] resume failed:", e.message); return 0; });
 
 app.listen(PORT, HOST, () => {
@@ -356,6 +378,6 @@ app.listen(PORT, HOST, () => {
   console.log(`  Invite list: ${process.env.ALLOWED_EMAILS || "(none)"} · admins: ${process.env.ADMIN_EMAILS || "⚠ none - set ADMIN_EMAILS to review tester requests"} · plus testers approved in the app`);
   console.log(`  WhatsApp: ${whatsappConfigured() ? `on (+${whatsappNumber() || "number not set"})` : "off"}`);
   console.log(`  WhatsApp chat sync: ${syncAvailable() ? `on (${resumed || 0} linked account${resumed === 1 ? "" : "s"} reconnecting)` : "off"}`);
-  console.log(`  Meeting notes: ${meetings.meetingsConfigured() ? `on (notetaker at ${process.env.ATTENDEE_URL})` : "off (set ATTENDEE_URL and ATTENDEE_API_KEY)"}`);
+  console.log(`  Meeting notes: ${recordings.recordingAvailable() ? "recording in the browser on" : "recording off (needs GROQ_API_KEY)"} · notetaker bot ${meetings.meetingsConfigured() ? `on (${process.env.ATTENDEE_URL})` : "off"}`);
   console.log(`  Daily limit: ${DAILY_LIMIT || "none"} AI requests per person\n`);
 });

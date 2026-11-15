@@ -209,6 +209,20 @@ async function migrate() {
       updated_at timestamptz not null default now(),
       unique (user_id, calendar_event_id)
     );
+    alter table meetings alter column meeting_url drop not null;
+    alter table meetings add column if not exists source text not null default 'bot';
+    create table if not exists meeting_segments (
+      meeting_id text not null references meetings(id) on delete cascade,
+      n integer not null,
+      offset_ms integer not null default 0,
+      mime text,
+      audio bytea,
+      text text,
+      status text not null default 'pending',
+      tries integer not null default 0,
+      created_at timestamptz not null default now(),
+      primary key (meeting_id, n)
+    );
     create index if not exists meetings_user on meetings(user_id, join_at desc);
     create index if not exists meetings_status on meetings(status);
     create table if not exists meeting_prefs (

@@ -68,7 +68,7 @@ export const platformOf = (url) => (/meet\.google\.com/.test(url) ? "Google Meet
 const out = (m) => m && ({
   id: m.id, title: m.title, platform: m.platform, meetingUrl: m.meeting_url, status: m.status, error: m.error,
   joinAt: m.join_at, startedAt: m.started_at, endedAt: m.ended_at, createdAt: m.created_at, auto: Boolean(m.calendar_event_id),
-  hasNotes: Boolean(m.summary), hasTranscript: Boolean(m.transcript),
+  hasNotes: Boolean(m.summary), hasTranscript: Boolean(m.transcript), source: m.source || "bot",
 });
 export async function listMeetings(userId, limit = 20) {
   return (await query(`select * from meetings where user_id = $1 order by coalesce(join_at, created_at) desc limit $2`, [userId, limit])).map(out);
@@ -278,11 +278,12 @@ export async function summarize(meetingId) {
   if (summarizingNow.has(meetingId)) return;
   summarizingNow.add(meetingId);
   try {
-    const m = await one(`select * from meetings where id = $1`, [meetingId]);
+    const m = await one(`select m.*, u.name as recorder_name from meetings m join users u on u.id = m.user_id where m.id = $1`, [meetingId]);
     if (!m?.transcript) return;
     if (!hasApiKey()) { await setMeeting(m.id, { status: "done", error: "The transcript is saved, but no summary: the server's AI isn't set up." }); return; }
     await setMeeting(m.id, { status: "summarizing", error: null });
-    const header = `Meeting: ${m.title} (${m.platform}), ${new Date(m.started_at || m.join_at || m.created_at).toUTCString()}`;
+    const header = `Meeting: ${m.title} (${m.platform}), ${new Date(m.started_at || m.join_at || m.created_at).toUTCString()}`
+      + (m.source === "recording" ? `\nThis is an audio recording transcribed without speaker names, and lines from different people run together. Don't guess who said something. Only name an action item's owner when the words make it clear (e.g. "I will…" right after someone is asked by name, or "Sam will…"); otherwise write "Owner unclear". The person who recorded it is ${m.recorder_name || "the user"}.` : "");
     // Long meetings: take notes on each part, then combine them.
     const chunks = [];
     let rest = m.transcript;

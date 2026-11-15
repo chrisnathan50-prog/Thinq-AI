@@ -117,8 +117,8 @@ function connRows() {
     const live = (mt.meetings || []).find((m) => ["joining", "waiting_room", "recording"].includes(m.status));
     const next = (mt.meetings || []).find((m) => m.status === "scheduled");
     rows.push({ pane: "meetings", icon: "i-video", name: "Meeting notes",
-      status: live ? (live.status === "recording" ? "Taking notes now" : "Joining a call…") : mt.autoJoin ? "Auto-join on" : next ? "Next one scheduled" : "Paste a link to start",
-      dot: live ? "live" : mt.autoJoin || next ? "live" : null });
+      status: mrec ? `Recording ${fmtDur(Date.now() - mrec.started)}` : live ? (live.status === "recording" ? "Taking notes now" : "Joining a call…") : mt.autoJoin ? "Auto-join on" : next ? "Next one scheduled" : mt.record ? "Record a meeting" : "Paste a link to start",
+      dot: mrec ? "off" : live ? "live" : mt.autoJoin || next ? "live" : null });
   }
   const wa = state.whatsapp || {};
   if (wa.available) rows.push({ pane: "wa", icon: "i-wa", name: "Thinq on WhatsApp", status: wa.linked ? "Connected" : waPending ? "Waiting for code" : "Not connected", dot: wa.linked ? "live" : waPending ? "demo" : null });
@@ -309,13 +309,147 @@ function renderWaSync() {
   });
 }
 
-// ---------------- meeting notes (Thinq's notetaker joins Meet / Zoom / Teams calls) ----------------
+// ---------------- meeting recorder (records mic + optionally a meeting tab, in 5-minute pieces) ----------------
+// Each piece is a complete audio file, uploaded as soon as it's done and transcribed on the server, so long
+// meetings work and nothing already sent is lost if the tab closes. Audio is mixed from the microphone and,
+// on desktop Chrome/Edge, the shared tab's sound (so the other people in a Meet/Zoom/Teams tab are heard too).
+const SEG_MS = 5 * 60 * 1000;
+let mrec = null; // { id, title, started, ctx, dest, sources, recorder, n, queue, uploading, stopping, timer, wake }
+const fmtDur = (ms) => { const s = Math.floor(ms / 1000), h = Math.floor(s / 3600); return `${h ? `${h}:` : ""}${String(Math.floor((s % 3600) / 60)).padStart(h ? 2 : 1, "0")}:${String(s % 60).padStart(2, "0")}`; };
+const recMime = () => ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"].find((t) => window.MediaRecorder?.isTypeSupported?.(t)) || "";
+
+async function startMeetingRecording({ title, withTab }) {
+  if (mrec) return notice("A recording is already running.");
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return notice("This browser can't record audio. Try Chrome, Edge or Safari.");
+  let tab = null, mic = null;
+  if (withTab) {
+    try {
+      tab = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, selfBrowserSurface: "exclude", systemAudio: "include", preferCurrentTab: false });
+    } catch { return notice("Recording didn't start: no tab was shared. Untick “Also record a meeting tab” to record just your microphone."); }
+    if (!tab.getAudioTracks().length) {
+      tab.getTracks().forEach((t) => t.stop());
+      return notice("That share had no sound. Choose the meeting's browser tab and keep “Share tab audio” switched on.");
+    }
+  }
+  try { mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
+  catch { if (!tab) return notice("Thinq couldn't use your microphone. Allow microphone access for this site and try again."); }
+
+  const ctx = new AudioContext();
+  const dest = ctx.createMediaStreamDestination();
+  const sources = [mic, tab].filter(Boolean);
+  for (const s of sources) if (s.getAudioTracks().length) ctx.createMediaStreamSource(new MediaStream(s.getAudioTracks())).connect(dest);
+
+  let r;
+  try { r = await api("/api/recordings", { method: "POST", body: JSON.stringify({ title, withTab: Boolean(tab) }) }); }
+  catch (err) { sources.forEach((s) => s.getTracks().forEach((t) => t.stop())); ctx.close(); return notice(err.message); }
+
+  mrec = { id: r.id, title: r.title, started: Date.now(), ctx, dest, sources, n: 0, queue: [], uploading: false, stopping: false, tab: Boolean(tab), mic: Boolean(mic) };
+  // If they stop sharing the tab from Chrome's own bar, keep recording the microphone.
+  tab?.getVideoTracks()[0]?.addEventListener("ended", () => { if (mrec && !mrec.stopping) { mrec.tab = false; notice(mic ? "Tab sharing stopped - still recording your microphone." : "Tab sharing stopped."); if (!mic) stopMeetingRecording(); } });
+  try { mrec.wake = await navigator.wakeLock?.request("screen"); } catch { /* not supported */ }
+  nextPiece();
+  mrec.timer = setInterval(renderRecBar, 1000);
+  renderRecBar();
+  $("#connDialog").close();
+  state.meetings = await api("/api/meetings").catch(() => state.meetings);
+  renderMeetings();
+}
+
+function nextPiece() {
+  const type = recMime();
+  const recorder = new MediaRecorder(mrec.dest.stream, { ...(type ? { mimeType: type } : {}), audioBitsPerSecond: 32000 });
+  const chunks = [], n = mrec.n++, offset = Date.now() - mrec.started;
+  recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+  recorder.onstop = () => {
+    const blob = new Blob(chunks, { type: recorder.mimeType || type || "audio/webm" });
+    if (mrec && !mrec.cancelled && blob.size > 2000) { mrec.queue.push({ n, offset, blob }); uploadPieces(); }
+  };
+  recorder.start(10_000);
+  mrec.recorder = recorder;
+  mrec.rotate = setTimeout(() => { if (mrec && !mrec.stopping && recorder.state !== "inactive") { recorder.stop(); nextPiece(); } }, SEG_MS);
+}
+
+async function uploadPieces() {
+  const cur = mrec;
+  if (!cur || cur.uploading) return;
+  cur.uploading = true;
+  while (cur.queue.length && !cur.cancelled) {
+    const p = cur.queue[0];
+    let ok = false;
+    for (let attempt = 0; attempt < 4 && !ok; attempt++) {
+      try {
+        const res = await fetch(`/api/recordings/${cur.id}/segments?n=${p.n}&offset=${p.offset}`, { method: "POST", headers: { "Content-Type": p.blob.type }, body: p.blob });
+        if (res.ok) ok = true;
+        else if (res.status >= 400 && res.status < 500) { notice((await res.json().catch(() => ({}))).error || "Part of the recording couldn't be saved."); break; }
+      } catch { /* offline - retry */ }
+      if (!ok) await new Promise((r) => setTimeout(r, 3000 * (attempt + 1)));
+    }
+    if (!ok) notice("Part of the recording couldn't be uploaded. The notes may have a gap.");
+    cur.queue.shift();
+  }
+  cur.uploading = false;
+  cur.drained?.();
+}
+
+async function stopMeetingRecording({ cancel = false } = {}) {
+  const cur = mrec;
+  if (!cur || cur.stopping) return;
+  cur.stopping = true; cur.cancelled = cancel;
+  clearTimeout(cur.rotate); clearInterval(cur.timer);
+  renderRecBar();
+  await new Promise((resolve) => {
+    if (cur.recorder?.state === "inactive") return resolve();
+    cur.recorder.addEventListener("stop", () => setTimeout(resolve, 50), { once: true });
+    cur.recorder.stop();
+  });
+  cur.sources.forEach((s) => s.getTracks().forEach((t) => t.stop()));
+  cur.ctx.close().catch(() => {});
+  cur.wake?.release?.().catch(() => {});
+  try {
+    if (cancel) {
+      await api(`/api/recordings/${cur.id}`, { method: "DELETE" });
+    } else {
+      if (cur.uploading || cur.queue.length) await new Promise((r) => { cur.drained = r; if (!cur.uploading) uploadPieces(); });
+      await api(`/api/recordings/${cur.id}/finish`, { method: "POST" });
+    }
+  } catch (err) { notice(err.message); }
+  mrec = null;
+  renderRecBar();
+  state.meetings = await api("/api/meetings").catch(() => state.meetings);
+  renderMeetings();
+  if (!cancel) notice(`Recording saved. Thinq is writing the notes for “${cur.title}” - they'll appear in Meeting notes in a minute or two.`, "ok");
+}
+
+// The bar is drawn once per state (recording / saving); each second only the timer text changes, so the
+// buttons are never replaced under someone's cursor.
+function renderRecBar() {
+  const bar = $("#mrecBar");
+  if (!mrec) { bar.hidden = true; bar.innerHTML = ""; bar.dataset.mode = ""; renderLinks(); return; }
+  const mode = mrec.stopping ? (mrec.cancelled ? "discarding" : "saving") : `rec-${mrec.tab}-${mrec.mic}`;
+  if (bar.dataset.mode !== mode) {
+    bar.dataset.mode = mode; bar.hidden = false;
+    bar.innerHTML = mrec.stopping
+      ? `<span class="spin"></span><span class="mrec-txt"><b>${mrec.cancelled ? "Discarding…" : "Saving the recording…"}</b></span>`
+      : `<span class="dot"></span><span class="mrec-txt"><b>Recording “${esc(mrec.title)}”</b><small><span id="mrecTime">0:00</span> · ${mrec.tab && mrec.mic ? "meeting tab + microphone" : mrec.tab ? "meeting tab" : "microphone"} · keep this tab open</small></span>
+         <button class="btn sm" id="mrecStop">Stop & get notes</button><button class="btn ghost sm" id="mrecDiscard">Discard</button>`;
+    $("#mrecStop")?.addEventListener("click", () => stopMeetingRecording());
+    $("#mrecDiscard")?.addEventListener("click", () => { if (confirm("Discard this recording? Nothing will be saved.")) stopMeetingRecording({ cancel: true }); });
+    renderLinks();
+  }
+  const elapsed = fmtDur(Date.now() - mrec.started);
+  const t = $("#mrecTime"); if (t) t.textContent = elapsed;
+  const t2 = document.querySelector(".meet-rectime"); if (t2) t2.textContent = elapsed;
+  const row = document.querySelector('.link-row[data-pane="meetings"] small'); if (row && !mrec.stopping) row.textContent = `Recording ${elapsed}`;
+}
+window.addEventListener("beforeunload", (e) => { if (mrec && !mrec.stopping) { e.preventDefault(); e.returnValue = ""; } });
+
+// ---------------- meeting notes (recordings, and the optional notetaker bot) ----------------
 const MEET_STATUS = {
   creating: ["Starting…", "demo"], scheduled: ["Scheduled", "demo"], joining: ["Joining…", "demo"], waiting_room: ["Waiting to be let in", "demo"],
-  recording: ["Taking notes", "live"], processing: ["Finishing up…", "demo"], summarizing: ["Writing notes…", "demo"],
+  recording: ["Taking notes", "live"], processing: ["Finishing up…", "demo"], transcribing: ["Transcribing…", "demo"], summarizing: ["Writing notes…", "demo"],
   done: ["Notes ready", "live"], no_notes: ["No notes", "off"], failed: ["Didn't join", "off"], cancelled: ["Cancelled", "none"],
 };
-const ACTIVE_MEET = ["creating", "scheduled", "joining", "waiting_room", "recording", "processing", "summarizing"];
+const ACTIVE_MEET = ["creating", "scheduled", "joining", "waiting_room", "recording", "processing", "transcribing", "summarizing"];
 let meetPoll = null, meetOpen = null; // meetOpen: id of the meeting whose notes are shown
 function meetWatch() {
   clearInterval(meetPoll);
@@ -336,8 +470,10 @@ function renderMeetings() {
   const list = s.meetings || [];
   const when = (m) => new Date(m.startedAt || m.joinAt || m.createdAt).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
   const item = (m) => {
-    const [label, dot] = MEET_STATUS[m.status] || [m.status, "none"];
-    const canStop = ["scheduled", "joining", "waiting_room", "recording"].includes(m.status);
+    const [label, dot] = m.source === "recording" && m.status === "recording" ? ["Recording", "off"] : MEET_STATUS[m.status] || [m.status, "none"];
+    const isRec = m.source === "recording";
+    const canStop = !isRec && ["scheduled", "joining", "waiting_room", "recording"].includes(m.status);
+    const canFinish = isRec && m.status === "recording" && mrec?.id !== m.id; // left open in another tab or device
     return `<li class="meet-item" data-id="${m.id}">
       <div class="meet-row">
         <span class="meet-txt"><b>${esc(m.title)}</b><small>${esc(when(m))} · ${esc(m.platform)}</small></span>
@@ -348,22 +484,40 @@ function renderMeetings() {
         ${m.hasNotes || m.hasTranscript ? `<button class="btn ghost sm" data-meet="open">${meetOpen === m.id ? "Hide notes" : "View notes"}</button>` : ""}
         ${m.hasTranscript && !m.hasNotes && m.status === "done" ? `<button class="btn ghost sm" data-meet="summarize">Write notes again</button>` : ""}
         ${canStop ? `<button class="btn ghost sm" data-meet="stop">${m.status === "scheduled" ? "Cancel" : "Remove from call"}</button>` : ""}
+        ${canFinish ? `<button class="btn ghost sm" data-meet="finish">Finish and get notes</button>` : ""}
         ${!canStop && !ACTIVE_MEET.includes(m.status) ? `<button class="btn ghost sm icon-only" data-meet="delete" aria-label="Delete this meeting's notes">${icon("i-trash", 13)}</button>` : ""}
       </div>
       ${meetOpen === m.id ? `<div class="meet-notes" id="meetNotes">Loading…</div>` : ""}
     </li>`;
   };
-  box.innerHTML = `
-    <p>Thinq joins your call as a participant called <b>“${esc((state.user?.name || "Your").split(" ")[0])}'s Thinq Notetaker”</b>, says hello in the chat so everyone knows, and gives you notes with decisions and action items afterwards.</p>
+  const canTab = Boolean(navigator.mediaDevices?.getDisplayMedia) && !/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+  const recordBlock = !s.record ? "" : mrec
+    ? `<div class="meet-recnow"><span class="dot off"></span><b>Recording “${esc(mrec.title)}”</b><span class="meet-rectime">${fmtDur(Date.now() - mrec.started)}</span></div>
+       <p class="meta">Use the bar at the top of the chat to stop. Keep this tab open while you record.</p>`
+    : `<form class="meet-rec" id="recForm">
+        <input class="input" id="recTitle" type="text" maxlength="200" placeholder="Meeting name (optional)" aria-label="Meeting name">
+        ${canTab ? `<label class="meet-check"><input type="checkbox" id="recTab" checked><span>Also record a meeting tab's sound <small>(Google Meet, Zoom or Teams in your browser). Chrome asks which tab: pick the meeting and keep “Share tab audio” on.</small></span></label>` : ""}
+        <button class="btn sm" type="submit">${icon("i-mic", 13)}Record meeting</button>
+      </form>`;
+  const botBlock = !s.bot ? "" : `
+    <h3 class="meet-sub">Send a notetaker into a call</h3>
     <form class="meet-form" id="meetForm">
       <input class="input" id="meetUrl" type="url" inputmode="url" placeholder="Paste a Google Meet, Zoom or Teams link" aria-label="Meeting link" required>
       <button class="btn sm" type="submit">Send notetaker</button>
     </form>
-    ${state.mode === "google" ? `<label class="meet-toggle"><input type="checkbox" id="meetAuto" ${s.autoJoin ? "checked" : ""}><span><b>Join my calendar meetings automatically</b><small>Any meeting with a Meet, Zoom or Teams link. You can remove it from any call.</small></span></label>` : `<p class="meta">Connect Gmail & Calendar to have the notetaker join your meetings automatically.</p>`}
-    ${list.length ? `<ul class="meet-list">${list.map(item).join("")}</ul>` : `<p class="meta">No meetings yet.</p>`}
-    <p class="meta">Notes come from the meeting's live captions. Only you can see them. Tell people in the call they're being transcribed.</p>`;
+    ${state.mode === "google" ? `<label class="meet-toggle"><input type="checkbox" id="meetAuto" ${s.autoJoin ? "checked" : ""}><span><b>Join my calendar meetings automatically</b><small>Any meeting with a Meet, Zoom or Teams link. You can remove it from any call.</small></span></label>` : ""}`;
+  box.innerHTML = `
+    <p>${s.record ? "Record a meeting from this browser and Thinq writes the notes: summary, decisions and action items. You can also ask Thinq about it afterwards." : `Thinq joins your call as <b>“${esc((state.user?.name || "Your").split(" ")[0])}'s Thinq Notetaker”</b> and gives you notes afterwards.`}</p>
+    ${recordBlock}
+    ${botBlock}
+    ${list.length ? `<h3 class="meet-sub">Your meetings</h3><ul class="meet-list">${list.map(item).join("")}</ul>` : `<p class="meta">No meetings yet.</p>`}
+    <p class="meta">Only you can see your notes. Let people in the meeting know you're recording.</p>`;
+  $("#recForm")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    startMeetingRecording({ title: $("#recTitle").value.trim(), withTab: Boolean($("#recTab")?.checked) });
+  });
 
-  $("#meetForm").addEventListener("submit", async (e) => {
+  $("#meetForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const btn = e.currentTarget.querySelector("button"); btn.disabled = true; btn.textContent = "Sending…";
     try {
@@ -396,6 +550,7 @@ $("#meet").addEventListener("click", async (e) => {
     if (act === "delete" && !confirm("Delete this meeting's notes and transcript from Thinq?")) return;
     b.disabled = true;
     if (act === "stop") await api(`/api/meetings/${id}/stop`, { method: "POST" });
+    if (act === "finish") await api(`/api/recordings/${id}/finish`, { method: "POST" });
     if (act === "summarize") await api(`/api/meetings/${id}/summarize`, { method: "POST" });
     if (act === "delete") { await api(`/api/meetings/${id}`, { method: "DELETE" }); if (meetOpen === id) meetOpen = null; }
     state.meetings = await api("/api/meetings"); renderMeetings();
