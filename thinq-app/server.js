@@ -7,7 +7,7 @@ import express from "express";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { initDb } from "./src/db.js";
+import { initDb, query } from "./src/db.js";
 import * as store from "./src/store.js";
 import { hasApiKey, apiKeyName, MODEL, AI_PROVIDER } from "./src/agent.js";
 import { providerFor } from "./src/providers/index.js";
@@ -78,7 +78,7 @@ api.use(requireUser);
 api.get("/state", async (req, res) => {
   const p = await providerFor(req.user);
   res.json({
-    user: { name: req.user.name, email: req.user.email, picture: req.user.picture },
+    user: { name: req.user.name, email: req.user.email, picture: req.user.picture, tourDone: Boolean(req.user.tour_done_at) },
     mode: p.mode,
     profile: await p.profile().catch(() => null),
     googleConfigured: googleConfigured(),
@@ -102,6 +102,13 @@ api.get("/state", async (req, res) => {
   });
 });
 
+// The welcome tour: shown once to each person (on any device) until they finish or skip it.
+api.post("/tour", async (req, res) => {
+  const done = req.body?.done !== false;
+  await query(`update users set tour_done_at = ${done ? "now()" : "null"} where id = $1`, [req.user.id]);
+  if (done) await store.logAction(req.user.id, "tour_done", { step: String(req.body?.step || "").slice(0, 20) });
+  res.json({ ok: true });
+});
 api.post("/conversations", async (req, res) => res.json(await store.createConversation(req.user.id)));
 api.delete("/conversations/:id", async (req, res) => {
   const ok = await store.deleteConversation(req.user.id, req.params.id);

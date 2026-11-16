@@ -1,3 +1,4 @@
+import { createTour } from "/app/tour.js";
 // Thinq app - browser side. Talks to the local server in server.js.
 const $ = (s, r = document) => r.querySelector(s);
 const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -75,12 +76,14 @@ function renderAccount() {
     <button class="icon-btn" id="acctBtn" aria-label="Account options" aria-haspopup="menu" aria-expanded="false">${icon("i-more", 16)}</button>
     <div class="acct-menu" id="acctMenu" role="menu" hidden>
       ${state.admin ? `<a role="menuitem" href="/app/admin">${icon("i-check", 14)}Admin dashboard${state.admin.pendingTesters ? `<span class="badge">${state.admin.pendingTesters}</span>` : ""}</a>` : ""}
+      <button role="menuitem" id="takeTour">${icon("i-spark", 14)}Take the tour</button>
       <button role="menuitem" class="danger" id="deleteAll">${icon("i-trash", 14)}Delete all chats</button>
       <button role="menuitem" id="logout">${icon("i-logout", 14)}Log out</button>
     </div>`;
   const menu = $("#acctMenu"), btn = $("#acctBtn");
   const setMenu = (open) => { menu.hidden = !open; btn.setAttribute("aria-expanded", String(open)); };
   btn.addEventListener("click", (e) => { e.stopPropagation(); setMenu(menu.hidden); });
+  $("#takeTour").addEventListener("click", () => { setMenu(false); tour.start(); });
   $("#logout").addEventListener("click", async () => {
     await fetch("/auth/logout", { method: "POST" }).catch(() => {});
     location.href = "/";
@@ -562,6 +565,16 @@ $("#meet").addEventListener("click", async (e) => {
     if (act === "delete") { await api(`/api/meetings/${id}`, { method: "DELETE" }); if (meetOpen === id) meetOpen = null; }
     state.meetings = await api("/api/meetings"); renderMeetings();
   } catch (err) { notice(err.message); b.disabled = false; }
+});
+
+// ---------------- welcome tour (see tour.js) ----------------
+const tour = createTour({
+  state: () => state,
+  openConn: (pane) => openConn(pane),
+  fillInput: (text) => { const t = $("#input"); t.value = text; autosize(); t.focus(); },
+  turnOnPush: async () => { await turnOnPush(); renderNotify(); },
+  pushSupport: () => pushSupport(),
+  pushOn: () => pushHere,
 });
 
 // ---------------- notifications (Web Push: reminders, email alerts, calendar heads-ups) ----------------
@@ -1146,6 +1159,7 @@ $("#micBtn").hidden = !(state.voiceAvailable && canRecord());
 if (state.images?.available) $("#input").placeholder = "Ask Thinq anything, attach a document, or ask for an image…";
 await openConversation(location.hash.slice(1) || null);
 loadAgenda();
-initPush();
+await initPush();
+tour.maybeStart();
 // Tapping a notification while Thinq is open switches to that chat.
 addEventListener("hashchange", () => { const id = location.hash.slice(1); if (id && id !== conversationId) openConversation(id); });

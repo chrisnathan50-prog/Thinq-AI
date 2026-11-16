@@ -278,6 +278,7 @@ async function migrate() {
       primary key (user_id, key)
     );
     alter table messages add column if not exists attachments jsonb;
+    alter table users add column if not exists tour_done_at timestamptz;
     create index if not exists documents_conv on documents(conversation_id);
     create index if not exists conversations_user on conversations(user_id, created_at desc);
     create index if not exists messages_conv on messages(conversation_id, id);
