@@ -639,6 +639,19 @@ async function turnOnPush(onWaiting) {
   state.notifications = await api("/api/notifications/subscribe", { method: "POST", body: JSON.stringify({ subscription: sub.toJSON() }) });
   pushHere = true;
 }
+// Did the service worker get a push since `since`? (It notes each one - see sw.js.)
+async function pushArrived(since, ms) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    try {
+      const r = await (await caches.open("thinq-push-log")).match("/app/__push-log");
+      const log = r && await r.json();
+      if (log && Date.parse(log.at) >= since - 2000) return log;
+    } catch { return null; }
+    await new Promise((res) => setTimeout(res, 700));
+  }
+  return null;
+}
 async function turnOffPush() {
   const sub = await swReg?.pushManager.getSubscription();
   if (sub) {
@@ -695,7 +708,15 @@ $("#notif").addEventListener("click", async (e) => {
       notice("Notifications are on for this device.", "ok");
     }
     if (act === "off") { await turnOffPush(); notice("Notifications are off for this device.", "ok"); }
-    if (act === "test") { await api("/api/notifications/test", { method: "POST" }); notice("Test sent. It should pop up in a few seconds.", "ok"); }
+    if (act === "test") {
+      const since = Date.now();
+      await api("/api/notifications/test", { method: "POST" });
+      b.textContent = "Sending…";
+      const got = await pushArrived(since, 12000);
+      notice(got?.ok ? "Test delivered. If no pop-up appeared, your computer is hiding notifications: check Do Not Disturb / Focus, and that notifications are allowed for your browser in your system settings."
+        : got ? `Your browser got the test but couldn't show it (${got.error}).`
+        : "The test was sent, but this browser hasn't received it yet. Some networks and VPNs block browser notifications; try another network, or wait a minute.", got?.ok ? "ok" : "err");
+    }
     if (act === "cancel") state.notifications = await api(`/api/reminders/${b.closest(".notif-item").dataset.id}`, { method: "DELETE" });
     renderNotify();
   } catch (err) { renderNotify(); notice(err.message); }

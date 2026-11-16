@@ -3,17 +3,31 @@
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
 
+// Notes when the last push arrived and whether showing it worked, so the app can tell "your browser never
+// got it" apart from "your computer hid it" (Connections → Notifications → Send a test).
+async function note(entry) {
+  try {
+    const cache = await caches.open("thinq-push-log");
+    await cache.put("/app/__push-log", new Response(JSON.stringify({ at: new Date().toISOString(), ...entry })));
+  } catch {}
+}
+
 self.addEventListener("push", (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch { data = { title: "Thinq", body: event.data?.text() || "" }; }
-  event.waitUntil(self.registration.showNotification(data.title || "Thinq", {
-    body: data.body || "",
-    tag: data.tag,
-    icon: "/app/icon-192.png",
-    badge: "/app/badge-96.png",
-    data: { url: data.url || "/app" },
-    renotify: Boolean(data.tag),
-  }));
+  const opts = { body: data.body || "", icon: "/app/icon-192.png", badge: "/app/badge-96.png", data: { url: data.url || "/app" } };
+  if (data.tag) { opts.tag = data.tag; opts.renotify = true; }
+  event.waitUntil((async () => {
+    try {
+      await self.registration.showNotification(data.title || "Thinq", opts);
+      await note({ ok: true, tag: data.tag || null });
+    } catch (err) {
+      await note({ ok: false, error: `${err.name}: ${err.message}` });
+      await self.registration.showNotification("Thinq", { body: data.body || data.title || "You have a new notification." });
+    }
+    // Let an open Thinq tab know too.
+    for (const c of await self.clients.matchAll({ type: "window" })) c.postMessage({ type: "push", title: data.title });
+  })());
 });
 
 self.addEventListener("notificationclick", (event) => {
