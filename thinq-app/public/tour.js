@@ -86,7 +86,10 @@ export function createTour(ctx) {
              ${ctx.pushSupport() === "ios-install" ? `<p class="tour-small">On iPhone: tap Share → <b>Add to Home Screen</b>, open Thinq from there, then turn notifications on.</p>` : ""}`,
         action: ctx.pushOn() || ctx.pushSupport() !== "ok" || Notification.permission === "denied" ? null : { label: "Turn on notifications", run: async (btn) => {
           btn.disabled = true;
-          try { await ctx.turnOnPush(); go(i + 1); }
+          try {
+            await ctx.turnOnPush((hint) => { btn.textContent = "Waiting for you to allow…"; showHint(hint); });
+            go(i + 1);
+          }
           catch (err) { btn.disabled = false; showError(err.message); }
         } },
         next: ctx.pushOn() ? "Next" : "Later",
@@ -215,7 +218,8 @@ export function createTour(ctx) {
     });
   }
 
-  function showError(msg) { const e = card.querySelector(".tour-err"); if (e) { e.textContent = msg; e.hidden = false; } }
+  function showHint(msg) { const e = card.querySelector(".tour-err"); if (e) { e.textContent = msg; e.hidden = false; e.classList.add("hint"); } }
+  function showError(msg) { card.querySelector(".tour-err")?.classList.remove("hint");  const e = card.querySelector(".tour-err"); if (e) { e.textContent = msg; e.hidden = false; } }
 
   // Open a connection's setup on top of the tour; continue with the next step when it's closed.
   function pauseFor(pane) {

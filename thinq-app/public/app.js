@@ -572,7 +572,7 @@ const tour = createTour({
   state: () => state,
   openConn: (pane) => openConn(pane),
   fillInput: (text) => { const t = $("#input"); t.value = text; autosize(); t.focus(); },
-  turnOnPush: async () => { await turnOnPush(); renderNotify(); },
+  turnOnPush: async (onWaiting) => { await turnOnPush(onWaiting); renderNotify(); },
   pushSupport: () => pushSupport(),
   pushOn: () => pushHere,
 });
@@ -599,10 +599,22 @@ async function initPush() {
   renderNotify();
 }
 const b64ToBytes = (s) => { const b = atob((s + "=".repeat((4 - (s.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(b, (c) => c.charCodeAt(0)); };
-async function turnOnPush() {
+// Where the browser's "Allow notifications" question is when it doesn't pop up on its own.
+const PERMISSION_HINT = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)
+  ? "Your browser is asking whether Thinq may send notifications. Tap Allow."
+  : "Your browser is asking whether Thinq may send notifications. If you don't see a popup, click the bell icon (or the icon at the left end of the address bar) and choose Allow.";
+// onWaiting() is called if the browser's question is still open after a moment - Chrome often shows only a
+// small bell in the address bar instead of a popup, which looks like nothing happened.
+async function turnOnPush(onWaiting) {
+  // Ask straight away, while it still counts as the person's click (some browsers require that).
+  const asking = Notification.requestPermission();
+  const timer = onWaiting ? setTimeout(() => { if (Notification.permission === "default") onWaiting(PERMISSION_HINT); }, 1200) : null;
+  let perm;
+  try { perm = await asking; } finally { clearTimeout(timer); }
+  if (perm !== "granted") throw new Error(perm === "denied"
+    ? "Notifications are blocked for Thinq. Click the icon at the left end of the address bar, allow Notifications, then try again."
+    : "Notifications weren't turned on. Tap the button again and choose Allow when your browser asks.");
   if (!swReg) swReg = await navigator.serviceWorker.register("/app/sw.js", { scope: "/app/" });
-  const perm = await Notification.requestPermission();
-  if (perm !== "granted") throw new Error(perm === "denied" ? "Notifications are blocked for Thinq. Allow them in your browser's site settings, then try again." : "Notifications weren't allowed.");
   await navigator.serviceWorker.ready;
   const sub = (await swReg.pushManager.getSubscription()) || await swReg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(state.notifications.publicKey) });
   state.notifications = await api("/api/notifications/subscribe", { method: "POST", body: JSON.stringify({ subscription: sub.toJSON() }) });
@@ -654,12 +666,20 @@ $("#notif").addEventListener("click", async (e) => {
   b.disabled = true;
   try {
     const act = b.dataset.notif;
-    if (act === "on") { await turnOnPush(); notice("Notifications are on for this device.", "ok"); }
+    if (act === "on") {
+      await turnOnPush((hint) => {
+        b.innerHTML = `${icon("i-bell", 13)}Waiting for you to allow…`;
+        let p = $("#notifHint");
+        if (!p) { p = document.createElement("p"); p.id = "notifHint"; p.className = "notif-tip"; b.after(p); }
+        p.textContent = hint;
+      });
+      notice("Notifications are on for this device.", "ok");
+    }
     if (act === "off") { await turnOffPush(); notice("Notifications are off for this device.", "ok"); }
     if (act === "test") { await api("/api/notifications/test", { method: "POST" }); notice("Test sent. It should pop up in a few seconds.", "ok"); }
     if (act === "cancel") state.notifications = await api(`/api/reminders/${b.closest(".notif-item").dataset.id}`, { method: "DELETE" });
     renderNotify();
-  } catch (err) { notice(err.message); b.disabled = false; }
+  } catch (err) { renderNotify(); notice(err.message); }
 });
 $("#notif").addEventListener("change", async (e) => {
   const el = e.target.closest("[data-pref]"); if (!el) return;
