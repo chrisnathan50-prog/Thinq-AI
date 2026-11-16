@@ -159,7 +159,7 @@ function renderChannels() {
   if (!total) { $("#channels").innerHTML = `<p class="empty-note">No conversations in this period yet. (Counting started with this update.)</p>`; return; }
   const pa = Math.round((app / total) * 100), pw = 100 - pa;
   $("#channels").innerHTML = `
-    <div class="stack" role="img" aria-label="App ${pa}%, WhatsApp ${pw}%">
+    <div class="split-bar" role="img" aria-label="App ${pa}%, WhatsApp ${pw}%">
       ${app ? `<span class="seg s1" style="flex:${app}" title="App: ${fmt(app)} (${pa}%)"></span>` : ""}
       ${wa ? `<span class="seg s2" style="flex:${wa}" title="WhatsApp: ${fmt(wa)} (${pw}%)"></span>` : ""}
     </div>

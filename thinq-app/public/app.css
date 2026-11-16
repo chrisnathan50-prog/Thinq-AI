@@ -331,11 +331,11 @@ body.admin{--series-1:#2a78d6;--series-2:#eb6834;--grid:#ececf0}
 .barlist .fill{height:10px;border-radius:0 4px 4px 0;background:var(--series-1);flex:none}
 .barlist .val{font-variant-numeric:tabular-nums;color:var(--ink);font-weight:500;font-size:12.5px}
 .barlist .who{font-size:12px;color:var(--muted);text-align:right}
-.stack{display:flex;gap:2px;height:22px;margin-top:6px}
-.stack .seg{border-radius:0;min-width:3px}
-.stack .seg:first-child{border-radius:4px 0 0 4px}
-.stack .seg:last-child{border-radius:0 4px 4px 0}
-.stack .seg:only-child{border-radius:4px}
+.split-bar{display:flex;gap:2px;height:22px;margin-top:6px}
+.split-bar .seg{border-radius:0;min-width:3px}
+.split-bar .seg:first-child{border-radius:4px 0 0 4px}
+.split-bar .seg:last-child{border-radius:0 4px 4px 0}
+.split-bar .seg:only-child{border-radius:4px}
 .s1{background:var(--series-1)}.s2{background:var(--series-2)}
 .legend{list-style:none;display:grid;gap:8px;margin-top:14px;font-size:13px}
 .legend li{display:flex;align-items:center;gap:8px}
