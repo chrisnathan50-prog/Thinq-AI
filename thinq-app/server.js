@@ -27,6 +27,7 @@ import { mountTesters, loadApprovedTesters, isAdmin } from "./src/testers.js";
 import { syncAvailable, syncState, startSync, cancelSync, disconnectSync, resumeAllSyncs } from "./src/whatsapp-sync.js";
 import * as meetings from "./src/meetings.js";
 import * as recordings from "./src/recordings.js";
+import * as notifier from "./src/notify.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SITE_DIR = process.env.SITE_DIR || path.resolve(here, "..", "thinq-site");
@@ -92,6 +93,7 @@ api.get("/state", async (req, res) => {
     whatsapp: await whatsappState(req.user.id),
     whatsappSync: await syncState(req.user.id),
     meetings: await meetingsState(req.user.id),
+    notifications: await notifyState(req.user.id).catch(() => null),
     images: { available: imagesAvailable(), today: await store.imagesToday(req.user.id), limit: IMAGE_DAILY_LIMIT },
     documentTypes: ACCEPTED,
     conversations: await store.listConversations(req.user.id),
@@ -201,6 +203,46 @@ api.delete("/whatsapp-sync", async (req, res) => {
   await disconnectSync(req.user.id);
   await store.logAction(req.user.id, "whatsapp_sync_disconnected", {});
   res.json({ ok: true });
+});
+
+// ---------- notifications (Web Push), reminders and email alerts ----------
+async function notifyState(userId) {
+  return { publicKey: await notifier.publicKey(), ...(await notifier.channels(userId)), prefs: await notifier.getPrefs(userId), items: await notifier.listItems(userId), whatsappLinked: Boolean(await store.whatsappLinkForUser(userId)) && whatsappConfigured() };
+}
+const notifyErr = (res, err) => {
+  if (!err?.userFacing) console.error("[notify]", err);
+  res.status(400).json({ error: err?.userFacing ? err.message : "Something went wrong with notifications. Try again." });
+};
+api.get("/notifications", async (req, res) => {
+  try { res.json(await notifyState(req.user.id)); } catch (err) { notifyErr(res, err); }
+});
+api.post("/notifications/subscribe", async (req, res) => {
+  try {
+    await notifier.subscribe(req.user.id, req.body?.subscription, req.get("user-agent"));
+    await store.logAction(req.user.id, "notifications_on", {});
+    res.json(await notifyState(req.user.id));
+  } catch (err) { notifyErr(res, err); }
+});
+api.post("/notifications/unsubscribe", async (req, res) => {
+  await notifier.unsubscribe(req.user.id, req.body?.endpoint);
+  res.json(await notifyState(req.user.id));
+});
+api.post("/notifications/test", async (req, res) => {
+  try {
+    const n = await notifier.notify(req.user.id, { title: "Thinq notifications are on", body: "This is how reminders and alerts will look.", tag: "test" }, "test");
+    n ? res.json({ ok: true, reached: n }) : res.status(400).json({ error: "No device has notifications on yet." });
+  } catch (err) { notifyErr(res, err); }
+});
+api.put("/notifications/settings", async (req, res) => {
+  const b = req.body || {};
+  const patch = {};
+  for (const k of ["calendar", "meetings", "whatsapp"]) if (typeof b[k] === "boolean") patch[k] = b[k];
+  if (b.calendarMinutes != null) patch.calendarMinutes = Number(b.calendarMinutes);
+  await notifier.setPrefs(req.user.id, patch);
+  res.json(await notifyState(req.user.id));
+});
+api.delete("/reminders/:id", async (req, res) => {
+  (await notifier.cancelItem(req.user.id, req.params.id)) ? res.json(await notifyState(req.user.id)) : res.status(404).json({ error: "Not found" });
 });
 
 // ---------- meeting notes (Thinq's notetaker bot in Meet / Zoom / Teams calls) ----------
@@ -368,6 +410,15 @@ if (fs.existsSync(SITE_DIR)) {
 
 meetings.startMeetingWorkers();
 recordings.startRecordingWorker();
+notifier.startNotifyWorker();
+
+// Keep-awake: Render's free plan puts the server to sleep after ~15 minutes without visitors, and a sleeping
+// server can't send reminders. Visiting our own public /healthz every 10 minutes counts as a visitor.
+// (A GitHub Action also pings it, to wake it again after a deploy or crash - see .github/workflows/keep-awake.yml.)
+// Set KEEP_AWAKE=off to stop.
+if (process.env.NODE_ENV === "production" && process.env.KEEP_AWAKE !== "off" && /^https:\/\//.test(publicUrl())) {
+  setInterval(() => fetch(`${publicUrl()}/healthz`, { signal: AbortSignal.timeout(20_000) }).catch(() => {}), 10 * 60_000).unref();
+}
 const resumed = await resumeAllSyncs().catch((e) => { console.warn("[wa-sync] resume failed:", e.message); return 0; });
 
 app.listen(PORT, HOST, () => {
@@ -379,5 +430,6 @@ app.listen(PORT, HOST, () => {
   console.log(`  WhatsApp: ${whatsappConfigured() ? `on (+${whatsappNumber() || "number not set"})` : "off"}`);
   console.log(`  WhatsApp chat sync: ${syncAvailable() ? `on (${resumed || 0} linked account${resumed === 1 ? "" : "s"} reconnecting)` : "off"}`);
   console.log(`  Meeting notes: ${recordings.recordingAvailable() ? "recording in the browser on" : "recording off (needs GROQ_API_KEY)"} · notetaker bot ${meetings.meetingsConfigured() ? `on (${process.env.ATTENDEE_URL})` : "off"}`);
+  console.log(`  Notifications: on (reminders, email alerts, calendar heads-ups)${process.env.NODE_ENV === "production" && process.env.KEEP_AWAKE !== "off" ? " · keep-awake ping every 10 min" : ""}`);
   console.log(`  Daily limit: ${DAILY_LIMIT || "none"} AI requests per person\n`);
 });

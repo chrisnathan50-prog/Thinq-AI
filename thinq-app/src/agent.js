@@ -16,6 +16,7 @@ import { generateImage, imagesAvailable, ImageError, IMAGE_DAILY_LIMIT } from ".
 import { hasSyncedChats, syncState, recentChats, searchMessages, readChat, resolveChat } from "./whatsapp-sync.js";
 import { meetingsConfigured, listMeetings, findMeetings, findMeetingUrl, platformOf } from "./meetings.js";
 import { recordingAvailable } from "./recordings.js";
+import * as notifier from "./notify.js";
 
 export const AI_PROVIDER = (process.env.AI_PROVIDER || "anthropic").toLowerCase() === "groq" ? "groq" : "anthropic";
 export const MODEL = AI_PROVIDER === "groq" ? GROQ_MODEL : process.env.THINQ_MODEL || "claude-opus-5-5";
@@ -88,6 +89,10 @@ const STATUS = {
   list_meetings: "Checking your meeting notes",
   read_meeting_notes: "Reading meeting notes",
   send_notetaker: "Preparing the notetaker",
+  set_reminder: "Setting a reminder",
+  watch_for_email: "Setting an email alert",
+  list_reminders: "Checking your reminders",
+  cancel_reminder: "Cancelling a reminder",
 };
 
 function tzOffset(timeZone, date = new Date()) {
@@ -120,8 +125,77 @@ function contextBlock({ timeZone, profile, mode, notes, channel, waSync }) {
     channel === "whatsapp" ? "Channel: WhatsApp. Keep replies short (under about 120 words), plain text, *single asterisks* for bold, no tables or headings, no markdown links. Drafts and invites you prepare appear right after your reply as WhatsApp messages with Send and Discard buttons - tell the user to tap Send when they're happy, or edit it in the Thinq app." : null,
     waSync ? WA_SYNC_NOTE(waSync) : null,
     meetingsConfigured() || recordingAvailable() ? MEETINGS_NOTE(meetingsConfigured()) : null,
+    NOTIFY_NOTE,
     notes.length ? `Things the user asked you to remember:\n${notes.map((n) => `- ${n.text}`).join("\n")}` : "No remembered preferences yet.",
   ].filter(Boolean).join("\n");
+}
+
+const NOTIFY_NOTE = "Reminders and alerts: you can set reminders (set_reminder) and email alerts (watch_for_email) that reach the user as phone/computer notifications even when Thinq is closed. When the user asks to be reminded or told about something later, use these instead of just promising. For \"remind me N minutes before X\", work out the time from the calendar or what they said. Never claim a reminder is set unless the tool said so.";
+
+// Reminders and email alerts, delivered as push notifications (see src/notify.js).
+function notifyTools(userId, timeZone, offset, conversationId, mode) {
+  const where = async () => {
+    const c = await notifier.channels(userId);
+    const places = [...c.devices, ...(c.whatsapp ? ["WhatsApp"] : [])];
+    return places.length
+      ? `It will be sent to: ${places.join(", ")}.`
+      : "WARNING: notifications aren't turned on on any device yet, so the user won't get it. Tell them to open Connections → Notifications and tap Turn on notifications (on iPhone, add Thinq to the Home Screen first).";
+  };
+  const err = (e) => { if (e?.userFacing) return `Couldn't do that: ${e.message}`; throw e; };
+  return [
+    tool({
+      name: "set_reminder",
+      description: "Set a reminder that pops up as a notification on the user's devices at a given time.",
+      inputSchema: z.object({
+        text: z.string().min(1).max(300).describe("What to remind them of, written to the user (e.g. 'Meeting with Sam starts at 2:30')"),
+        at: z.string().optional().describe("Local time YYYY-MM-DDTHH:MM in the user's time zone"),
+        in_minutes: z.number().min(1).max(525600).optional().describe("Or: this many minutes from now"),
+      }),
+      run: async ({ text, at, in_minutes }) => {
+        if (!at && !in_minutes) return "Give either at or in_minutes.";
+        const due = in_minutes ? new Date(Date.now() + in_minutes * 60_000) : new Date(`${at.length === 16 ? at + ":00" : at}${/[+-]\d\d:\d\d$|Z$/.test(at) ? "" : offset}`);
+        try {
+          const r = await notifier.addReminder(userId, { text, dueAt: due, conversationId });
+          return `Reminder set (${r.id}) for ${localTime(r.dueAt, timeZone)}. ${await where()}`;
+        } catch (e) { return err(e); }
+      },
+    }),
+    tool({
+      name: "watch_for_email",
+      description: "Watch the user's Gmail for an email that hasn't arrived yet and notify them when it does. When it arrives, Thinq reads it and answers what_to_tell_me in the notification and in this chat.",
+      inputSchema: z.object({
+        from: z.string().optional().describe("Sender's email address or name"),
+        subject_contains: z.string().optional().describe("Words in the subject, if known"),
+        what_to_tell_me: z.string().max(300).describe("What the user wants to know from it, e.g. 'the time the meeting is scheduled for'"),
+        days: z.number().int().min(1).max(30).optional().describe("How long to keep watching (default 7 days)"),
+      }),
+      run: async ({ from, subject_contains, what_to_tell_me, days }) => {
+        if (mode !== "google") return "Email alerts need the user's real Gmail connected (this is demo mode). Tell them to connect Gmail first.";
+        try {
+          const w = await notifier.addEmailWatch(userId, { from, subject: subject_contains, ask: what_to_tell_me, days, conversationId });
+          return `Email alert set (${w.id}): checking Gmail about every minute until ${localTime(w.expiresAt, timeZone)}. ${await where()}`;
+        } catch (e) { return err(e); }
+      },
+    }),
+    tool({
+      name: "list_reminders",
+      description: "List the user's upcoming reminders and active email alerts.",
+      inputSchema: z.object({}),
+      run: async () => {
+        const list = await notifier.listItems(userId);
+        if (!list.length) return "No reminders or email alerts set.";
+        return JSON.stringify(list.map((r) => r.kind === "reminder"
+          ? { id: r.id, type: "reminder", when: localTime(r.dueAt, timeZone), text: r.text }
+          : { id: r.id, type: "email alert", from: r.from, subject: r.subject, wants: r.text, until: localTime(r.expiresAt, timeZone) }));
+      },
+    }),
+    tool({
+      name: "cancel_reminder",
+      description: "Cancel a reminder or email alert by its id (from list_reminders).",
+      inputSchema: z.object({ id: z.string() }),
+      run: async ({ id }) => ((await notifier.cancelItem(userId, id)) ? "Cancelled." : "No active reminder or alert with that id."),
+    }),
+  ];
 }
 
 // Read-only tools over the user's synced WhatsApp chats (see src/whatsapp-sync.js).
@@ -285,6 +359,7 @@ export function buildTools({ userId, p, conversationId, timeZone, queued, images
   });
 
   return [
+    ...notifyTools(userId, timeZone, offset, conversationId, p.mode),
     ...(imagesAvailable() ? [imageTool] : []),
     ...(waSync ? whatsappTools(userId, timeZone, conversationId, queued) : []),
     ...(meetingsConfigured() || recordingAvailable() ? meetingTools(userId, p, timeZone, conversationId, queued).filter((t) => t.name !== "send_notetaker" || meetingsConfigured()) : []),

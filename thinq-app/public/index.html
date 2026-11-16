@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Thinq AI</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%230b0b0c'%3E%3Ccircle cx='12' cy='3' r='2'/%3E%3Ccircle cx='12' cy='21' r='2'/%3E%3Ccircle cx='3' cy='12' r='2'/%3E%3Ccircle cx='21' cy='12' r='2'/%3E%3Ccircle cx='12' cy='12' r='3.2'/%3E%3Ccircle cx='5.6' cy='5.6' r='1.7'/%3E%3Ccircle cx='18.4' cy='5.6' r='1.7'/%3E%3Ccircle cx='5.6' cy='18.4' r='1.7'/%3E%3Ccircle cx='18.4' cy='18.4' r='1.7'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="manifest" href="/app/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/app/apple-touch-icon.png">
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Thinq">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..600&display=swap" rel="stylesheet">
@@ -19,6 +24,7 @@
     <symbol id="i-send" viewBox="0 0 16 16"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-mail" viewBox="0 0 16 16"><rect x="2" y="3.5" width="12" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="m2.5 4.5 5.5 4 5.5-4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></symbol>
     <symbol id="i-cal" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 16 16"><path d="M4 11.5V7.2a4 4 0 0 1 8 0v4.3l1.2 1.2H2.8L4 11.5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M6.6 14.2a1.6 1.6 0 0 0 2.8 0" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
     <symbol id="i-video" viewBox="0 0 16 16"><rect x="1.5" y="4" width="9" height="8" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10.5 7l4-2.2v6.4l-4-2.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></symbol>
     <symbol id="i-spark" viewBox="0 0 16 16"><path d="M8 1.5c.5 3.4 3.1 6 6.5 6.5-3.4.5-6 3.1-6.5 6.5-.5-3.4-3.1-6-6.5-6.5 3.4-.5 6-3.1 6.5-6.5z" fill="currentColor"/></symbol>
     <symbol id="i-check" viewBox="0 0 16 16"><path d="M4.5 8.2 7 10.5l4.5-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -115,6 +121,7 @@
   <section class="conn wa" id="wasync" data-pane="wasync" aria-live="polite" hidden></section>
   <section class="conn wa" id="wa" data-pane="wa" aria-live="polite" hidden></section>
   <section class="conn meet" id="meet" data-pane="meetings" aria-live="polite" hidden></section>
+  <section class="conn notif" id="notif" data-pane="notifications" aria-live="polite" hidden></section>
 </dialog>
 
 <script src="/app/app.js" type="module"></script>

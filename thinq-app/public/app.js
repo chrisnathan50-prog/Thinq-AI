@@ -56,7 +56,7 @@ async function api(path, opts = {}) {
 // ---------------- state ----------------
 async function refresh() {
   state = await api("/api/state");
-  renderAccount(); renderConn(); renderWhatsApp(); renderWaSync(); renderMeetings(); renderNotes(); renderConvos(); renderApprovals(); renderGreeting();
+  renderAccount(); renderConn(); renderWhatsApp(); renderWaSync(); renderMeetings(); renderNotify(); renderNotes(); renderConvos(); renderApprovals(); renderGreeting();
 }
 
 function renderGreeting() {
@@ -120,6 +120,13 @@ function connRows() {
       status: mrec ? `Recording ${fmtDur(Date.now() - mrec.started)}` : live ? (live.status === "recording" ? "Taking notes now" : "Joining a call…") : mt.autoJoin ? "Auto-join on" : next ? "Next one scheduled" : mt.record ? "Record a meeting" : "Paste a link to start",
       dot: mrec ? "off" : live ? "live" : mt.autoJoin || next ? "live" : null });
   }
+  const nt = state.notifications;
+  if (nt && pushSupport() !== "none") {
+    const n = nt.devices?.length || 0;
+    rows.push({ pane: "notifications", icon: "i-bell", name: "Notifications",
+      status: pushHere ? (nt.items?.length ? `On · ${nt.items.length} reminder${nt.items.length > 1 ? "s" : ""}` : "On") : n ? `On for ${n} other device${n > 1 ? "s" : ""}` : "Off",
+      dot: pushHere ? "live" : n ? "demo" : null });
+  }
   const wa = state.whatsapp || {};
   if (wa.available) rows.push({ pane: "wa", icon: "i-wa", name: "Thinq on WhatsApp", status: wa.linked ? "Connected" : waPending ? "Waiting for code" : "Not connected", dot: wa.linked ? "live" : waPending ? "demo" : null });
   return rows;
@@ -139,7 +146,7 @@ function renderLinks() {
     </button></li>`).join("")}</ul>${foot}`;
 }
 
-const connTitles = { google: "Gmail & Calendar", wasync: "WhatsApp chats", wa: "Thinq on WhatsApp", meetings: "Meeting notes" };
+const connTitles = { google: "Gmail & Calendar", wasync: "WhatsApp chats", wa: "Thinq on WhatsApp", meetings: "Meeting notes", notifications: "Notifications" };
 function openConn(pane) {
   const dlg = $("#connDialog");
   $("#connDialogTitle").textContent = connTitles[pane] || "Connection";
@@ -555,6 +562,97 @@ $("#meet").addEventListener("click", async (e) => {
     if (act === "delete") { await api(`/api/meetings/${id}`, { method: "DELETE" }); if (meetOpen === id) meetOpen = null; }
     state.meetings = await api("/api/meetings"); renderMeetings();
   } catch (err) { notice(err.message); b.disabled = false; }
+});
+
+// ---------------- notifications (Web Push: reminders, email alerts, calendar heads-ups) ----------------
+let swReg = null, pushHere = false;
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const standalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+// "ok" | "ios-install" (iPhone: only works from the Home Screen) | "none"
+function pushSupport() {
+  if ("serviceWorker" in navigator && "PushManager" in window && "Notification" in window) return "ok";
+  if (isIOS && !standalone()) return "ios-install";
+  return "none";
+}
+async function initPush() {
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    swReg = await navigator.serviceWorker.register("/app/sw.js", { scope: "/app/" });
+    const sub = await swReg.pushManager?.getSubscription();
+    pushHere = Boolean(sub) && Notification.permission === "granted";
+    // Re-send the subscription in case the server lost it (or the browser rotated it).
+    if (pushHere) state.notifications = await api("/api/notifications/subscribe", { method: "POST", body: JSON.stringify({ subscription: sub.toJSON() }) });
+  } catch (err) { console.warn("Notifications unavailable:", err.message); }
+  renderNotify();
+}
+const b64ToBytes = (s) => { const b = atob((s + "=".repeat((4 - (s.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(b, (c) => c.charCodeAt(0)); };
+async function turnOnPush() {
+  if (!swReg) swReg = await navigator.serviceWorker.register("/app/sw.js", { scope: "/app/" });
+  const perm = await Notification.requestPermission();
+  if (perm !== "granted") throw new Error(perm === "denied" ? "Notifications are blocked for Thinq. Allow them in your browser's site settings, then try again." : "Notifications weren't allowed.");
+  await navigator.serviceWorker.ready;
+  const sub = (await swReg.pushManager.getSubscription()) || await swReg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(state.notifications.publicKey) });
+  state.notifications = await api("/api/notifications/subscribe", { method: "POST", body: JSON.stringify({ subscription: sub.toJSON() }) });
+  pushHere = true;
+}
+async function turnOffPush() {
+  const sub = await swReg?.pushManager.getSubscription();
+  if (sub) {
+    state.notifications = await api("/api/notifications/unsubscribe", { method: "POST", body: JSON.stringify({ endpoint: sub.endpoint }) });
+    await sub.unsubscribe().catch(() => {});
+  }
+  pushHere = false;
+}
+function renderNotify() {
+  const box = $("#notif"), s = state.notifications;
+  renderLinks();
+  if (!box || !s) return;
+  const support = pushSupport();
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const when = (iso) => new Date(iso).toLocaleString([], { timeZone: tz, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  const others = (s.devices || []).length - (pushHere ? 1 : 0);
+  const blocked = support === "ok" && Notification.permission === "denied";
+  const here = support === "ios-install"
+    ? `<p class="notif-tip"><b>On iPhone, add Thinq to your Home Screen first.</b> Tap the Share button, choose “Add to Home Screen”, then open Thinq from your Home Screen and turn notifications on there.</p>`
+    : support === "none" ? `<p class="notif-tip">This browser can't show notifications. Try Chrome, Edge, Firefox or Safari.</p>`
+    : blocked ? `<p class="notif-tip"><b>Notifications are blocked for Thinq in this browser.</b> Allow them in the site settings (the icon next to the address), then reload.</p>`
+    : pushHere
+      ? `<div class="notif-on"><span class="dot live"></span><b>On for this device</b><button class="btn ghost sm" data-notif="test">Send a test</button><button class="btn ghost sm" data-notif="off">Turn off</button></div>`
+      : `<button class="btn sm" data-notif="on">${icon("i-bell", 13)}Turn on notifications</button>`;
+  const items = s.items || [];
+  const item = (r) => `<li class="notif-item" data-id="${r.id}">
+      <span class="notif-txt"><b>${esc(r.kind === "reminder" ? r.text : `Email ${r.from ? `from ${r.from}` : ""}${r.subject ? ` about “${r.subject}”` : ""}`)}</b>
+      <small>${r.kind === "reminder" ? esc(when(r.dueAt)) : `Watching until ${esc(when(r.expiresAt))} · ${esc(r.text)}`}</small></span>
+      <button class="btn ghost sm" data-notif="cancel">Cancel</button></li>`;
+  const p = s.prefs || {};
+  box.innerHTML = `
+    <p>Thinq can remind you of things and tell you when an email you're waiting for arrives, even when Thinq is closed. Just ask, for example <i>“remind me at 3pm to call Sam”</i> or <i>“tell me when Sam's email arrives and what time the meeting is”</i>.</p>
+    ${here}
+    ${(s.devices || []).length ? `<p class="meta">Turned on for: ${esc([...new Set(s.devices)].join(", "))}${others > 0 && !pushHere ? " (not this one)" : ""}</p>` : ""}
+    <h3 class="meet-sub">Also notify me about</h3>
+    <label class="meet-toggle"><input type="checkbox" data-pref="calendar" ${p.calendar ? "checked" : ""}><span><b>Upcoming calendar events</b><small>${state.mode === "google" ? `A heads-up <select class="notif-mins" data-pref="calendarMinutes" aria-label="Minutes before">${[5, 10, 15, 30].map((m) => `<option value="${m}" ${p.calendarMinutes === m ? "selected" : ""}>${m} min</option>`).join("")}</select> before each one.` : "Needs Gmail & Calendar connected."}</small></span></label>
+    <label class="meet-toggle"><input type="checkbox" data-pref="meetings" ${p.meetings ? "checked" : ""}><span><b>Meeting notes ready</b><small>When Thinq finishes the notes for a recording.</small></span></label>
+    ${s.whatsappLinked ? `<label class="meet-toggle"><input type="checkbox" data-pref="whatsapp" ${p.whatsapp ? "checked" : ""}><span><b>Also send to WhatsApp</b><small>A copy of each reminder and alert in your Thinq WhatsApp chat (only works if you've messaged Thinq there in the last 24 hours).</small></span></label>` : ""}
+    <h3 class="meet-sub">Reminders and email alerts</h3>
+    ${items.length ? `<ul class="meet-list notif-list">${items.map(item).join("")}</ul>` : `<p class="meta">None set. Ask Thinq in the chat to set one.</p>`}`;
+}
+$("#notif").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-notif]"); if (!b) return;
+  b.disabled = true;
+  try {
+    const act = b.dataset.notif;
+    if (act === "on") { await turnOnPush(); notice("Notifications are on for this device.", "ok"); }
+    if (act === "off") { await turnOffPush(); notice("Notifications are off for this device.", "ok"); }
+    if (act === "test") { await api("/api/notifications/test", { method: "POST" }); notice("Test sent. It should pop up in a few seconds.", "ok"); }
+    if (act === "cancel") state.notifications = await api(`/api/reminders/${b.closest(".notif-item").dataset.id}`, { method: "DELETE" });
+    renderNotify();
+  } catch (err) { notice(err.message); b.disabled = false; }
+});
+$("#notif").addEventListener("change", async (e) => {
+  const el = e.target.closest("[data-pref]"); if (!el) return;
+  const val = el.type === "checkbox" ? el.checked : Number(el.value);
+  try { state.notifications = await api("/api/notifications/settings", { method: "PUT", body: JSON.stringify({ [el.dataset.pref]: val }) }); renderNotify(); }
+  catch (err) { notice(err.message); }
 });
 
 function renderNotes() {
@@ -1048,3 +1146,6 @@ $("#micBtn").hidden = !(state.voiceAvailable && canRecord());
 if (state.images?.available) $("#input").placeholder = "Ask Thinq anything, attach a document, or ask for an image…";
 await openConversation(location.hash.slice(1) || null);
 loadAgenda();
+initPush();
+// Tapping a notification while Thinq is open switches to that chat.
+addEventListener("hashchange", () => { const id = location.hash.slice(1); if (id && id !== conversationId) openConversation(id); });

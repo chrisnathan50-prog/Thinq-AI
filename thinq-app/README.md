@@ -121,6 +121,26 @@ Thinq can also send a notetaker bot into **Google Meet, Zoom and Microsoft Teams
 
 Thinq tells Attendee to call `https://YOUR-APP/webhooks/attendee` when a bot changes state; Thinq treats that only as a hint and re-checks the bot through the API, and also checks active meetings every minute, so nothing is lost while the Render server is asleep.
 
+### Notifications and reminders (free)
+
+People can turn on notifications in **Connections → Notifications**. Then Thinq can:
+
+- **Remind them**: "remind me at 2:27 to join the call", "remind me 3 minutes before my 2:30 meeting".
+- **Tell them when an email arrives**: "tell me when Sam's email comes in and what time the meeting is". Thinq checks Gmail about every minute (for up to 7 days by default). When the email arrives, it reads it and puts the answer in the notification and in the chat.
+- **Give calendar heads-ups** 5–30 minutes before each event, and say when **meeting notes are ready**. Both can be turned off.
+- Optionally send a copy to their Thinq WhatsApp chat.
+
+How it works: standard Web Push (the `web-push` library). The browser runs `public/sw.js`, which shows notifications even when Thinq is closed. Nothing to sign up for:
+- The server's push keys (VAPID) are created on first start and stored encrypted in the database. You can set `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` instead. Changing keys turns off everyone's notifications until they turn them on again.
+
+Works in Chrome, Edge and Firefox (desktop and Android) and Safari on Mac. **On iPhone/iPad (iOS 16.4+), people must first add Thinq to their Home Screen** (Share → Add to Home Screen) and open it from there. The pane explains this.
+
+**Keeping the server awake.** Render's free plan sleeps the server after about 15 minutes without visitors, and a sleeping server can't send reminders. Two things keep it awake:
+1. In production the server visits its own `/healthz` every 10 minutes (`KEEP_AWAKE=off` turns this off).
+2. A GitHub Action (`.github/workflows/keep-awake.yml`) visits `https://thinq.onrender.com/healthz` every 5 minutes. This wakes the server after a deploy or crash. Change the URL there if your address changes.
+
+One always-on free service uses about 730 of Render's 750 free hours a month, so don't run a second free service on the same account. For guaranteed uptime, use a paid instance.
+
 ### Images (free, optional)
 
 Thinq creates images with **Cloudflare Workers AI** (FLUX.1 schnell) through a `create_image` tool. It works with either AI choice (Groq or Claude).

@@ -303,6 +303,7 @@ export async function summarize(meetingId) {
       summary = await completeText({ system: SUMMARY_SYSTEM, prompt: `${header}\nBelow are notes on each part of one long meeting, in order. Combine them into one set of notes for the whole meeting.\n\n${parts.map((p, i) => `<part n="${i + 1}">\n${p}\n</part>`).join("\n\n")}`, maxTokens: 2000 });
     }
     await setMeeting(m.id, { summary: summary || "(No summary could be written.)", status: "done", error: null });
+    import("./notify.js").then((n) => n.notify(m.user_id, { title: "Meeting notes ready", body: m.title || "Your meeting", url: "/app", tag: `meeting-${m.id}` }, "meetings")).catch(() => {});
     await store.logAction(m.user_id, "meeting_summarized", { meetingId: m.id, chars: m.transcript.length, parts: chunks.length });
   } catch (err) {
     console.warn("[meetings] summary failed:", err.message);

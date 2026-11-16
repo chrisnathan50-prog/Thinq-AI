@@ -230,6 +230,53 @@ async function migrate() {
       auto_join boolean not null default false,
       updated_at timestamptz not null default now()
     );
+    create table if not exists app_secrets (
+      name text primary key,
+      value text not null
+    );
+    create table if not exists push_subscriptions (
+      endpoint text primary key,
+      user_id text not null references users(id) on delete cascade,
+      keys jsonb not null,
+      device text,
+      failures int not null default 0,
+      last_ok_at timestamptz,
+      created_at timestamptz not null default now()
+    );
+    create index if not exists push_subscriptions_user on push_subscriptions(user_id);
+    create table if not exists notify_prefs (
+      user_id text primary key references users(id) on delete cascade,
+      calendar boolean not null default true,
+      calendar_minutes int not null default 10,
+      meetings boolean not null default true,
+      whatsapp boolean not null default false,
+      updated_at timestamptz not null default now()
+    );
+    create table if not exists reminders (
+      id text primary key,
+      user_id text not null references users(id) on delete cascade,
+      kind text not null,
+      text text not null,
+      due_at timestamptz,
+      watch_from text,
+      watch_subject text,
+      watch_since timestamptz,
+      expires_at timestamptz,
+      checked_at timestamptz,
+      status text not null default 'active',
+      result text,
+      conversation_id text,
+      created_at timestamptz not null default now(),
+      fired_at timestamptz
+    );
+    create index if not exists reminders_user on reminders(user_id, status);
+    create index if not exists reminders_due on reminders(status, kind, due_at);
+    create table if not exists notify_sent (
+      user_id text not null references users(id) on delete cascade,
+      key text not null,
+      sent_at timestamptz not null default now(),
+      primary key (user_id, key)
+    );
     alter table messages add column if not exists attachments jsonb;
     create index if not exists documents_conv on documents(conversation_id);
     create index if not exists conversations_user on conversations(user_id, created_at desc);
