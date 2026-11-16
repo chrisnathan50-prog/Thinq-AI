@@ -427,6 +427,21 @@ export function buildTools({ userId, p, conversationId, timeZone, queued, images
   ];
 }
 
+// On Groq's free tier every request counts against ~8,000 tokens a minute, so only the recent part of a long
+// conversation is sent (about 3,000 tokens). Claude gets the whole conversation.
+const HISTORY_CHARS = AI_PROVIDER === "groq" ? 12000 : Infinity;
+function recentHistory(messages) {
+  const kept = [];
+  let chars = 0;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    chars += messages[i].text.length;
+    if (chars > HISTORY_CHARS && kept.length) break;
+    kept.unshift(messages[i]);
+  }
+  while (kept.length > 1 && kept[0].role !== "user") kept.shift();
+  return kept;
+}
+
 /**
  * Runs one turn of the conversation. Yields progress events, then a final reply:
  *   { type: "status", text }   while tools run
@@ -444,7 +459,7 @@ export async function* runTurn({ user, conversationId, userText, timeZone, attac
     ? `\n\n[Attached: ${docs.map((d) => `"${d.name}" (document_id: ${d.id}${d.parts ? `, ${d.parts} part${d.parts > 1 ? "s" : ""}` : ""})`).join("; ")}]`
     : "";
   const imageNote = (list) => list?.length ? `\n\n[Images shown under this reply: ${list.map((i) => `"${i.prompt}"`).join("; ")}]` : "";
-  const history = conversation.messages.map((m) => ({ role: m.role, content: m.text + (m.role === "user" ? attachNote(m.attachments) : imageNote(m.attachments?.filter((a) => a.type === "image"))) }));
+  const history = recentHistory(conversation.messages).map((m) => ({ role: m.role, content: m.text + (m.role === "user" ? attachNote(m.attachments) : imageNote(m.attachments?.filter((a) => a.type === "image"))) }));
   userText = userText + attachNote(attachments.map((d) => ({ ...d, parts: partCount(d.chars) })));
   const context = contextBlock({ timeZone, profile, mode: p.mode, notes: await store.listNotes(user.id), channel, waSync });
   const onTool = (name) => store.logAction(user.id, "tool", { tool: name, conversationId, ai: AI_PROVIDER });

@@ -130,7 +130,7 @@ function renderLinks() {
   const left = state.usage?.limit ? Math.max(0, state.usage.limit - state.usage.today) : null;
   const foot = !state.hasApiKey
     ? `<p class="links-foot warn"><span class="dot off"></span>AI not set up: the server needs <code>${esc(state.apiKeyName)}</code></p>`
-    : `<p class="links-foot">${state.aiProvider === "groq" ? "Groq (free tier)" : "Claude"}${left !== null ? ` · ${left} of ${state.usage.limit} left today` : ""}</p>`;
+    : `<p class="links-foot">${left !== null ? `${left} of ${state.usage.limit} requests left today` : ""}</p>`;
   $("#links").innerHTML = `<h3 class="links-head">Connections</h3>
     <ul>${connRows().map((r) => `<li><button type="button" class="link-row" data-pane="${r.pane}" aria-haspopup="dialog">
       <span class="link-ic">${icon(r.icon, 14)}</span>

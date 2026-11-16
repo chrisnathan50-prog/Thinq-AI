@@ -7,7 +7,8 @@ export function friendlyError(err) {
   if (err?.userFacing) return err.message;
   if (err instanceof GroqError) {
     if (err.status === 401) return "The server's Groq API key was rejected. The site owner needs to check GROQ_API_KEY.";
-    if (err.status === 429) return "Thinq's AI is busy (free-tier limit reached). Wait a minute and try again.";
+    if (err.status === 429 && err.daily) return "Thinq's AI has used up its free allowance for today. It resets within 24 hours.";
+    if (err.status === 429) return "Thinq's AI is busy right now. Wait a minute and try again.";
     if (err.status === 404 || err.code === "model_not_found" || err.code === "model_decommissioned") return `The AI model "${MODEL}" isn't available any more. The site owner needs to set GROQ_MODEL.`;
     if (err.status === 413 || err.code === "context_length_exceeded") return "This conversation got too long. Start a new conversation and try again.";
     if (err.status === 400 && err.code === "tool_use_failed") return "The AI got confused while using a tool. Try rephrasing your request.";

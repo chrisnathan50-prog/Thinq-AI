@@ -6,6 +6,11 @@ import * as z from "zod/v4";
 export const GROQ_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
 const BASE_URL = (process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1").replace(/\/$/, "");
 const MAX_STEPS = 12;
+// Groq's free tier allows only ~8,000 tokens a minute per model, and one Thinq request is ~3,000 before any
+// history or tool results. Each model has its own allowance, so when the main one is used up for the minute,
+// switch to this smaller one instead of failing. GROQ_FALLBACK_MODEL=off turns this off.
+const FALLBACK_MODEL = (process.env.GROQ_FALLBACK_MODEL ?? "openai/gpt-oss-20b").trim();
+const fallbackFor = (model) => (FALLBACK_MODEL && FALLBACK_MODEL !== "off" && FALLBACK_MODEL !== model ? FALLBACK_MODEL : null);
 
 export class GroqError extends Error {
   constructor(status, message, code, retryAfter) {
@@ -43,14 +48,20 @@ async function chat(body, tries = { wait: 0, toolRetry: 0 }) {
 
   let message, code;
   try { const e = (await res.json()).error || {}; message = e.message; code = e.code; } catch {}
-  // Short waits on the free tier: wait and try again (at most twice).
-  if ((res.status === 429 || res.status >= 500) && tries.wait < 2 && (retryAfter ?? 2) <= 15) {
+  // Per-minute limit on the main model: use the fallback model's separate allowance straight away.
+  const daily = /per day|\(TPD\)|\(RPD\)/i.test(message || "");
+  if (res.status === 429 && !tries.fellBack && fallbackFor(body.model)) {
+    console.warn(`Groq: ${body.model} is rate-limited (${daily ? "daily" : "per-minute"}), using ${FALLBACK_MODEL}`);
+    return chat({ ...body, model: fallbackFor(body.model) }, { ...tries, fellBack: true });
+  }
+  // Short waits on the free tier: wait and try again (at most twice, up to 30 seconds each).
+  if ((res.status === 429 || res.status >= 500) && !daily && tries.wait < 2 && (retryAfter ?? 2) <= 30) {
     await sleep((retryAfter ?? 2) * 1000);
     return chat(body, { ...tries, wait: tries.wait + 1 });
   }
   // Open models sometimes write a malformed tool call; Groq rejects it with tool_use_failed. Ask again once.
   if (res.status === 400 && code === "tool_use_failed" && tries.toolRetry < 1) return chat(body, { ...tries, toolRetry: tries.toolRetry + 1 });
-  throw new GroqError(res.status, message, code, retryAfter);
+  throw Object.assign(new GroqError(res.status, message, code, retryAfter), { daily });
 }
 
 async function runOne(call, byName) {

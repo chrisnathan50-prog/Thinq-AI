@@ -160,7 +160,7 @@ In `.env`, pick an AI service:
 |---|---|---|
 | Setting | `AI_PROVIDER=groq` | `AI_PROVIDER=anthropic` |
 | Key | `GROQ_API_KEY` from <https://console.groq.com/keys> — no card needed | `ANTHROPIC_API_KEY` from <https://console.anthropic.com> — a few cents per request |
-| Model | `openai/gpt-oss-120b` (change with `GROQ_MODEL`) | Claude Opus 5.5 (change with `THINQ_MODEL`) |
+| Model | `openai/gpt-oss-120b` (change with `GROQ_MODEL`; switches to `openai/gpt-oss-20b` when the free per-minute limit is hit, set with `GROQ_FALLBACK_MODEL`) | Claude Opus 5.5 (change with `THINQ_MODEL`) |
 | Good for | Trying Thinq for free; simple requests | Best quality on multi-step requests and drafts in your voice |
 | Watch out for | Free-tier limits per minute and per day — shared by everyone using your server | Cost on heavy use |
 
