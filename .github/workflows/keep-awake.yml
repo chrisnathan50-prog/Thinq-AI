@@ -1,0 +1,18 @@
+# Keeps the live Thinq server (Render free plan) awake so reminders and notifications go out on time.
+# Render sleeps a free server after ~15 minutes with no visitors. The server also pings itself every
+# 10 minutes while it's up; this wakes it again if it ever went to sleep (after a deploy, crash or restart).
+# GitHub runs scheduled jobs roughly on time but can be several minutes late - that's fine here.
+name: Keep Thinq awake
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Visit /healthz
+        run: curl -fsS --retry 3 --retry-delay 20 --max-time 60 https://thinq.onrender.com/healthz
