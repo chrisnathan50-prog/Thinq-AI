@@ -587,10 +587,26 @@ function pushSupport() {
   if (isIOS && !standalone()) return "ios-install";
   return "none";
 }
+// The app lives at /app (no trailing slash), so the service worker's scope must be "/app" - with "/app/" it
+// never controls the page and waiting for it hangs. The server allows this scope (Service-Worker-Allowed).
+const SW_SCOPE = "/app";
+const registerSW = () => navigator.serviceWorker.register("/app/sw.js", { scope: SW_SCOPE, updateViaCache: "none" });
+// Wait until the worker is running (needed before subscribing), without hanging forever.
+function swActive(reg, ms = 15000) {
+  if (reg.active) return Promise.resolve(reg);
+  return new Promise((resolve, reject) => {
+    const w = reg.installing || reg.waiting;
+    const timer = setTimeout(() => reject(new Error("Thinq's notification helper didn't start. Reload the page and try again.")), ms);
+    w?.addEventListener("statechange", () => { if (reg.active) { clearTimeout(timer); resolve(reg); } });
+    if (!w) navigator.serviceWorker.ready.then(() => { clearTimeout(timer); resolve(reg); });
+  });
+}
 async function initPush() {
   if (!("serviceWorker" in navigator)) return;
   try {
-    swReg = await navigator.serviceWorker.register("/app/sw.js", { scope: "/app/" });
+    // Remove the earlier registration that used the wrong scope ("/app/").
+    for (const r of await navigator.serviceWorker.getRegistrations()) if (new URL(r.scope).pathname === "/app/") await r.unregister().catch(() => {});
+    swReg = await registerSW();
     const sub = await swReg.pushManager?.getSubscription();
     pushHere = Boolean(sub) && Notification.permission === "granted";
     // Re-send the subscription in case the server lost it (or the browser rotated it).
@@ -614,9 +630,12 @@ async function turnOnPush(onWaiting) {
   if (perm !== "granted") throw new Error(perm === "denied"
     ? "Notifications are blocked for Thinq. Click the icon at the left end of the address bar, allow Notifications, then try again."
     : "Notifications weren't turned on. Tap the button again and choose Allow when your browser asks.");
-  if (!swReg) swReg = await navigator.serviceWorker.register("/app/sw.js", { scope: "/app/" });
-  await navigator.serviceWorker.ready;
-  const sub = (await swReg.pushManager.getSubscription()) || await swReg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(state.notifications.publicKey) });
+  if (!swReg) swReg = await registerSW();
+  await swActive(swReg);
+  const sub = (await swReg.pushManager.getSubscription()) || await Promise.race([
+    swReg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(state.notifications.publicKey) }),
+    new Promise((_, reject) => setTimeout(() => reject(new Error("Your browser's notification service didn't answer. Check your internet connection and try again.")), 20000)),
+  ]).catch((err) => { throw err?.name === "AbortError" || err?.name === "NotAllowedError" ? new Error("Your browser couldn't set up notifications for Thinq. If you use Brave, turn on “Use Google services for push messaging” in its settings; otherwise reload and try again.") : err; });
   state.notifications = await api("/api/notifications/subscribe", { method: "POST", body: JSON.stringify({ subscription: sub.toJSON() }) });
   pushHere = true;
 }

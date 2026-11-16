@@ -69,6 +69,11 @@ const validTz = (tz) => { try { new Intl.DateTimeFormat("en-US", { timeZone: tz 
 // ---------- the app (signed in only) ----------
 app.get(["/app", "/app/"], requireUser, (req, res) => res.sendFile(path.join(here, "public", "index.html")));
 app.get("/app/admin", requireUser, (req, res) => (isAdmin(req.user.email) ? res.sendFile(path.join(here, "public", "admin.html")) : res.redirect("/app")));
+// The notification service worker: allowed to cover /app itself (not just /app/...), and never cached.
+app.get("/app/sw.js", (req, res) => {
+  res.set({ "Service-Worker-Allowed": "/app", "Cache-Control": "no-cache" });
+  res.sendFile(path.join(here, "public", "sw.js"));
+});
 app.use("/app", express.static(path.join(here, "public"), { index: false }));
 
 // ---------- app state ----------
