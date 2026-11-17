@@ -19,6 +19,8 @@ const FEATURES = {
   event_created: "Invites sent (approved)",
   declined: "Drafts discarded",
   bot_created: "Group bots built",
+  routine_created: "Routines set up",
+  routine_sent: "Routine messages sent",
   bot_answer: "Group bot answers",
   bot_reminder: "Group reminders posted",
 };

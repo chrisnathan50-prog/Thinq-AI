@@ -53,6 +53,15 @@ The website has a **Help Us Test** page (`/testers.html`, linked from the home p
 - Optional `CONTACT_EMAIL` shows a "Prefer email?" link on the page. It's public, so use an address you're happy to share.
 - The form has spam protection (hidden field + 5 requests per hour per visitor).
 
+### Routines: tasks on a schedule
+
+Tell Thinq once and it keeps doing it — no need to ask every day:
+
+- **Reports to you** — *"Every weekday at 8am, summarise my unread emails and tell me what needs a reply."* Thinq runs the task at that time and sends you the result as a notification, in a chat called *Routine: …*, and (if you ask) as an email to yourself. These start right away.
+- **Messages to someone else** — *"Every day at 9pm, send Mum a goodnight message on WhatsApp"* or a weekly email. These are saved as **Needs your OK**: you open the **Routines** tab and tap **Turn on**, which shows exactly who gets what and when. The AI can't turn a routine on. Fixed text then goes out by itself; if Thinq writes the message fresh each time, each one waits in Approvals unless you tick *Send without asking me*. Changing the recipient or the message needs your OK again.
+
+Schedules: once, daily, weekly (any weekdays) or monthly, in your time zone. Manage them in the Routines tab (Turn on, Run now, Pause, Delete) or by asking Thinq ("move my summary to 7:30"). Each run counts as one AI request. WhatsApp messages go from your own number through the linked WhatsApp (see *WhatsApp chat sync*); email goes from your Gmail. Like reminders, a run more than 2 hours late (server asleep) is skipped.
+
 ### Group bots for Telegram (free, optional)
 
 People can ask Thinq to **build them a bot** for a Telegram group: *"Build a bot for my running club group that answers questions about our runs and reminds everyone every Friday at 6pm."* Thinq writes the bot's facts and reminders; the person adds it to their group and links it with a code. In the group the bot:

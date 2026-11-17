@@ -58,6 +58,7 @@ async function api(path, opts = {}) {
 async function refresh() {
   state = await api("/api/state");
   $("#botsTabBtn").hidden = !state.telegram;
+  api("/api/routines").then((r) => { routinesData = r.routines; const w = routinesData.filter((x) => x.status === "needs_ok").length; $("#rtBadge").hidden = !w; $("#rtBadge").textContent = w; if (!$("#tab-routines").hidden) renderRoutines(); }).catch(() => {});
   renderAccount(); renderConn(); renderWhatsApp(); renderWaSync(); renderMeetings(); renderNotify(); renderNotes(); renderConvos(); renderApprovals(); renderGreeting();
 }
 
@@ -934,6 +935,77 @@ async function loadAgenda() {
   } catch (err) { body.innerHTML = `<p class="none">${esc(err.message)}</p>`; }
 }
 
+// ---------------- routines (tasks on a schedule) ----------------
+let routinesData = [];
+const ROUTINE_EXAMPLES = [
+  "Every weekday at 8am, summarise my unread emails and tell me what needs a reply",
+  "Every Sunday at 6pm, preview my calendar for the coming week",
+  "Every day at 9pm, send Mum a goodnight message on WhatsApp",
+];
+const RT_STATUS = { active: "On", needs_ok: "Needs your OK", paused: "Paused", done: "Finished" };
+async function loadRoutines() {
+  try { routinesData = (await api("/api/routines")).routines; } catch (err) { $("#tab-routines").innerHTML = `<p class="none">${esc(err.message)}</p>`; return; }
+  renderRoutines();
+}
+function renderRoutines() {
+  const body = $("#tab-routines"), list = routinesData;
+  const waiting = list.filter((r) => r.status === "needs_ok").length;
+  $("#rtBadge").hidden = !waiting; $("#rtBadge").textContent = waiting;
+  const when = (iso, tz) => (iso ? new Date(iso).toLocaleString("en-US", { timeZone: tz, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—");
+  const intro = `<p class="bots-intro">Routines are tasks Thinq does on a schedule without being asked again. Ask in chat to add one.</p>`;
+  if (!list.length) {
+    body.innerHTML = intro + `<div class="none">No routines yet. Try asking:${ROUTINE_EXAMPLES.map((t, i) => `<button class="btn ghost sm" data-rtexample="${i}">“${esc(t)}”</button>`).join("")}</div>`;
+    return;
+  }
+  body.innerHTML = intro + list.map((r) => {
+    const what = r.kind === "report"
+      ? `<p class="purpose">${esc(r.instruction)}</p><small class="rt-deliver">Result: notification + “Routine: ${esc(r.title)}” chat${r.emailMe ? " + email to you" : ""}</small>`
+      : `<p class="purpose">${r.writeFresh ? `Thinq writes: ${esc(r.instruction)}` : `“${esc(r.messageText)}”`}</p><small class="rt-deliver">To <b>${esc(r.recipientName)}</b> by ${r.channel === "whatsapp" ? "WhatsApp (from your number)" : "email (from your Gmail)"}${r.writeFresh ? (r.autoSend ? " · sent without asking" : " · each one waits in Approvals") : ""}</small>`;
+    const okBox = r.status === "needs_ok" ? `<div class="rt-ok">
+        <b>Turn this on?</b> Thinq will send ${r.writeFresh ? "a message it writes" : "this message"} to ${esc(r.recipientName)} ${esc(r.schedule)}.
+        ${r.writeFresh ? `<label class="check-row"><input type="checkbox" data-autosend> Send without asking me each time</label>` : ""}
+        <button class="btn sm" data-rton>Turn on</button>
+      </div>` : "";
+    return `<article class="bot rt ${r.status}" data-rt="${esc(r.id)}">
+      <header><b>${esc(r.title)}</b><span class="pill-status">${RT_STATUS[r.status] || esc(r.status)}</span></header>
+      ${what}
+      <small class="rt-when">${esc(r.schedule)}${r.status === "active" ? ` · next ${when(r.nextRunAt, r.timeZone)}` : ""}</small>
+      ${r.lastResult ? `<small class="rt-last">Last run${r.lastRunAt ? ` ${when(r.lastRunAt, r.timeZone)}` : ""}: ${esc(r.lastResult)}</small>` : ""}
+      ${okBox}
+      <div class="bot-actions">
+        ${r.status === "active" ? `<button class="btn ghost sm" data-rtrun>Run now</button><button class="btn ghost sm" data-rtpause>Pause</button>` : ""}
+        ${r.status === "paused" ? `<button class="btn ghost sm" data-rtresume>Resume</button>` : ""}
+        ${r.kind === "report" && r.conversationId ? `<a class="btn ghost sm" href="#${esc(r.conversationId)}" data-rtopen>Results</a>` : ""}
+        <button class="btn ghost sm danger-text" data-rtdel>Delete</button>
+      </div>
+    </article>`;
+  }).join("") + `<p class="bots-foot">To change a routine, just ask Thinq — e.g. “move my email summary to 7:30”.</p>`;
+}
+$("#tab-routines").addEventListener("click", async (e) => {
+  const ex = e.target.closest("[data-rtexample]");
+  if (ex) { const i = $("#input"); i.value = ROUTINE_EXAMPLES[ex.dataset.rtexample]; autosize(); i.focus(); closeDrawers(); return; }
+  const card = e.target.closest("[data-rt]"); if (!card) return;
+  const id = card.dataset.rt, r = routinesData.find((x) => x.id === id);
+  try {
+    if (e.target.closest("[data-rton]")) {
+      await api(`/api/routines/${id}/on`, { method: "POST", body: JSON.stringify({ autoSend: Boolean(card.querySelector("[data-autosend]")?.checked) }) });
+      notice(`“${r.title}” is on.`, "ok");
+    } else if (e.target.closest("[data-rtrun]")) {
+      const b = e.target.closest("[data-rtrun]"); b.disabled = true; b.textContent = "Running…";
+      const out = await api(`/api/routines/${id}/run`, { method: "POST" });
+      notice(out.result, "ok"); refresh();
+    } else if (e.target.closest("[data-rtpause]") || e.target.closest("[data-rtresume]")) {
+      await api(`/api/routines/${id}`, { method: "PATCH", body: JSON.stringify({ paused: Boolean(e.target.closest("[data-rtpause]")) }) });
+    } else if (e.target.closest("[data-rtdel]")) {
+      if (!confirm(`Delete “${r.title}”?`)) return;
+      await api(`/api/routines/${id}`, { method: "DELETE" });
+    } else if (e.target.closest("[data-rtopen]")) {
+      e.preventDefault(); await openConversation(r.conversationId); closeDrawers(); return;
+    } else return;
+    loadRoutines();
+  } catch (err) { notice(err.message); loadRoutines(); }
+});
+
 // ---------------- group bots (Telegram) ----------------
 let botsData = null;
 const BOT_EXAMPLE = "Build a bot for my running club's Telegram group. It should answer questions about our runs (we meet Saturdays 7am at the park gates, 5k and 10k groups, bring water) and remind everyone every Friday at 6pm about Saturday's run.";
@@ -1002,9 +1074,10 @@ $("#tab-bots").addEventListener("click", async (e) => {
 
 function showTab(tab) {
   document.querySelectorAll("[data-tab]").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === tab));
-  $("#tab-approvals").hidden = tab !== "approvals"; $("#tab-agenda").hidden = tab !== "agenda"; $("#tab-bots").hidden = tab !== "bots";
+  $("#tab-approvals").hidden = tab !== "approvals"; $("#tab-agenda").hidden = tab !== "agenda"; $("#tab-bots").hidden = tab !== "bots"; $("#tab-routines").hidden = tab !== "routines";
   if (tab === "agenda") loadAgenda();
   if (tab === "bots") loadBots();
+  if (tab === "routines") loadRoutines();
 }
 
 // ---------------- documents ----------------

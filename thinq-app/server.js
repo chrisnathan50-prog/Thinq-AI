@@ -4,6 +4,7 @@
 //   /api/...     the app's data and chat (per user)
 //   /auth/...    Google sign-in, connecting Gmail & Calendar, log out
 import * as bots from "./src/bots.js";
+import * as routines from "./src/routines.js";
 import { mountTelegram, startTelegram, telegramConfigured, botUsername } from "./src/telegram.js";
 import express from "express";
 import fs from "node:fs";
@@ -318,6 +319,21 @@ api.put("/meetings/settings", async (req, res) => {
   res.json(await meetingsState(req.user.id));
 });
 
+// ---------- routines (tasks on a schedule) ----------
+const routineErr = (res, err) => (err instanceof routines.RoutineError || err.userFacing || err instanceof TurnError ? res.status(400).json({ error: err.message }) : (console.error(err), res.status(500).json({ error: "Something went wrong." })));
+api.get("/routines", async (req, res) => res.json({ routines: await routines.listRoutines(req.user.id) }));
+// Turning a routine on is only ever done here, by the user's own click - the AI has no tool for it.
+api.post("/routines/:id/on", async (req, res) => {
+  try { res.json(await routines.turnOn(req.user.id, req.params.id, { autoSend: req.body?.autoSend === true })); } catch (err) { routineErr(res, err); }
+});
+api.patch("/routines/:id", async (req, res) => {
+  try { res.json(await routines.updateRoutine(req.user.id, req.params.id, { paused: req.body?.paused === true ? true : req.body?.paused === false ? false : undefined })); } catch (err) { routineErr(res, err); }
+});
+api.post("/routines/:id/run", async (req, res) => {
+  try { res.json({ result: await routines.runNow(req.user.id, req.params.id) }); } catch (err) { routineErr(res, err); }
+});
+api.delete("/routines/:id", async (req, res) => { await routines.deleteRoutine(req.user.id, req.params.id); res.json({ ok: true }); });
+
 // ---------- group bots (built by chatting with Thinq; live in Telegram groups) ----------
 const botErr = (res, err) => (err instanceof bots.BotError ? res.status(400).json({ error: err.message }) : (console.error(err), res.status(500).json({ error: "Something went wrong." })));
 api.get("/bots", async (req, res) => res.json({ bots: await bots.listBots(req.user.id), telegram: { available: telegramConfigured(), username: botUsername() } }));
@@ -440,6 +456,7 @@ if (fs.existsSync(SITE_DIR)) {
 meetings.startMeetingWorkers();
 recordings.startRecordingWorker();
 notifier.startNotifyWorker();
+routines.startRoutineWorker(); // scheduled tasks: morning summaries, daily messages...
 await startTelegram(); // learns the bot's name, registers the webhook, starts group-bot reminders
 
 // Keep-awake: Render's free plan puts the server to sleep after ~15 minutes without visitors, and a sleeping

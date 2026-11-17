@@ -488,3 +488,19 @@ table.people .muted{color:var(--soft);font-size:12px}
 .link-code code{font-size:17px;font-weight:600;letter-spacing:.04em;background:#fff;border:1px dashed var(--line);border-radius:8px;padding:4px 10px}
 .bots-foot{font-size:12px;color:var(--muted);line-height:1.5}
 #tab-bots .none .btn{display:block;margin:10px auto 0;white-space:normal}
+
+/* ---------- routines panel ---------- */
+.rt .rt-deliver,.rt .rt-when,.rt .rt-last{display:block;font-size:12px;color:var(--muted);line-height:1.45}
+.rt .rt-deliver b{font-weight:500;color:var(--ink-2)}
+.rt .rt-last{color:var(--ink-2)}
+.rt.needs_ok .pill-status{background:#fff7e6;color:#7a4b00}
+.rt.done .pill-status{background:#f4f4f6;color:var(--muted)}
+.rt.done{opacity:.75}
+.rt-ok{display:grid;gap:8px;background:#fffbf0;border:1px solid #f9e2b0;border-radius:12px;padding:10px 12px;font-size:13px;color:#5c3b00}
+.rt-ok .btn{justify-self:start}
+.check-row{display:flex;gap:8px;align-items:center;font-size:12.5px}
+#tab-routines .none .btn{display:block;margin:8px auto 0;white-space:normal;text-align:left}
+/* four tabs in the side panel: keep them on one line */
+.panel-head .segmented{min-width:0;flex:0 1 auto;overflow-x:auto;scrollbar-width:none}
+.panel-head .segmented::-webkit-scrollbar{display:none}
+.panel-head .segmented button{padding:7px 10px;gap:5px;white-space:nowrap}
