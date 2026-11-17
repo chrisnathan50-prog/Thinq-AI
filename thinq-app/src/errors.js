@@ -10,6 +10,7 @@ export function friendlyError(err) {
     if (err.status === 429 && err.daily) return "Thinq's AI has used up its free allowance for today. It resets within 24 hours.";
     if (err.status === 429) return "Thinq's AI is busy right now. Wait a minute and try again.";
     if (err.status === 404 || err.code === "model_not_found" || err.code === "model_decommissioned") return `The AI model "${MODEL}" isn't available any more. The site owner needs to set GROQ_MODEL.`;
+    if (/request too large/i.test(err.message || "")) return "That request was too big for Thinq's free AI tier. Try a shorter message, or start a new conversation.";
     if (err.status === 413 || err.code === "context_length_exceeded") return "This conversation got too long. Start a new conversation and try again.";
     if (err.status === 400 && err.code === "tool_use_failed") return "The AI got confused while using a tool. Try rephrasing your request.";
     if (err.status === 0) return "Couldn't reach the AI service. Try again in a moment.";

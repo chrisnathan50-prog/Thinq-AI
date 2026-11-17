@@ -686,6 +686,40 @@ function recentHistory(messages) {
   return kept;
 }
 
+// ---------- fitting Groq's free tier: at most ~8,000 tokens per request ----------
+// With every feature on, the tool descriptions alone are ~5,000 tokens. On Groq we always send the email and
+// calendar basics, and each other group of tools only when the conversation is about it. Claude gets everything.
+const CORE_TOOLS = new Set(["search_inbox", "read_email", "list_events", "find_free_time", "draft_email", "propose_event", "remember"]);
+const TOOL_GROUPS = [
+  { re: /\b(image|picture|photo|draw|logo|illustrat|poster|wallpaper|artwork|sketch)/i, tools: ["create_image"] },
+  { re: /remind|alert|notif|let me know|tell me (when|if)|watch for|ping me|heads.?up|nudge/i, tools: ["set_reminder", "watch_for_email", "list_reminders", "cancel_reminder"] },
+  { re: /whats ?app|\bchats?\b|\btext(ed|ing)?\b|message|\bgroups?\b|\bdm\b/i, tools: ["whatsapp_recent_chats", "search_whatsapp", "read_whatsapp_chat", "draft_whatsapp"] },
+  { re: /meeting|\bcall\b|transcript|notes|zoom|google meet|teams|record|notetaker/i, tools: ["list_meetings", "read_meeting_notes", "send_notetaker"] },
+  { re: /\bbots?\b|telegram|group chat|link code/i, tools: ["build_group_bot", "update_group_bot", "list_group_bots", "get_bot_link_code"] },
+  { re: /routine|every (day|morning|evening|night|week|weekday|month|mon|tue|wed|thu|fri|sat|sun)|each (day|morning|evening|week)|daily|weekly|monthly|schedul|automatic|recurring|on its own|without (me )?asking|\b(morning|evening|night|nightly|weekend|weekday|week|day)\w*\W+(\w+\W+){0,2}(summary|digest|brief|briefing|report|recap|round-?up)|\b(summary|digest|briefing|recap)\W+(\w+\W+){0,3}(every|each|morning|evening|night)/i, tools: ["create_routine", "update_routine", "list_routines", "delete_routine"] },
+  { re: /document_id|attach|\bpdf\b|document|\bfile\b|\.docx/i, tools: ["read_document"] },
+];
+const GROUPED = new Set([...CORE_TOOLS, ...TOOL_GROUPS.flatMap((g) => g.tools)]);
+export function pickToolsFor(specs, texts) {
+  const hay = texts.join("\n");
+  const wanted = new Set(CORE_TOOLS);
+  for (const g of TOOL_GROUPS) if (g.re.test(hay)) g.tools.forEach((t) => wanted.add(t));
+  return specs.filter((s) => wanted.has(s.name) || !GROUPED.has(s.name)); // tools added later default to "always"
+}
+const GROQ_BUDGET_TOKENS = 7000; // leaves room under the 8,000 limit for counting differences
+const approxTokens = (s) => Math.ceil(String(s).length / 3.5);
+function toolTokens(specs) {
+  return specs.reduce((n, s) => n + approxTokens(JSON.stringify({ name: s.name, description: s.description, parameters: z.toJSONSchema(s.inputSchema) })) + 10, 0);
+}
+// Drop the oldest history (then shorten what's left) until the whole request fits.
+function fitHistory(history, fixedTokens) {
+  const h = history.map((m) => ({ ...m }));
+  const total = () => fixedTokens + h.reduce((n, m) => n + approxTokens(m.content) + 4, 0);
+  while (h.length && total() > GROQ_BUDGET_TOKENS) h.shift();
+  while (h.length && h[0].role !== "user") h.shift();
+  return h;
+}
+
 /**
  * Runs one turn of the conversation. Yields progress events, then a final reply:
  *   { type: "status", text }   while tools run
@@ -703,14 +737,18 @@ export async function* runTurn({ user, conversationId, userText, timeZone, attac
     ? `\n\n[Attached: ${docs.map((d) => `"${d.name}" (document_id: ${d.id}${d.parts ? `, ${d.parts} part${d.parts > 1 ? "s" : ""}` : ""})`).join("; ")}]`
     : "";
   const imageNote = (list) => list?.length ? `\n\n[Images shown under this reply: ${list.map((i) => `"${i.prompt}"`).join("; ")}]` : "";
-  const history = recentHistory(conversation.messages).map((m) => ({ role: m.role, content: m.text + (m.role === "user" ? attachNote(m.attachments) : imageNote(m.attachments?.filter((a) => a.type === "image"))) }));
+  // A routine run starts fresh each time: earlier runs' results aren't needed (and would only grow the request).
+  const history = (channel === "routine" ? [] : recentHistory(conversation.messages)).map((m) => ({ role: m.role, content: m.text + (m.role === "user" ? attachNote(m.attachments) : imageNote(m.attachments?.filter((a) => a.type === "image"))) }));
   userText = userText + attachNote(attachments.map((d) => ({ ...d, parts: partCount(d.chars) })));
   const context = contextBlock({ timeZone, profile, mode: p.mode, notes: await store.listNotes(user.id), channel, waSync });
   const onTool = (name) => store.logAction(user.id, "tool", { tool: name, conversationId, ai: AI_PROVIDER });
 
   if (AI_PROVIDER === "groq") {
     let text = "";
-    for await (const ev of runGroqTurn({ system: `${INSTRUCTIONS}\n\n${context}`, history, userText, specs })) {
+    const system = `${INSTRUCTIONS}\n\n${context}`;
+    const groqSpecs = pickToolsFor(specs, [userText, ...history.slice(-4).map((m) => m.content)]);
+    const groqHistory = fitHistory(history, approxTokens(system) + toolTokens(groqSpecs) + approxTokens(userText) + 50);
+    for await (const ev of runGroqTurn({ system, history: groqHistory, userText, specs: groqSpecs })) {
       if (ev.type === "tool") { onTool(ev.name); yield { type: "status", text: STATUS[ev.name] || "Working" }; }
       if (ev.type === "final") text = ev.text;
     }

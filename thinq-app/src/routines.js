@@ -21,6 +21,7 @@ import { groqComplete } from "./llm/groq.js";
 import { AI_PROVIDER, MODEL } from "./agent.js";
 import Anthropic from "@anthropic-ai/sdk";
 import { publicUrl } from "./providers/google.js";
+import { friendlyError } from "./errors.js";
 
 export const MAX_ROUTINES = 20;
 export class RoutineError extends Error {}
@@ -251,7 +252,7 @@ async function runDue() {
     else {
       try { result = await runRoutine(r); }
       catch (err) {
-        result = `Didn't work: ${err instanceof TurnError || err.userFacing ? err.message : "something went wrong"}`;
+        result = `Didn't work: ${err instanceof TurnError || err.userFacing || err instanceof RoutineError ? err.message : friendlyError(err)}`;
         console.warn(`[routines] ${r.id} failed:`, err.message);
         await notify(r.user_id, { title: `Routine didn't run: ${r.title}`, body: result, url: "/app", tag: `routine-${r.id}` }, "reminder").catch(() => 0);
       }

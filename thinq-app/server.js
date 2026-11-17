@@ -320,7 +320,7 @@ api.put("/meetings/settings", async (req, res) => {
 });
 
 // ---------- routines (tasks on a schedule) ----------
-const routineErr = (res, err) => (err instanceof routines.RoutineError || err.userFacing || err instanceof TurnError ? res.status(400).json({ error: err.message }) : (console.error(err), res.status(500).json({ error: "Something went wrong." })));
+const routineErr = (res, err) => (err instanceof routines.RoutineError || err.userFacing || err instanceof TurnError ? res.status(400).json({ error: err.message }) : (console.error(err), res.status(500).json({ error: friendlyError(err) })));
 api.get("/routines", async (req, res) => res.json({ routines: await routines.listRoutines(req.user.id) }));
 // Turning a routine on is only ever done here, by the user's own click - the AI has no tool for it.
 api.post("/routines/:id/on", async (req, res) => {
