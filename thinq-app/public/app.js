@@ -57,6 +57,7 @@ async function api(path, opts = {}) {
 // ---------------- state ----------------
 async function refresh() {
   state = await api("/api/state");
+  $("#botsTabBtn").hidden = !state.telegram;
   renderAccount(); renderConn(); renderWhatsApp(); renderWaSync(); renderMeetings(); renderNotify(); renderNotes(); renderConvos(); renderApprovals(); renderGreeting();
 }
 
@@ -933,10 +934,77 @@ async function loadAgenda() {
   } catch (err) { body.innerHTML = `<p class="none">${esc(err.message)}</p>`; }
 }
 
+// ---------------- group bots (Telegram) ----------------
+let botsData = null;
+const BOT_EXAMPLE = "Build a bot for my running club's Telegram group. It should answer questions about our runs (we meet Saturdays 7am at the park gates, 5k and 10k groups, bring water) and remind everyone every Friday at 6pm about Saturday's run.";
+async function loadBots() {
+  const body = $("#tab-bots");
+  try { botsData = await api("/api/bots"); } catch (err) { body.innerHTML = `<p class="none">${esc(err.message)}</p>`; return; }
+  renderBots();
+}
+function renderBots() {
+  const body = $("#tab-bots"), list = botsData?.bots || [], handle = botsData?.telegram?.username;
+  const when = (iso, tz) => iso ? new Date(iso).toLocaleString("en-US", { timeZone: tz, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—";
+  const intro = `<p class="bots-intro">Bots answer questions and post reminders in your Telegram groups. They only know what you tell them — never your email or calendar.</p>`;
+  if (!list.length) {
+    body.innerHTML = intro + `<div class="none">No bots yet.<br>Ask Thinq to build one, for example:<button class="btn ghost sm" id="botExample">“Build a bot for my running club…”</button></div>`;
+    $("#botExample").addEventListener("click", () => { const i = $("#input"); i.value = BOT_EXAMPLE; autosize(); i.focus(); closeDrawers(); });
+    return;
+  }
+  body.innerHTML = intro + list.map((b) => `
+    <article class="bot ${b.status}" data-bot="${esc(b.id)}">
+      <header><b>${esc(b.name)}</b><span class="pill-status">${b.status === "active" ? "Active" : "Paused"}</span></header>
+      ${b.purpose ? `<p class="purpose">${esc(b.purpose)}</p>` : ""}
+      <h4>Groups</h4>
+      ${b.groups.length ? `<ul class="bot-groups">${b.groups.map((g) => `<li><span>${esc(g.title || "Telegram group")}${g.paused ? " · paused" : ""}</span><button class="mini" data-unlink="${esc(g.chatId)}">Remove</button></li>`).join("")}</ul>` : `<p class="muted">Not in a group yet.</p>`}
+      <div class="link-box" hidden></div>
+      <h4>Reminders</h4>
+      ${b.reminders.length ? `<ul class="bot-rems">${b.reminders.map((r) => `<li class="${r.active ? "" : "done"}"><div><span>${esc(r.message)}</span><small>${esc(r.schedule)}${r.active ? ` · next ${when(r.nextRunAt, b.timeZone)}` : " · finished"}</small></div><button class="mini" data-delrem="${esc(r.id)}" aria-label="Delete reminder">${icon("i-x", 11)}</button></li>`).join("")}</ul>` : `<p class="muted">No reminders. Ask Thinq to add some.</p>`}
+      <div class="bot-actions">
+        <button class="btn sm" data-link>Link a group</button>
+        <button class="btn ghost sm" data-toggle>${b.status === "active" ? "Pause" : "Resume"}</button>
+        <button class="btn ghost sm danger-text" data-delbot>Delete</button>
+      </div>
+    </article>`).join("") + `<p class="bots-foot">To change a bot's facts or reminders, just ask Thinq — e.g. “move the Friday reminder to 7pm”.${handle ? ` Bot: <a class="link" href="https://t.me/${esc(handle)}" target="_blank" rel="noopener">@${esc(handle)}</a>` : ""}</p>`;
+}
+$("#tab-bots").addEventListener("click", async (e) => {
+  const card = e.target.closest("[data-bot]"); if (!card) return;
+  const id = card.dataset.bot, bot = botsData.bots.find((b) => b.id === id), handle = botsData.telegram?.username;
+  try {
+    if (e.target.closest("[data-link]")) {
+      const r = await api(`/api/bots/${id}/link-code`, { method: "POST" });
+      const box = card.querySelector(".link-box");
+      box.hidden = false;
+      box.innerHTML = `<ol>
+          <li>${handle ? `<a class="link" href="https://t.me/${esc(handle)}?startgroup=thinq" target="_blank" rel="noopener">Add @${esc(handle)} to your group</a>` : "Add the Thinq bot to your group"}</li>
+          <li>A group admin sends this in the group:</li>
+        </ol>
+        <div class="link-code"><code>/link ${esc(r.code)}</code><button class="mini" data-copycode="/link ${esc(r.code)}">Copy</button></div>
+        <small>Works for ${r.expiresInMinutes} minutes.</small>`;
+    } else if (e.target.closest("[data-copycode]")) {
+      const b = e.target.closest("[data-copycode]");
+      await navigator.clipboard?.writeText(b.dataset.copycode).catch(() => {});
+      b.textContent = "Copied";
+    } else if (e.target.closest("[data-toggle]")) {
+      await api(`/api/bots/${id}`, { method: "PATCH", body: JSON.stringify({ paused: bot.status === "active" }) });
+      loadBots();
+    } else if (e.target.closest("[data-delbot]")) {
+      if (!confirm(`Delete ${bot.name}? It will stop answering and posting reminders in ${bot.groups.length || "its"} group${bot.groups.length === 1 ? "" : "s"}.`)) return;
+      await api(`/api/bots/${id}`, { method: "DELETE" }); loadBots();
+    } else if (e.target.closest("[data-delrem]")) {
+      await api(`/api/bots/${id}/reminders/${e.target.closest("[data-delrem]").dataset.delrem}`, { method: "DELETE" }); loadBots();
+    } else if (e.target.closest("[data-unlink]")) {
+      if (!confirm("Remove the bot from this group? It will stop answering and posting reminders there.")) return;
+      await api(`/api/bots/${id}/groups/${encodeURIComponent(e.target.closest("[data-unlink]").dataset.unlink)}`, { method: "DELETE" }); loadBots();
+    }
+  } catch (err) { notice(err.message); }
+});
+
 function showTab(tab) {
   document.querySelectorAll("[data-tab]").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === tab));
-  $("#tab-approvals").hidden = tab !== "approvals"; $("#tab-agenda").hidden = tab !== "agenda";
+  $("#tab-approvals").hidden = tab !== "approvals"; $("#tab-agenda").hidden = tab !== "agenda"; $("#tab-bots").hidden = tab !== "bots";
   if (tab === "agenda") loadAgenda();
+  if (tab === "bots") loadBots();
 }
 
 // ---------------- documents ----------------

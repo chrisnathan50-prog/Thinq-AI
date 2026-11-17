@@ -277,6 +277,45 @@ async function migrate() {
       sent_at timestamptz not null default now(),
       primary key (user_id, key)
     );
+    create table if not exists group_bots (
+      id text primary key,
+      user_id text not null references users(id) on delete cascade,
+      name text not null,
+      purpose text,
+      knowledge text,
+      time_zone text not null default 'UTC',
+      status text not null default 'active',
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+    create table if not exists bot_reminders (
+      id text primary key,
+      bot_id text not null references group_bots(id) on delete cascade,
+      message text not null,
+      repeat text not null,
+      time_of_day text not null,
+      on_date text,
+      weekdays text,
+      day_of_month integer,
+      next_run_at timestamptz,
+      last_run_at timestamptz,
+      active boolean not null default true,
+      created_at timestamptz not null default now()
+    );
+    create index if not exists bot_reminders_due on bot_reminders(next_run_at) where active;
+    create table if not exists bot_groups (
+      chat_id text primary key,
+      bot_id text not null references group_bots(id) on delete cascade,
+      platform text not null default 'telegram',
+      title text,
+      paused boolean not null default false,
+      linked_at timestamptz not null default now()
+    );
+    create table if not exists bot_link_codes (
+      code_hash text primary key,
+      bot_id text not null references group_bots(id) on delete cascade,
+      expires_at timestamptz not null
+    );
     alter table messages add column if not exists attachments jsonb;
     alter table users add column if not exists tour_done_at timestamptz;
     create index if not exists documents_conv on documents(conversation_id);

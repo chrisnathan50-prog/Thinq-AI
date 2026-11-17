@@ -53,6 +53,22 @@ The website has a **Help Us Test** page (`/testers.html`, linked from the home p
 - Optional `CONTACT_EMAIL` shows a "Prefer email?" link on the page. It's public, so use an address you're happy to share.
 - The form has spam protection (hidden field + 5 requests per hour per visitor).
 
+### Group bots for Telegram (free, optional)
+
+People can ask Thinq to **build them a bot** for a Telegram group: *"Build a bot for my running club group that answers questions about our runs and reminds everyone every Friday at 6pm."* Thinq writes the bot's facts and reminders; the person adds it to their group and links it with a code. In the group the bot:
+
+- answers questions — `/ask …`, a reply to one of its messages, or an @mention — **only from the facts written into it** (it never sees the owner's email, calendar or documents);
+- posts reminders on schedule (once, daily, weekly or monthly, in the owner's time zone);
+- has admin commands: `/link CODE`, `/pause`, `/resume`, `/unlink`; anyone can use `/reminders` and `/help`.
+
+People manage their bots in the app's **Bots** tab (link a group, pause, delete reminders) or just by asking Thinq ("move the Friday reminder to 7pm"). Answers count toward the owner's daily request limit, and each group gets at most 30 answers an hour.
+
+**Setup** (5 minutes): in Telegram, message **@BotFather** → `/newbot` → pick a name and a username ending in `bot` → copy the token it gives you into Render as `TELEGRAM_BOT_TOKEN`. Thinq registers its webhook by itself on startup. Optional: in @BotFather, `/setprivacy` → *Disable* lets @mentions work (otherwise members use `/ask` or reply to the bot). One Telegram bot serves everyone's group bots — each group shows the bot it's linked to.
+
+Reminders need the server awake: the keep-awake ping (GitHub Action + self-ping) handles that on Render's free plan, though a reminder can arrive a few minutes late after the server wakes up; one more than 2 hours late is skipped.
+
+WhatsApp groups aren't supported: Meta's official API only allows groups a business creates itself (max 8 people, Official Business Account required).
+
 ### WhatsApp (optional)
 
 People can chat with Thinq on WhatsApp through Meta's official **WhatsApp Cloud API**. Each person links their number once: in the app, *Connect WhatsApp* shows a 6-digit code that they send to Thinq's WhatsApp number. After that they can:

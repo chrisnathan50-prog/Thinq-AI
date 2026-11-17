@@ -3,6 +3,8 @@
 //   /app         the assistant (./public) - signed-in users only
 //   /api/...     the app's data and chat (per user)
 //   /auth/...    Google sign-in, connecting Gmail & Calendar, log out
+import * as bots from "./src/bots.js";
+import { mountTelegram, startTelegram, telegramConfigured, botUsername } from "./src/telegram.js";
 import express from "express";
 import fs from "node:fs";
 import path from "node:path";
@@ -59,6 +61,7 @@ app.use((req, res, next) => {
 
 app.get("/healthz", (req, res) => res.json({ ok: true }));
 mountWhatsApp(app); // Meta calls this directly - no Thinq sign-in
+mountTelegram(app); // Telegram calls this directly (checked with a secret header)
 meetings.mountMeetings(app); // Attendee (the meeting notetaker) calls this - no Thinq sign-in
 app.use(attachUser);
 mountAuth(app);
@@ -93,6 +96,7 @@ api.get("/state", async (req, res) => {
     model: MODEL,
     usage: { today: await store.usageToday(req.user.id), limit: DAILY_LIMIT },
     voiceAvailable: voiceAvailable(),
+    telegram: telegramConfigured() ? { username: botUsername() } : null,
     admin: isAdmin(req.user.email) ? { pendingTesters: (await store.listTesters()).filter((t) => t.status === "pending").length } : null,
     speechAvailable: speechAvailable(),
     whatsapp: await whatsappState(req.user.id),
@@ -314,6 +318,19 @@ api.put("/meetings/settings", async (req, res) => {
   res.json(await meetingsState(req.user.id));
 });
 
+// ---------- group bots (built by chatting with Thinq; live in Telegram groups) ----------
+const botErr = (res, err) => (err instanceof bots.BotError ? res.status(400).json({ error: err.message }) : (console.error(err), res.status(500).json({ error: "Something went wrong." })));
+api.get("/bots", async (req, res) => res.json({ bots: await bots.listBots(req.user.id), telegram: { available: telegramConfigured(), username: botUsername() } }));
+api.post("/bots/:id/link-code", async (req, res) => {
+  try { res.json({ code: await bots.createLinkCode(req.user.id, req.params.id), username: botUsername(), expiresInMinutes: 30 }); } catch (err) { botErr(res, err); }
+});
+api.patch("/bots/:id", async (req, res) => {
+  try { res.json(await bots.updateBot(req.user.id, req.params.id, { status: req.body?.paused === true ? "paused" : req.body?.paused === false ? "active" : undefined })); } catch (err) { botErr(res, err); }
+});
+api.delete("/bots/:id", async (req, res) => { await bots.deleteBot(req.user.id, req.params.id); res.json({ ok: true }); });
+api.delete("/bots/:id/reminders/:rid", async (req, res) => { await bots.deleteReminder(req.user.id, req.params.id, req.params.rid); res.json({ ok: true }); });
+api.delete("/bots/:id/groups/:chatId", async (req, res) => { await bots.unlinkGroupForUser(req.user.id, req.params.id, req.params.chatId); res.json({ ok: true }); });
+
 // ---------- generated images ----------
 api.get("/images/:id", async (req, res) => {
   const img = await store.getImage(req.user.id, req.params.id);
@@ -423,6 +440,7 @@ if (fs.existsSync(SITE_DIR)) {
 meetings.startMeetingWorkers();
 recordings.startRecordingWorker();
 notifier.startNotifyWorker();
+await startTelegram(); // learns the bot's name, registers the webhook, starts group-bot reminders
 
 // Keep-awake: Render's free plan puts the server to sleep after ~15 minutes without visitors, and a sleeping
 // server can't send reminders. Visiting our own public /healthz every 10 minutes counts as a visitor.
@@ -439,6 +457,7 @@ app.listen(PORT, HOST, () => {
   console.log(`  AI: ${AI_PROVIDER === "groq" ? "Groq" : "Anthropic"} (${MODEL})${hasApiKey() ? "" : ` - ⚠ ${apiKeyName()} missing`}`);
   console.log(`  Google sign-in: ${googleConfigured() ? `on (redirect URI: ${redirectUri()})` : "⚠ not configured"}`);
   console.log(`  Invite list: ${process.env.ALLOWED_EMAILS || "(none)"} · admins: ${process.env.ADMIN_EMAILS || "⚠ none - set ADMIN_EMAILS to review tester requests"} · plus testers approved in the app`);
+  console.log(`  Telegram group bots: ${telegramConfigured() ? `on (@${botUsername() || "?"})` : "off (set TELEGRAM_BOT_TOKEN)"}`);
   console.log(`  WhatsApp: ${whatsappConfigured() ? `on (+${whatsappNumber() || "number not set"})` : "off"}`);
   console.log(`  WhatsApp chat sync: ${syncAvailable() ? `on (${resumed || 0} linked account${resumed === 1 ? "" : "s"} reconnecting)` : "off"}`);
   console.log(`  Meeting notes: ${recordings.recordingAvailable() ? "recording in the browser on" : "recording off (needs GROQ_API_KEY)"} · notetaker bot ${meetings.meetingsConfigured() ? `on (${process.env.ATTENDEE_URL})` : "off"}`);

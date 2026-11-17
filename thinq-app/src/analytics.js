@@ -18,6 +18,9 @@ const FEATURES = {
   email_sent: "Emails sent (approved)",
   event_created: "Invites sent (approved)",
   declined: "Drafts discarded",
+  bot_created: "Group bots built",
+  bot_answer: "Group bot answers",
+  bot_reminder: "Group reminders posted",
 };
 
 const n = (v) => Number(v || 0);
