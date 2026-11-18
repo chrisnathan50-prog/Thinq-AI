@@ -178,6 +178,111 @@ svg{display:block}
 .btn{display:inline-flex;align-items:center;gap:12px;font-size:23px;font-weight:600;letter-spacing:-.02em;color:#fff;padding:21px 38px 21px 32px;border-radius:99px;background:var(--label);
   box-shadow:0 1px 2px rgba(0,0,0,.2),0 12px 24px -12px rgba(0,0,0,.45)}
 .fine{display:flex;justify-content:center;align-items:center;gap:6px;font-size:15.5px;color:var(--label-3);margin-top:20px}
+
+/* ---------- shared for 5–9 ---------- */
+.wall{position:absolute;inset:0;width:100%;height:100%}
+.lgd{position:relative;
+  background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,.06));
+  -webkit-backdrop-filter:blur(24px) saturate(180%);backdrop-filter:blur(24px) saturate(180%);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),inset 1.5px 1.5px 0 -.5px rgba(255,255,255,.6),inset -1px -1px 0 -.5px rgba(255,255,255,.25),
+    inset 0 0 30px rgba(255,255,255,.06),0 24px 48px -24px rgba(0,0,0,.5)}
+.lgd::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:radial-gradient(120% 70% at 18% -10%,rgba(255,255,255,.16),transparent 46%)}
+.lg>*,.lgd>*{position:relative;z-index:1}
+.inset{background:rgba(255,255,255,.46);box-shadow:inset 0 0 0 1px rgba(255,255,255,.5),inset 1px 1px 0 rgba(255,255,255,.9)}
+.mk{width:46px;height:46px;border-radius:50%;background:var(--label);color:#fff;display:grid;place-items:center;flex:none}
+.black{display:flex;align-items:center;justify-content:center;gap:12px;height:76px;border-radius:99px;background:var(--label);color:#fff;font-size:23px;font-weight:600;letter-spacing:-.02em;
+  box-shadow:0 1px 2px rgba(0,0,0,.2),0 14px 26px -14px rgba(0,0,0,.5)}
+
+/* 5 · Find a time */
+.f5 .card{position:absolute;left:104px;right:104px;top:236px;border-radius:66px;padding:36px}
+.bub{margin-left:auto;width:fit-content;max-width:80%;font-size:21px;line-height:1.3;padding:15px 22px;border-radius:28px 28px 8px 28px}
+.f5 .ans{display:flex;align-items:center;gap:16px;margin-top:30px}
+.f5 .ans h3{font-size:29px;font-weight:600;letter-spacing:-.026em;line-height:1.2}
+.slots{display:grid;gap:12px;margin-top:26px}
+.slot{display:flex;align-items:center;gap:18px;padding:16px 20px 16px 16px;border-radius:30px}
+.slot.on{background:rgba(255,255,255,.88);box-shadow:0 0 0 2px var(--blue),0 10px 24px -14px rgba(0,60,140,.45)}
+.dt{width:66px;height:66px;border-radius:17px;background:#fff;text-align:center;line-height:1;box-shadow:0 0 0 1px var(--sep);flex:none}
+.dt i{display:block;font-style:normal;font-size:12px;font-weight:600;color:var(--red);padding-top:10px}
+.dt b{display:block;font-size:28px;font-weight:400;letter-spacing:-.03em;margin-top:3px}
+.slot .tx{flex:1}
+.slot .tx b{display:block;font-size:22px;font-weight:600;letter-spacing:-.02em}
+.slot .tx small{font-size:16px;color:var(--label-2)}
+.radio{width:34px;height:34px;border-radius:50%;box-shadow:inset 0 0 0 2px rgba(60,60,67,.22)}
+.radio.on{background:var(--blue);box-shadow:none;display:grid;place-items:center;color:#fff}
+.f5 .black{margin-top:28px}
+.f5 .note{text-align:center;font-size:16px;color:var(--label-2);margin-top:16px}
+
+/* 6 · Voice note */
+.f6{color:#fff}
+.f6 .isl{position:absolute;left:50%;top:84px;transform:translateX(-50%);display:flex;align-items:center;gap:14px;padding:16px 28px 16px 22px;border-radius:99px;font-size:22px;font-weight:600}
+.f6 .dot{width:14px;height:14px;border-radius:50%;background:#ff453a;box-shadow:0 0 0 5px rgba(255,69,58,.25)}
+.f6 .isl span:last-child{color:rgba(255,255,255,.6);font-weight:500}
+.f6 .orbw{position:absolute;left:50%;top:420px;transform:translate(-50%,-50%)}
+.f6 .halo{position:absolute;left:50%;top:50%;border-radius:50%;transform:translate(-50%,-50%);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.14)}
+.f6 .orb{width:250px;height:250px;border-radius:50%;display:grid;place-items:center}
+.f6 .tr{position:absolute;left:84px;right:84px;top:660px;border-radius:56px;padding:38px 40px 42px}
+.f6 .tr small{display:flex;align-items:center;gap:8px;font-size:17px;color:rgba(255,255,255,.62);font-weight:500}
+.f6 .tr p{font-size:32px;line-height:1.32;letter-spacing:-.022em;margin-top:16px;font-weight:500}
+.f6 .tr p span{color:rgba(255,255,255,.42)}
+.f6 .bar{position:absolute;left:0;right:0;bottom:92px;display:flex;justify-content:center;align-items:center;gap:56px}
+.f6 .c{border-radius:50%;display:grid;place-items:center}
+
+/* 7 · Memory */
+.f7 .card{position:absolute;left:100px;right:100px;top:290px;border-radius:66px;padding:38px 36px 36px}
+.f7 .hd{display:flex;align-items:center;gap:18px}
+.f7 .hd .mk{width:72px;height:72px}
+.f7 .hd b{display:block;font-size:32px;font-weight:600;letter-spacing:-.028em}
+.f7 .hd small{font-size:18px;color:var(--label-2)}
+.grp{margin-top:30px;border-radius:30px;overflow:hidden}
+.row{display:flex;align-items:center;gap:18px;padding:18px 22px 18px 18px;position:relative}
+.row+.row::before{content:"";position:absolute;left:88px;right:0;top:0;height:1px;background:rgba(60,60,67,.14)}
+.sq{width:52px;height:52px;border-radius:14px;display:grid;place-items:center;color:#fff;flex:none}
+.row .tx{flex:1}
+.row .tx b{display:block;font-size:21px;font-weight:500;letter-spacing:-.018em}
+.row .tx small{font-size:15.5px;color:var(--label-2)}
+.inp{display:flex;align-items:center;gap:14px;margin-top:18px;border-radius:99px;padding:10px 10px 10px 28px;font-size:20px;color:var(--label-2)}
+.inp span{flex:1}
+.inp .pl{width:56px;height:56px;border-radius:50%;background:var(--label);color:#fff;display:grid;place-items:center}
+
+/* 8 · Document */
+.f8 .page{position:absolute;left:176px;top:96px;width:548px;height:420px;background:#fff;border-radius:22px;padding:56px 54px;transform:rotate(-3deg);
+  box-shadow:0 1px 2px rgba(0,0,0,.08),0 40px 70px -30px rgba(0,40,60,.45);font-size:14.5px;line-height:1.6;color:rgba(29,29,31,.75)}
+.f8 .page h4{font-size:26px;font-weight:600;color:var(--label);letter-spacing:-.025em;margin-bottom:6px}
+.f8 .page .m{font-size:13px;color:var(--label-3);margin-bottom:24px}
+.f8 .page p+p{margin-top:14px}
+.f8 .page mark{background:rgba(255,204,0,.42);color:var(--label);border-radius:3px;padding:0 2px}
+.f8 .card{position:absolute;left:90px;right:90px;top:476px;border-radius:64px;padding:32px}
+.att{display:flex;align-items:center;gap:14px;padding:12px 22px 12px 12px;border-radius:24px;width:fit-content}
+.att .pf{width:48px;height:56px;border-radius:9px;background:#fff;box-shadow:0 0 0 1px var(--sep);display:grid;place-items:end center;padding-bottom:6px;font-size:10px;font-weight:700;color:var(--red)}
+.att b{display:block;font-size:18px;font-weight:600;letter-spacing:-.015em}
+.att small{font-size:15px;color:var(--label-2)}
+.f8 .bub{margin-top:18px}
+.kd{margin-top:18px;border-radius:32px;overflow:hidden}
+.kd .r{display:flex;align-items:baseline;gap:20px;padding:18px 26px;position:relative}
+.kd .r+.r::before{content:"";position:absolute;left:26px;right:0;top:0;height:1px;background:rgba(60,60,67,.14)}
+.kd .r b{width:100px;font-size:21px;font-weight:600;letter-spacing:-.02em}
+.kd .r span{font-size:21px;color:rgba(29,29,31,.8);flex:1}
+.f8 .black{margin-top:22px}
+
+/* 9 · Lock screen */
+.f9{color:#fff}
+.f9 .date{position:absolute;top:96px;left:0;right:0;text-align:center;font-size:30px;font-weight:600;letter-spacing:-.015em;opacity:.92}
+.f9 .clock{position:absolute;top:118px;left:0;right:0;text-align:center;font-size:250px;font-weight:600;letter-spacing:-.045em;line-height:1;
+  color:rgba(255,255,255,.78);text-shadow:0 2px 0 rgba(255,255,255,.35),0 10px 40px rgba(120,60,90,.25)}
+.stack{position:absolute;left:44px;right:44px;top:600px}
+.nt{border-radius:46px;padding:22px 26px 24px 22px;display:flex;gap:18px;color:var(--label)}
+.nt+.nt{margin-top:12px}
+.nt .ic{width:62px;height:62px;border-radius:16px;background:var(--label);color:#fff;display:grid;place-items:center;flex:none}
+.nt .bd{flex:1}
+.nt .top{display:flex;justify-content:space-between;font-size:16px;color:var(--label-2)}
+.nt .top b{color:var(--label);font-weight:600}
+.nt .t{font-size:21px;font-weight:600;letter-spacing:-.018em;margin-top:4px}
+.nt p{font-size:19px;line-height:1.32;color:rgba(29,29,31,.82);margin-top:2px}
+.ghost{height:22px;margin:-34px auto 0;border-radius:0 0 34px 34px;position:relative;z-index:-1}
+.f9 .qa{position:absolute;bottom:84px;left:96px;right:96px;display:flex;justify-content:space-between}
+.f9 .qa div{width:100px;height:100px;border-radius:50%;display:grid;place-items:center}
+.f9 .home{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);width:270px;height:9px;border-radius:9px;background:rgba(255,255,255,.85)}
+.stack{z-index:1}
 </style>
 </head>
 <body>
@@ -363,6 +468,148 @@ svg{display:block}
       <div class="fine"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10V7.5a5 5 0 0 1 10 0V10h.5A2.5 2.5 0 0 1 20 12.5v7a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 19.5v-7A2.5 2.5 0 0 1 6.5 10zm2 0h6V7.5a3 3 0 0 0-6 0z"/></svg>Nothing sends until you approve it</div>
     </div>
   </div>
+</section>
+
+<!-- 5 · Find a time -->
+<section class="frame f5" id="f5" aria-label="Scheduling card">
+  <svg class="wall" viewBox="0 0 900 1200" preserveAspectRatio="none" aria-hidden="true">
+    <defs><linearGradient id="s5" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b7d6ea"/><stop offset=".55" stop-color="#e4eee6"/><stop offset="1" stop-color="#f1efe2"/></linearGradient>
+      <filter id="b5"><feGaussianBlur stdDeviation="2"/></filter></defs>
+    <rect width="900" height="1200" fill="url(#s5)"/>
+    <circle cx="690" cy="300" r="120" fill="#fff6dc" opacity=".8" filter="url(#b5)"/>
+    <g filter="url(#b5)">
+      <path d="M0 640 C160 560 330 600 470 560 S760 520 900 570 V1200 H0Z" fill="#b6d1ae"/>
+      <path d="M0 780 C220 700 420 760 610 710 S840 690 900 720 V1200 H0Z" fill="#8fbb8e"/>
+      <path d="M0 920 C260 850 520 920 900 850 V1200 H0Z" fill="#6a9e72"/>
+      <path d="M0 1060 C300 1000 600 1060 900 1010 V1200 H0Z" fill="#4f8360"/>
+    </g>
+  </svg>
+  <div class="card lg">
+    <div class="bub inset">Find 30 minutes with Priya this week</div>
+    <div class="ans"><div class="mk"><svg width="24" height="24"><use href="#mark"/></svg></div><h3>You’re both free at these times</h3></div>
+    <div class="slots">
+      <div class="slot inset"><div class="dt"><i>WED</i><b class="tn">19</b></div><div class="tx"><b class="tn">10:30 – 11:00 AM</b><small>Before your 11:30 call</small></div><div class="radio"></div></div>
+      <div class="slot on"><div class="dt"><i>THU</i><b class="tn">20</b></div><div class="tx"><b class="tn">2:00 – 2:30 PM</b><small>Priya prefers Thursdays</small></div>
+        <div class="radio on"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></div></div>
+      <div class="slot inset"><div class="dt"><i>FRI</i><b class="tn">21</b></div><div class="tx"><b class="tn">11:00 – 11:30 AM</b><small>Your only gap on Friday</small></div><div class="radio"></div></div>
+    </div>
+    <div class="black"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 11.2 20 3.6c.6-.3 1.2.3.9.9l-7.6 16.6c-.3.7-1.3.6-1.4-.1l-1.3-6.3-6.3-1.3c-.7-.1-.8-1.1-.1-1.4z"/></svg>Invite Priya</div>
+    <p class="note">The invite waits in Approvals until you send it</p>
+  </div>
+</section>
+
+<!-- 6 · Voice note -->
+<section class="frame f6" id="f6" aria-label="Voice note">
+  <svg class="wall" viewBox="0 0 900 1200" preserveAspectRatio="none" aria-hidden="true">
+    <defs><linearGradient id="s6" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0a1027"/><stop offset=".55" stop-color="#1a2552"/><stop offset=".82" stop-color="#433a6e"/><stop offset="1" stop-color="#8a5a6e"/></linearGradient>
+      <filter id="b6" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="40"/></filter><filter id="b6s"><feGaussianBlur stdDeviation="3"/></filter></defs>
+    <rect width="900" height="1200" fill="url(#s6)"/>
+    <ellipse cx="450" cy="1200" rx="620" ry="260" fill="#ff9a6b" opacity=".45" filter="url(#b6)"/>
+    <ellipse cx="160" cy="380" rx="260" ry="200" fill="#3b6bd6" opacity=".55" filter="url(#b6)"/>
+    <ellipse cx="760" cy="560" rx="240" ry="220" fill="#6a4fc2" opacity=".5" filter="url(#b6)"/>
+    <g filter="url(#b6s)" fill="#0b0f24" opacity=".85"><path d="M0 1080 L60 1040 L60 990 L120 990 L120 1050 L190 1020 L190 960 L250 960 L250 1030 L330 1000 L330 940 L380 940 L380 1010 L470 990 L470 930 L540 930 L540 1000 L620 980 L620 950 L700 950 L700 1010 L780 990 L780 960 L840 960 L840 1020 L900 1000 V1200 H0Z"/></g>
+    <g fill="#ffd9a8" opacity=".7"><circle cx="90" cy="1010" r="2.5"/><circle cx="210" cy="985" r="2.5"/><circle cx="360" cy="960" r="2.5"/><circle cx="505" cy="955" r="2.5"/><circle cx="660" cy="975" r="2.5"/><circle cx="810" cy="985" r="2.5"/><circle cx="230" cy="1005" r="2"/><circle cx="520" cy="980" r="2"/></g>
+  </svg>
+  <div class="isl lgd"><span class="dot"></span><span>Recording</span><span class="tn">0:14</span></div>
+  <div class="orbw">
+    <div class="halo" style="width:470px;height:470px"></div>
+    <div class="halo" style="width:370px;height:370px;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.22)"></div>
+    <div class="orb lgd">
+      <svg width="86" height="86" viewBox="0 0 24 24" fill="#fff"><rect x="8.5" y="2.5" width="7" height="12.5" rx="3.5"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/><path d="M12 18v3.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </div>
+  </div>
+  <div class="tr lgd">
+    <small><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M4 9h2v6H4zm4-4h2v14H8zm4 2h2v10h-2zm4 3h2v4h-2z"/></svg>Live transcript</small>
+    <p>Remind me to call the landlord before Friday, and draft a note to Jonah about <span>the contract</span></p>
+  </div>
+  <div class="bar">
+    <div class="c lgd" style="width:104px;height:104px"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></div>
+    <div class="c lgd" style="width:136px;height:136px"><div style="width:44px;height:44px;border-radius:11px;background:#ff453a"></div></div>
+    <div class="c" style="width:104px;height:104px;background:#fff"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#1d1d1f" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19.5v-15M5.5 11 12 4.5 18.5 11"/></svg></div>
+  </div>
+</section>
+
+<!-- 7 · Memory -->
+<section class="frame f7" id="f7" aria-label="What Thinq remembers">
+  <svg class="wall" viewBox="0 0 900 1200" preserveAspectRatio="none" aria-hidden="true">
+    <defs><filter id="b7" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="14"/></filter></defs>
+    <rect width="900" height="1200" fill="#f7e2d6"/>
+    <g filter="url(#b7)">
+      <path d="M-50 300 C200 180 420 420 700 260 S980 200 980 200 V1300 H-50Z" fill="#f4cdb9"/>
+      <path d="M-50 520 C240 380 480 640 760 470 S980 420 980 420 V1300 H-50Z" fill="#efb29b"/>
+      <path d="M-50 760 C220 620 520 860 800 690 S980 650 980 650 V1300 H-50Z" fill="#e8958a"/>
+      <path d="M-50 980 C260 860 540 1060 820 920 S980 880 980 880 V1300 H-50Z" fill="#d87a86"/>
+    </g>
+  </svg>
+  <div class="card lg">
+    <div class="hd"><div class="mk"><svg width="36" height="36"><use href="#mark"/></svg></div><div><b>Thinq remembers</b><small>Used every time it drafts or plans</small></div></div>
+    <div class="grp inset">
+      <div class="row"><div class="sq" style="background:#0a84ff"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17c2.5 0 3.5-9 6-9s1 7 3.5 7S15 11 17 11s2 3 4 3"/><path d="M3 21h18"/></svg></div><div class="tx"><b>Sign my emails as Alex</b><small>Signature</small></div></div>
+      <div class="row"><div class="sq" style="background:#ff9500"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/></svg></div><div class="tx"><b>No meetings before 10 AM</b><small>Calendar</small></div></div>
+      <div class="row"><div class="sq" style="background:#34c759"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 20c.6-4 3.8-6 8-6s7.4 2 8 6z"/></svg></div><div class="tx"><b>Priya prefers Thursdays</b><small>People</small></div></div>
+      <div class="row"><div class="sq" style="background:#5e5ce6"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M21 15.5v-2L13.5 9V4a1.5 1.5 0 0 0-3 0v5L3 13.5v2l7.5-2.3V18l-2 1.5V21l3.5-1 3.5 1v-1.5l-2-1.5v-4.8z"/></svg></div><div class="tx"><b class="tn">Away Dec 20 – Jan 3</b><small>Thinq will hold replies</small></div></div>
+    </div>
+    <div class="inp inset"><span>Tell Thinq something to remember</span><div class="pl"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div></div>
+  </div>
+</section>
+
+<!-- 8 · Document -->
+<section class="frame f8" id="f8" aria-label="Ask about a document">
+  <svg class="wall" viewBox="0 0 900 1200" preserveAspectRatio="none" aria-hidden="true">
+    <defs><linearGradient id="s8" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9fd0de"/><stop offset="1" stop-color="#e3f1ee"/></linearGradient>
+      <linearGradient id="sea8" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5fb2c2"/><stop offset="1" stop-color="#1c6681"/></linearGradient>
+      <filter id="b8"><feGaussianBlur stdDeviation="2.5"/></filter></defs>
+    <rect width="900" height="1200" fill="url(#s8)"/>
+    <g filter="url(#b8)"><rect y="560" width="900" height="640" fill="url(#sea8)"/>
+      <path d="M520 600h220M560 650h150M600 720h120M480 800h260M560 900h160" stroke="#e8fbff" stroke-width="5" stroke-linecap="round" opacity=".45"/></g>
+  </svg>
+  <div class="page">
+    <h4>Lease Agreement</h4><div class="m">12 pages</div>
+    <p>This agreement begins on <mark>January 1, 2027</mark> and runs for twelve months between the landlord and the tenant named below.</p>
+    <p>Rent is reviewed once a year, on <mark>March 15</mark>, and will not rise by more than three per cent.</p>
+    <p>Either party may end this agreement by giving written notice no later than <mark>November 30</mark>.</p>
+  </div>
+  <div class="card lg">
+    <div class="att inset"><div class="pf">PDF</div><div><b>Lease 2027.pdf</b><small>12 pages</small></div></div>
+    <div class="bub inset">What are the key dates?</div>
+    <div class="kd inset">
+      <div class="r"><b class="tn">Jan 1</b><span>Lease starts</span></div>
+      <div class="r"><b class="tn">Mar 15</b><span>Rent review, up to 3%</span></div>
+      <div class="r"><b class="tn">Nov 30</b><span>Last day to give notice</span></div>
+    </div>
+    <div class="black"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5a6 6 0 0 0-6 6v4.2L4.3 16a1 1 0 0 0 .9 1.5h13.6a1 1 0 0 0 .9-1.5L18 12.7V8.5a6 6 0 0 0-6-6zM9.5 19a2.5 2.5 0 0 0 5 0z"/></svg>Add 3 reminders</div>
+  </div>
+</section>
+
+<!-- 9 · Lock screen -->
+<section class="frame f9" id="f9" aria-label="Lock screen notifications">
+  <svg class="wall" viewBox="0 0 900 1200" preserveAspectRatio="none" aria-hidden="true">
+    <defs><linearGradient id="s9" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8a27a"/><stop offset=".35" stop-color="#f4c79c"/><stop offset=".6" stop-color="#f1d6c2"/></linearGradient>
+      <filter id="b9"><feGaussianBlur stdDeviation="2"/></filter><filter id="b9b" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="50"/></filter></defs>
+    <rect width="900" height="1200" fill="url(#s9)"/>
+    <circle cx="560" cy="560" r="150" fill="#fff2d6" opacity=".85" filter="url(#b9b)"/>
+    <g filter="url(#b9)">
+      <path d="M0 640 L120 560 L210 610 L330 500 L450 590 L560 520 L690 600 L800 540 L900 590 V1200 H0Z" fill="#b997a6"/>
+      <path d="M0 760 L140 660 L260 730 L400 640 L520 720 L650 650 L780 730 L900 680 V1200 H0Z" fill="#8f7699"/>
+      <path d="M0 880 L170 790 L320 860 L470 780 L620 860 L760 800 L900 850 V1200 H0Z" fill="#62557e"/>
+      <path d="M0 1010 L200 930 L380 990 L560 920 L740 990 L900 950 V1200 H0Z" fill="#3b3a5c"/>
+    </g>
+  </svg>
+  <div class="date">Wednesday, November 18</div>
+  <div class="clock tn">9:41</div>
+  <div class="stack">
+    <div class="nt lg"><div class="ic"><svg width="34" height="34"><use href="#mark"/></svg></div>
+      <div class="bd"><div class="top"><b>Thinq</b><span>now</span></div><div class="t">Q3 planning in 15 minutes</div><p>Priya accepted. Last week’s notes are attached to the invite.</p></div></div>
+    <div class="nt lg"><div class="ic"><svg width="34" height="34"><use href="#mark"/></svg></div>
+      <div class="bd"><div class="top"><b>Thinq</b><span>8m ago</span></div><div class="t">Your unread digest</div><p>4 need a reply: Maya, Jonah and two invoices.</p></div></div>
+    <div class="ghost lg" style="width:92%;margin-top:-30px"></div>
+    <div class="ghost lg" style="width:84%;margin-top:-12px;height:24px"></div>
+  </div>
+  <div class="qa">
+    <div class="lgd"><svg width="40" height="40" viewBox="0 0 24 24" fill="#fff"><path d="M7 2.5h10v4l-2.5 3.5V21a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1V10L7 6.5z"/><rect x="11" y="12" width="2" height="3.5" rx="1" fill="#3b3a5c"/></svg></div>
+    <div class="lgd"><svg width="42" height="42" viewBox="0 0 24 24" fill="#fff"><path d="M9 4h6l1.6 2.5H19a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8.5a2 2 0 0 1 2-2h2.4z"/><circle cx="12" cy="13" r="3.6" fill="#3b3a5c"/></svg></div>
+  </div>
+  <div class="home"></div>
 </section>
 </body>
 </html>
