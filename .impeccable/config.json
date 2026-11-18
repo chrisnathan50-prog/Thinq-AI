@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "geist",
+        "files": [
+          "video/thinq-explainer/scene.html"
+        ],
+        "createdAt": "2026-11-18T03:10:42.108Z",
+        "reason": "Claude: Geist is Thinq's existing brand font (src/pages/index.html); the video matches the site"
+      }
+    ]
+  }
+}
