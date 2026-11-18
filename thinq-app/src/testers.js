@@ -7,6 +7,7 @@ import { requireUser, requireAdmin, isAdmin, allowTester, disallowTester, setApp
 import { providerFor } from "./providers/index.js";
 import { publicUrl } from "./providers/google.js";
 import { analytics } from "./analytics.js";
+import { checkProviders, providers } from "./llm/groq.js";
 
 const EMAIL = /^[^\s@<>()",;:]{1,64}@[a-z0-9-]+(\.[a-z0-9-]+)+$/i;
 const contactEmail = () => (process.env.CONTACT_EMAIL || "").trim() || null;
@@ -75,6 +76,10 @@ export function mountTesters(app) {
   // ---- admin (signed-in admins only) ----
   const admin = express.Router();
   admin.use(requireUser, requireAdmin);
+
+  // Which AI services Thinq can fall back to, and whether each one answers (with tool calling) right now.
+  admin.get("/ai", (req, res) => res.json({ providers: providers().map((p) => ({ provider: p.label })) }));
+  admin.post("/ai/check", async (req, res) => res.json({ results: await checkProviders() }));
 
   admin.get("/analytics", async (req, res) => {
     try { res.json(await analytics(req.query.days)); }

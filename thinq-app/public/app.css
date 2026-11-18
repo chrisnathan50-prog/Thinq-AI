@@ -504,3 +504,11 @@ table.people .muted{color:var(--soft);font-size:12px}
 .panel-head .segmented{min-width:0;flex:0 1 auto;overflow-x:auto;scrollbar-width:none}
 .panel-head .segmented::-webkit-scrollbar{display:none}
 .panel-head .segmented button{padding:7px 10px;gap:5px;white-space:nowrap}
+
+/* admin: AI services */
+.ai-chain{display:grid;gap:6px;margin:4px 0 10px 18px;font-size:13px}
+.ai-chain li{display:list-item}
+.ai-chain li .name{color:var(--ink);margin-right:10px}
+.ai-chain li .state{color:var(--muted)}
+.ai-chain li.ok .state{color:#14662f}
+.ai-chain li.bad .state{color:#b91c1c}

@@ -27,7 +27,7 @@ import { chatTurn, TurnError, busy, DAILY_LIMIT } from "./src/turns.js";
 import { approveItem, declineItem } from "./src/approvals.js";
 import { mountWhatsApp, whatsappConfigured, whatsappNumber, linkUrl } from "./src/whatsapp.js";
 import { mountTesters, loadApprovedTesters, isAdmin } from "./src/testers.js";
-import { syncAvailable, syncState, startSync, cancelSync, disconnectSync, resumeAllSyncs } from "./src/whatsapp-sync.js";
+import { syncAvailable, syncState, startSync, cancelSync, disconnectSync, resumeAllSyncs, stopAllSyncs } from "./src/whatsapp-sync.js";
 import * as meetings from "./src/meetings.js";
 import * as recordings from "./src/recordings.js";
 import * as notifier from "./src/notify.js";
@@ -467,6 +467,15 @@ if (process.env.NODE_ENV === "production" && process.env.KEEP_AWAKE !== "off" &&
   setInterval(() => fetch(`${publicUrl()}/healthz`, { signal: AbortSignal.timeout(20_000) }).catch(() => {}), 10 * 60_000).unref();
 }
 const resumed = await resumeAllSyncs().catch((e) => { console.warn("[wa-sync] resume failed:", e.message); return 0; });
+
+// Deploys and restarts: let go of WhatsApp links cleanly so the new copy of the server can take them over at once.
+const shutdown = (sig) => {
+  console.log(`  ${sig}: shutting down`);
+  try { stopAllSyncs(); } catch {}
+  setTimeout(() => process.exit(0), 1500).unref();
+};
+process.once("SIGTERM", () => shutdown("SIGTERM"));
+process.once("SIGINT", () => shutdown("SIGINT"));
 
 app.listen(PORT, HOST, () => {
   console.log(`\n  Thinq is running at ${publicUrl()}`);

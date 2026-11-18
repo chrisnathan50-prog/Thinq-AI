@@ -205,6 +205,25 @@ $("#people").addEventListener("click", (e) => {
   renderPeople();
 });
 
+// ---------- AI services ----------
+async function loadAi() {
+  try {
+    const r = await api("/api/admin/ai");
+    $("#aiChain").innerHTML = r.providers.length ? r.providers.map((p) => `<li><span class="name">${esc(p.provider)}</span><span class="state">—</span></li>`).join("") : "<li>No AI service is set up.</li>";
+  } catch {}
+}
+$("#aiCheck").addEventListener("click", async (e) => {
+  const b = e.target; b.disabled = true; b.textContent = "Checking… (up to a minute)";
+  try {
+    const { results } = await api("/api/admin/ai/check", { method: "POST" });
+    $("#aiChain").innerHTML = results.map((r) => `<li class="${r.ok ? "ok" : "bad"}"><span class="name">${esc(r.provider)}</span><span class="state">${r.ok
+      ? `✓ working · ${(r.ms / 1000).toFixed(1)}s${r.toolCalling ? "" : " · didn't use the tool"}`
+      : `✕ ${esc(r.error || "failed")}`}</span></li>`).join("");
+  } catch (err) { flash(esc(err.message), "err"); }
+  b.disabled = false; b.textContent = "Check them now";
+});
+loadAi();
+
 // ================= TESTERS =================
 let testers = [], filter = "pending";
 const when = (iso) => new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });

@@ -229,10 +229,17 @@ async function connect(userId, { pairPhone } = {}) {
         return;
       }
       if (!state.creds.registered && Date.now() - entry.startedAt > QR_WAIT_MS) { stop(userId, "expired"); return; }
-      // Restart required right after pairing, or a dropped connection: reconnect with a growing delay.
-      const delay = code === DisconnectReason.restartRequired ? 0 : Math.min(60_000, 2000 * 2 ** entry.retries++);
+      // Restart required right after pairing, or a dropped connection: reconnect quickly (1s, 2s, 4s, 8s, then every 15s).
+      // 440 = another copy of Thinq took over this WhatsApp link (happens for a few seconds during a deploy): give it
+      // room instead of fighting it - the copy that's shutting down stops for good (see stopAllSyncs).
+      const delay = code === DisconnectReason.restartRequired ? 0
+        : code === DisconnectReason.connectionReplaced ? 20_000
+        : Math.min(15_000, 1000 * 2 ** entry.retries++);
+      console.warn(`[wa-sync] connection closed (code ${code ?? "?"}); reconnecting in ${Math.round(delay / 1000)}s`);
       entry.status = state.creds.registered ? "reconnecting" : entry.status;
-      setTimeout(() => { if (live.get(userId) === entry && !entry.stopped) connect(userId).catch((e) => console.warn("[wa-sync] reconnect failed:", e.message)); }, delay);
+      clearTimeout(entry.timer);
+      entry.nextAt = Date.now() + delay;
+      entry.timer = setTimeout(() => { entry.timer = null; if (live.get(userId) === entry && !entry.stopped) connect(userId).catch((e) => console.warn("[wa-sync] reconnect failed:", e.message)); }, delay);
     }
   });
 
@@ -306,10 +313,34 @@ export async function disconnectSync(userId) {
   await wipe(userId);
 }
 
+// Someone is looking at Thinq while their WhatsApp is reconnecting: try right away instead of waiting out the delay.
+// Also covers a link that never came back after a restart (nothing was scheduled to retry it).
+const nudged = new Map(); // userId -> last nudge time
+function nudge(userId, entry) {
+  if (shuttingDown || Date.now() - (nudged.get(userId) || 0) < 10_000) return;
+  if (entry && (entry.status !== "reconnecting" || !entry.timer || entry.nextAt - Date.now() < 3000)) return;
+  nudged.set(userId, Date.now());
+  if (entry) { clearTimeout(entry.timer); entry.timer = null; }
+  connect(userId).catch((e) => console.warn("[wa-sync] reconnect failed:", e.message));
+}
+
+// Server is shutting down (deploy/restart): close every WhatsApp link without logging out, and don't reconnect,
+// so the new copy of the server can take over cleanly.
+let shuttingDown = false;
+export function stopAllSyncs() {
+  shuttingDown = true;
+  for (const entry of live.values()) {
+    entry.stopped = true;
+    clearTimeout(entry.timer);
+    try { entry.sock?.end(undefined); } catch { /* already closed */ }
+  }
+}
+
 export async function syncState(userId) {
   if (!syncAvailable()) return { available: false };
   const entry = live.get(userId);
   const session = await one(`select * from wa_sync_sessions where user_id = $1`, [userId]);
+  if (session?.status === "connected" && (!entry || entry.status === "reconnecting")) nudge(userId, entry);
   const counts = await one(`select count(*)::int as messages, count(distinct jid)::int as chats, max(at) as last from wa_messages where user_id = $1`, [userId]);
   const status = entry?.status || (session?.status === "connected" ? "reconnecting" : session?.status) || "off";
   const masked = (p) => p && `+${p.slice(0, -4).replace(/\d/g, "•")}${p.slice(-4)}`;
@@ -407,7 +438,7 @@ export async function readChat(userId, { chat, sinceDays, limit = 80 }) {
   return { chat: chatOut(c), messages: rows };
 }
 
-// ---------- sending (only ever called after the person taps Send on a draft) ----------
+// ---------- sending (only after the person taps Send on a draft, or a routine they turned on) ----------
 class SyncError extends Error { userFacing = true; }
 
 export async function sendToChat(userId, jid, text) {

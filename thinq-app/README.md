@@ -186,6 +186,10 @@ The free plan gives 10,000 "neurons" a day — about 130 images for the whole se
 6. **Log out / delete chats** — the ⋯ menu next to your name has *Log out* and *Delete all chats*. Hover a chat in the list for its trash button. Deleting a chat also removes its attached documents and images; drafts waiting in Approvals stay.
 7. **Personal starter questions** — a new chat suggests questions built from your own inbox, calendar and saved preferences (your next meeting, who's waiting on a reply, unread count, time of day). They come straight from your data, without an AI call, and refresh every few minutes.
 
+### When the free AI is busy
+
+Groq's free tier allows about 8,000 tokens a minute **per model**, and one Thinq request is 3,000–4,000 — so on its own it handles only a couple of messages a minute for everyone. Thinq therefore tries a chain and moves on the moment one is busy: Groq `gpt-oss-120b` → Groq `gpt-oss-20b` → Groq `qwen3.8-27b` → **Cloudflare Workers AI** (`glm-4.7-flash`, using the same `CLOUDFLARE_*` settings as images; roughly 200 extra requests a day, shared with images) → Mistral / OpenRouter if you add their keys. A busy service is skipped until its wait is over. Admins can see the chain and test each service under **Admin dashboard → AI services → Check them now**. On Groq, Thinq also only sends the tools a message needs, to stay under the per-request limit.
+
 ## Run it on your computer
 
 You need **Node.js 22.13 or newer** (`node --version`).
