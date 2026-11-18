@@ -3,3 +3,4 @@ draft*.mp4
 audio/mix.wav
 audio/mix_norm.wav
 final_120.mp4
+.chunks/

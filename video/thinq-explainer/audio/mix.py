@@ -8,11 +8,12 @@ import numpy as np, soundfile as sf
 from scipy.signal import butter, sosfilt, resample_poly
 
 SR = 48000
-DUR = 20.4 + 1.6          # tail so the last chord rings out under the fade
+DUR = 41.4 + 1.8          # tail so the last chord rings out under the fade
 N = int(SR * DUR)
 rng = np.random.default_rng(7)   # seeded: the mix is reproducible
 BEAT = 0.6
-SHOTS = [0, 3.6, 6.6, 10.2, 14.4, 17.4, 20.4]
+SHOTS = [0, 3.6, 6.6, 10.2, 14.4, 19.2, 24.0, 27.6, 31.2, 34.8, 41.4]
+NCH = len(SHOTS) - 1; END = NCH - 1   # last chapter = end card
 
 def mtof(m): return 440 * 2 ** ((m - 69) / 12)
 def t_axis(n): return np.arange(n) / SR
@@ -39,30 +40,34 @@ CHORDS = [
     [F-3, F+4, F+12, F+15, F+19],        # Dm9        shot 2: gathering
     [F-7, F+2, F+9, F+12, F+16],         # Bbmaj9     shot 3: plan
     [F-10, F+4, F+7, F+14, F+17],        # Gm11-ish   shot 4: waiting for OK
-    [F-5, F+7, F+12, F+14, F+19],        # Csus       shot 5: tension, keeps going
+    [F-5, F+7, F+12, F+14, F+19],        # Csus       approve: waiting for OK
+    [F-8, F-1, F+2, F+7, F+11],          # Am7        voice + docs
+    [F-3, F+4, F+12, F+15, F+19],        # Dm9        memory (breakdown)
+    [F-7, F+2, F+9, F+12, F+16],         # Bbmaj9     routines
+    [F-5, F+7, F+12, F+14, F+19],        # Csus       group bots: lift into the end
     [F-12, F+7, F+12, F+16, F+19, F+26], # Fmaj9 low  end card: home
 ]
 
 # pad: detuned sines through a soft lowpass, crossfading at each cut
 for k, ch in enumerate(CHORDS):
-    a = SHOTS[k] - (0.25 if k else 0); b = (SHOTS[k + 1] + 0.5) if k < 5 else DUR
+    a = SHOTS[k] - (0.25 if k else 0); b = (SHOTS[k + 1] + 0.5) if k < END else DUR
     n = int((b - a) * SR); tt = t_axis(n); sig = np.zeros(n)
     for m in ch:
         for det in (-0.07, 0.0, 0.07):
             f = mtof(m) * 2 ** (det / 12)
             sig += np.sin(2 * np.pi * f * tt + rng.uniform(0, 6.28)) * (0.6 if det == 0 else 0.3)
             sig += 0.12 * np.sin(2 * np.pi * 2 * f * tt)
-    sig = lp(sig, 1800 if k < 5 else 2400) / len(ch)
-    sig *= env_adsr(n, 0.45 if k else 0.08, 0.6 if k < 5 else 1.4) * (1 + 0.04 * np.sin(2 * np.pi * 0.3 * tt))
+    sig = lp(sig, 1800 if k < END else 2400) / len(ch)
+    sig *= env_adsr(n, 0.45 if k else 0.08, 0.6 if k < END else 2.0) * (1 + 0.04 * np.sin(2 * np.pi * 0.3 * tt))
     place(music, sig, a, 0.20 if k else 0.15)
 
 # sub bass on the root, enters with the window (shot 2)
-for k in range(1, 6):
-    a = SHOTS[k]; b = SHOTS[k + 1] if k < 5 else DUR - 0.4
+for k in range(1, NCH):
+    a = SHOTS[k]; b = SHOTS[k + 1] if k < END else DUR - 0.4
     n = int((b - a) * SR); tt = t_axis(n)
     root = CHORDS[k][0] - 12 + (12 if CHORDS[k][0] < 41 else 0)
     sig = np.sin(2 * np.pi * mtof(root) * tt) * env_adsr(n, 0.05, 0.3)
-    place(music, sig, a, 0.16 if k < 5 else 0.2)
+    place(music, sig, a, 0.16 if k < END else 0.2)
 
 # pluck arpeggio: 8ths from shot 2 to the end card, voiced high, panned gently
 def pluck(f, n_s=0.45, bright=1.0):
@@ -73,8 +78,8 @@ PATTERN = [0, 2, 1, 3, 2, 4, 1, 3]
 step = BEAT / 2
 t = SHOTS[1]
 i = 0
-while t < SHOTS[5] - 0.01:
-    k = max(j for j in range(6) if SHOTS[j] <= t + 1e-6)
+while t < SHOTS[END] - 0.01:
+    k = max(j for j in range(NCH) if SHOTS[j] <= t + 1e-6)
     ch = CHORDS[k]; m = ch[1:][PATTERN[i % 8] % (len(ch) - 1)] + 12
     acc = 1.0 if i % 2 == 0 else 0.62
     place(music, pluck(mtof(m)), t, 0.075 * acc, pan=0.35 * np.sin(i * 0.9))
@@ -106,10 +111,11 @@ KICK = [0, 6, 10]          # in 16ths within a bar of 16: syncopated
 STAB = [2, 7, 11, 14]
 bar0 = SHOTS[1]
 k16 = 0
-while bar0 + k16 * SIXT < SHOTS[5] - 0.01:
+while bar0 + k16 * SIXT < SHOTS[END] - 0.01:
     t16 = bar0 + k16 * SIXT; pos = k16 % 16
-    shot = max(j for j in range(6) if SHOTS[j] <= t16 + 1e-6)
-    full = shot >= 2
+    shot = max(j for j in range(NCH) if SHOTS[j] <= t16 + 1e-6)
+    full = shot >= 2 and shot != 6            # memory chapter is a breakdown
+    if shot == 6 and t16 >= SHOTS[7] - 0.6: place(music, snare(), t16, 0.05 + 0.08 * (t16 - SHOTS[7] + 0.6) / 0.6)  # fill back in
     if full and pos in KICK: place(music, kick(), t16, 0.34)
     if full and pos in (4, 12): place(music, snare(), t16, 0.12, pan=0.05)
     if shot >= 1 and pos % 2 == 1: place(music, shaker(), t16, 0.035 if pos % 4 == 3 else 0.02, pan=0.35)
@@ -138,41 +144,67 @@ def thump():
     n = int(0.18 * SR); tt = t_axis(n)
     return np.sin(2 * np.pi * (90 + 120 * np.exp(-tt * 40)) * tt) * np.exp(-tt * 22)
 
-# shot 1: three app tiles slam in (bell + thump), cards fan out with soft ticks
+# A: three app tiles slam in (bell + thump), cards fan out with soft ticks
 for at, m, pan in [(0.06, 77, -0.35), (0.84, 81, 0.35), (1.64, 84, -0.35)]:
     place(sfx, bell(mtof(m)), at + 0.12, 0.12, pan); place(sfx, thump(), at + 0.14, 0.26, pan)
 for at in (0.32, 0.55, 1.06, 1.30, 1.86, 2.10): place(sfx, tick(2600, 0.04), at + 0.1, 0.07, 0.15); place(sfx, whoosh(0.18), at, 0.05)
 for j in range(14): place(sfx, tick(3200 + 60 * j), 0.4 + j * 0.19, 0.03, 0.4)
-# shot 2: nine items fly in and land as dots of the mark (rising pentatonic), mark completes, becomes the icon
+# B: nine items land as dots of the mark, the mark completes and becomes the icon
 place(sfx, whoosh(0.9), 3.45, 0.16)
 for j, m in enumerate([72, 74, 77, 79, 81, 84, 86, 89, 91]): place(sfx, bell(mtof(m), 0.6), 4.12 + j * 0.1, 0.05, -0.4 + 0.1 * j)
 for j in range(4): place(sfx, tick(4200, 0.03), 4.82 + j * 0.06, 0.05)
 place(sfx, bell(mtof(65), 2.2), 5.0, 0.12); place(sfx, bell(mtof(77), 1.8), 5.02, 0.07)
 place(sfx, thump(), 5.62, 0.3)
-# shot 3: app opens into the phone, typing, send, reply rows
+# C: app opens, typing, send, reply rows
 place(sfx, whoosh(0.6), 6.45, 0.18)
 for j in range(11): place(sfx, tick(1800 + (j % 3) * 260, 0.025), 7.25 + j * (0.7 / 11), 0.07, -0.1)
 place(sfx, tick(1300, 0.05), 7.98, 0.16); place(sfx, whoosh(0.3), 8.05, 0.07)
 for j in range(3): place(sfx, bell(mtof(84 + [0, 3, 7][j]), 0.6), 9.0 + j * 0.28, 0.05, -0.2 + 0.2 * j)
-# shot 4: the draft lifts out of the phone, tap Send, ripple, it flies off
-place(sfx, whoosh(0.8), 10.15, 0.18)
-place(sfx, tick(1100, 0.06), 12.98, 0.22)
-place(sfx, bell(mtof(84), 1.4), 13.1, 0.1); place(sfx, bell(mtof(91), 1.2), 13.2, 0.07, 0.3)
-place(sfx, whoosh(0.6), 13.6, 0.14)
-# shot 5: toggle on, five morning briefs arrive
-place(sfx, whoosh(0.5, up=False), 14.25, 0.12)
-place(sfx, tick(900, 0.06), 15.15, 0.22); place(sfx, tick(2600, 0.04), 15.3, 0.08)
-for j, m in enumerate([79, 81, 84, 86, 88]): place(sfx, bell(mtof(m), 0.7), 15.66 + j * 0.33, 0.07, -0.4 + 0.2 * j)
-# end card: swell, low bell on the mark, shimmer as the icons orbit in
-place(sfx, whoosh(1.1), 16.6, 0.18)
-place(sfx, bell(mtof(53), 3.0), 17.45, 0.16); place(sfx, bell(mtof(65), 2.4), 17.5, 0.12); place(sfx, bell(mtof(77), 2.0), 17.55, 0.07)
-for j, m in enumerate([84, 88, 91, 96]): place(sfx, bell(mtof(m), 1.0), 17.6 + j * 0.12, 0.035, -0.45 + 0.3 * j)
-place(sfx, bell(mtof(84), 1.6), 18.82, 0.05, 0.2)
+# D: second message, dive through the screen, calendar builds, scan, slot found
+for j in range(14): place(sfx, tick(1800 + (j % 3) * 260, 0.025), 10.25 + j * (0.57 / 14), 0.06, -0.1)
+place(sfx, tick(1300, 0.05), 10.85, 0.16)
+place(sfx, whoosh(0.8), 10.95, 0.22)
+for j in range(10): place(sfx, tick(2200 + 90 * j, 0.03), 11.38 + j * 0.06, 0.035, -0.4 + 0.08 * j)
+place(sfx, whoosh(0.85), 12.3, 0.08)
+place(sfx, bell(mtof(84), 1.4), 13.2, 0.12); place(sfx, bell(mtof(91), 1.2), 13.26, 0.07, 0.3); place(sfx, thump(), 13.2, 0.2)
+# E: slot lifts into the invite, email slides up, two taps, both confirm, sweep out
+place(sfx, whoosh(0.8), 14.45, 0.16); place(sfx, whoosh(0.6), 14.85, 0.1)
+place(sfx, tick(1100, 0.06), 18.22, 0.22); place(sfx, bell(mtof(84), 1.2), 18.32, 0.1)
+place(sfx, tick(1100, 0.06), 18.7, 0.22); place(sfx, bell(mtof(88), 1.2), 18.8, 0.09, 0.3)
+place(sfx, whoosh(1.1), 18.85, 0.24)
+# F: voice capsule pops (liquid), transcript, contract drops, lens finds three dates
+place(sfx, thump(), 19.38, 0.2); place(sfx, bell(mtof(79), 0.8), 19.4, 0.06)
+place(sfx, whoosh(0.5), 20.55, 0.12); place(sfx, thump(), 21.2, 0.16)
+place(sfx, whoosh(0.4), 21.9, 0.07)
+for j, m in enumerate([84, 88, 91]): place(sfx, bell(mtof(m), 0.9), 22.32 + j * 0.42, 0.08, -0.3 + 0.3 * j)
+place(sfx, bell(mtof(96), 1.0), 23.28, 0.06)
+# G: the drop falls, splashes, the memory card blooms, two rows check, signature typed
+place(sfx, whoosh(0.5), 23.95, 0.1)
+def splash():
+    n = int(0.35 * SR); tt = t_axis(n)
+    return (np.sin(2 * np.pi * (300 + 900 * np.exp(-tt * 18)) * tt) * 0.6 + bp(rng.standard_normal(n), 800, 5000) * 0.5) * np.exp(-tt * 12)
+place(sfx, splash(), 24.42, 0.22)
+place(sfx, bell(mtof(77), 1.6), 24.5, 0.1)
+for j in range(2): place(sfx, bell(mtof(84 + 4 * j), 0.8), 24.85 + j * 0.38, 0.07)
+for j in range(4): place(sfx, tick(1900 + 200 * j, 0.025), 25.92 + j * 0.11, 0.07)
+# H: flip, toggle, five briefs
+place(sfx, whoosh(0.5), 27.5, 0.14)
+place(sfx, tick(900, 0.06), 28.85, 0.22); place(sfx, tick(2600, 0.04), 29.0, 0.08)
+for j, m in enumerate([79, 81, 84, 86, 88]): place(sfx, bell(mtof(m), 0.7), 29.16 + j * 0.3, 0.07, -0.4 + 0.2 * j)
+# I: pan, three messages
+place(sfx, whoosh(0.9), 30.95, 0.16)
+for at, m in [(31.78, 81), (32.68, 84), (33.38, 88)]: place(sfx, bell(mtof(m), 0.8), at, 0.08); place(sfx, thump(), at, 0.1)
+# J: collapse, dots converge, glass icon blooms, orbit shimmer, CTA
+place(sfx, whoosh(1.2), 34.4, 0.2)
+for j in range(13): place(sfx, tick(3000 + 120 * j, 0.03), 35.1 + j * 0.045, 0.04, -0.5 + 0.08 * j)
+place(sfx, bell(mtof(53), 3.4), 35.35, 0.18); place(sfx, bell(mtof(65), 2.8), 35.4, 0.13); place(sfx, bell(mtof(77), 2.2), 35.45, 0.07)
+for j, m in enumerate([84, 88, 91, 96]): place(sfx, bell(mtof(m), 1.0), 35.65 + j * 0.12, 0.035, -0.45 + 0.3 * j)
+place(sfx, bell(mtof(84), 1.8), 37.9, 0.06, 0.2)
 
 # ---------- voiceover ----------
-VO = [("p0a", 0.15), ("p0b", 1.00), ("p0c", 1.85),
-      ("vo1_af_heart", 3.75), ("vo2_af_heart", 6.75), ("vo3_af_heart", 10.35),
-      ("p4a", 14.50), ("p4b", 15.45), ("vo5_af_heart", 17.55)]
+VO = [("p0a", 0.15), ("p0b", 1.00), ("p0c", 1.85), ("vo1_af_heart", 3.75), ("vo2_af_heart", 6.75),
+      ("n1a", 10.35), ("n1b", 12.45), ("n2", 14.55), ("n3a", 19.35), ("n3b", 20.55), ("n3c", 22.15),
+      ("n4", 24.2), ("p4a", 27.75), ("p4b", 28.75), ("n5", 31.35), ("vo5_af_heart", 35.0), ("n6", 37.85)]
 vo = np.zeros(N)
 for name, at in VO:
     x, sr = sf.read(f"{name}.wav")
@@ -194,7 +226,7 @@ for idx in range(N):
 music *= sm[:, None]
 
 # final fade on the tail
-fade = np.ones(N); fi = int(20.0 * SR); fade[fi:] = np.linspace(1, 0, N - fi) ** 2
+fade = np.ones(N); fi = int(41.6 * SR); fade[fi:] = np.linspace(1, 0, N - fi) ** 2
 
 mix = (music * 0.72 + sfx * 1.0 + vo2 * 1.0) * fade[:, None]
 mix = np.tanh(mix * 1.1) / 1.1   # soft clip safety
