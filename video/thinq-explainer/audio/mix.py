@@ -80,18 +80,43 @@ while t < SHOTS[5] - 0.01:
     place(music, pluck(mtof(m)), t, 0.075 * acc, pan=0.35 * np.sin(i * 0.9))
     t += step; i += 1
 
-# soft kick on beats (shots 3-5) and a shaker on off-beats (shots 4-5)
+# groove (features-video style): syncopated kick, snare on 2 and 4, 16th shaker,
+# electric-piano chord stabs. Builds in from shot 2, full from shot 3, drops at the end card.
 def kick():
     n = int(0.32 * SR); tt = t_axis(n)
     f = 46 + 70 * np.exp(-tt * 28); ph = 2 * np.pi * np.cumsum(f) / SR
     return np.sin(ph) * np.exp(-tt * 11)
+def snare():
+    n = int(0.22 * SR); tt = t_axis(n)
+    body = np.sin(2 * np.pi * 190 * tt) * np.exp(-tt * 30)
+    nz = bp(rng.standard_normal(n), 1800, 9000) * np.exp(-tt * 18)
+    return body * 0.5 + nz * 0.8
 def shaker():
-    n = int(0.09 * SR); return hp(rng.standard_normal(n), 6000) * np.exp(-t_axis(n) * 55)
-b = SHOTS[2]
-while b < SHOTS[5] - 0.01:
-    place(music, kick(), b, 0.30)
-    if b >= SHOTS[3]: place(music, shaker(), b + BEAT / 2, 0.05, pan=0.3)
-    b += BEAT
+    n = int(0.07 * SR); return hp(rng.standard_normal(n), 6500) * np.exp(-t_axis(n) * 60)
+def epiano(notes, n_s=0.55):
+    n = int(n_s * SR); tt = t_axis(n); s = np.zeros(n)
+    for m in notes:
+        f = mtof(m)
+        s += (np.sin(2 * np.pi * f * tt + 0.8 * np.sin(2 * np.pi * f * tt) * np.exp(-tt * 9))   # FM bark
+              + 0.18 * np.sin(2 * np.pi * 7 * f * tt) * np.exp(-tt * 30))
+    s *= np.exp(-tt * 4.5) * np.minimum(1, tt * 300) * (1 + 0.15 * np.sin(2 * np.pi * 5 * tt))
+    return lp(s, 4200) / len(notes)
+SIXT = BEAT / 4
+KICK = [0, 6, 10]          # in 16ths within a bar of 16: syncopated
+STAB = [2, 7, 11, 14]
+bar0 = SHOTS[1]
+k16 = 0
+while bar0 + k16 * SIXT < SHOTS[5] - 0.01:
+    t16 = bar0 + k16 * SIXT; pos = k16 % 16
+    shot = max(j for j in range(6) if SHOTS[j] <= t16 + 1e-6)
+    full = shot >= 2
+    if full and pos in KICK: place(music, kick(), t16, 0.34)
+    if full and pos in (4, 12): place(music, snare(), t16, 0.12, pan=0.05)
+    if shot >= 1 and pos % 2 == 1: place(music, shaker(), t16, 0.035 if pos % 4 == 3 else 0.02, pan=0.35)
+    if pos in STAB:
+        ch = CHORDS[shot]; v = sorted(m + 12 if m < 57 else m for m in ch[1:4])
+        place(music, epiano(v), t16, 0.12 if full else 0.08, pan=-0.2)
+    k16 += 1
 
 # ---------- UI sound design (in sfx bus, not ducked) ----------
 def bell(f, n_s=1.2):
@@ -113,30 +138,35 @@ def thump():
     n = int(0.18 * SR); tt = t_axis(n)
     return np.sin(2 * np.pi * (90 + 120 * np.exp(-tt * 40)) * tt) * np.exp(-tt * 22)
 
-# shot 1: each card lands with a bell rising through the chord + a thump
-for at, m, pan in [(0.10, 77, -0.3), (0.86, 81, 0.25), (1.64, 84, -0.1)]:
-    place(sfx, bell(mtof(m)), at + 0.08, 0.12, pan); place(sfx, thump(), at + 0.1, 0.22, pan)
-# counters climbing: quiet ticks
-for j in range(14): place(sfx, tick(3200 + 60 * j), 0.4 + j * 0.19, 0.035, 0.4)
-# shot 2: cards rush into the window, Telegram pops in, spark turns
-place(sfx, whoosh(0.85), 3.3, 0.16)
-place(sfx, bell(mtof(88), 0.9), 4.62, 0.08, 0.45)
-place(sfx, bell(mtof(81), 1.6), 4.95, 0.07)
-# shot 3: typing, send, typing dots, reply rows
-for j in range(11): place(sfx, tick(1800 + (j % 3) * 260, 0.025), 6.82 + j * (0.68 / 11), 0.07, -0.15)
-place(sfx, tick(1400, 0.05), 7.6, 0.14); place(sfx, whoosh(0.3), 7.68, 0.06)
-for j in range(3): place(sfx, bell(mtof(84 + [0, 3, 7][j]), 0.6), 8.62 + j * 0.3, 0.05, -0.2 + 0.2 * j)
-# shot 4: sheet slides up, cursor presses Send, confirmation
-place(sfx, whoosh(0.7), 10.05, 0.16)
-place(sfx, tick(1200, 0.06), 13.04, 0.2)
-place(sfx, bell(mtof(84), 1.4), 13.16, 0.09); place(sfx, bell(mtof(88), 1.4), 13.26, 0.07, 0.3)
-# shot 5: routine card, toggle, the week checks itself off on a rising scale
-place(sfx, whoosh(0.5, up=False), 14.1, 0.12)
-place(sfx, tick(900, 0.06), 15.2, 0.2); place(sfx, tick(2600, 0.04), 15.3, 0.08)
-for j, m in enumerate([77, 79, 81, 84, 86]): place(sfx, bell(mtof(m), 0.7), 15.66 + j * 0.3, 0.06, -0.4 + 0.2 * j)
-# end card: swell into the spark, low bell under the wordmark
-place(sfx, whoosh(1.0), 16.75, 0.16)
-place(sfx, bell(mtof(65), 2.4), 17.55, 0.14); place(sfx, bell(mtof(77), 2.0), 17.6, 0.08)
+# shot 1: three app tiles slam in (bell + thump), cards fan out with soft ticks
+for at, m, pan in [(0.06, 77, -0.35), (0.84, 81, 0.35), (1.64, 84, -0.35)]:
+    place(sfx, bell(mtof(m)), at + 0.12, 0.12, pan); place(sfx, thump(), at + 0.14, 0.26, pan)
+for at in (0.32, 0.55, 1.06, 1.30, 1.86, 2.10): place(sfx, tick(2600, 0.04), at + 0.1, 0.07, 0.15); place(sfx, whoosh(0.18), at, 0.05)
+for j in range(14): place(sfx, tick(3200 + 60 * j), 0.4 + j * 0.19, 0.03, 0.4)
+# shot 2: nine items fly in and land as dots of the mark (rising pentatonic), mark completes, becomes the icon
+place(sfx, whoosh(0.9), 3.45, 0.16)
+for j, m in enumerate([72, 74, 77, 79, 81, 84, 86, 89, 91]): place(sfx, bell(mtof(m), 0.6), 4.12 + j * 0.1, 0.05, -0.4 + 0.1 * j)
+for j in range(4): place(sfx, tick(4200, 0.03), 4.82 + j * 0.06, 0.05)
+place(sfx, bell(mtof(65), 2.2), 5.0, 0.12); place(sfx, bell(mtof(77), 1.8), 5.02, 0.07)
+place(sfx, thump(), 5.62, 0.3)
+# shot 3: app opens into the phone, typing, send, reply rows
+place(sfx, whoosh(0.6), 6.45, 0.18)
+for j in range(11): place(sfx, tick(1800 + (j % 3) * 260, 0.025), 7.25 + j * (0.7 / 11), 0.07, -0.1)
+place(sfx, tick(1300, 0.05), 7.98, 0.16); place(sfx, whoosh(0.3), 8.05, 0.07)
+for j in range(3): place(sfx, bell(mtof(84 + [0, 3, 7][j]), 0.6), 9.0 + j * 0.28, 0.05, -0.2 + 0.2 * j)
+# shot 4: the draft lifts out of the phone, tap Send, ripple, it flies off
+place(sfx, whoosh(0.8), 10.15, 0.18)
+place(sfx, tick(1100, 0.06), 12.98, 0.22)
+place(sfx, bell(mtof(84), 1.4), 13.1, 0.1); place(sfx, bell(mtof(91), 1.2), 13.2, 0.07, 0.3)
+place(sfx, whoosh(0.6), 13.6, 0.14)
+# shot 5: toggle on, five morning briefs arrive
+place(sfx, whoosh(0.5, up=False), 14.25, 0.12)
+place(sfx, tick(900, 0.06), 15.15, 0.22); place(sfx, tick(2600, 0.04), 15.3, 0.08)
+for j, m in enumerate([79, 81, 84, 86, 88]): place(sfx, bell(mtof(m), 0.7), 15.66 + j * 0.33, 0.07, -0.4 + 0.2 * j)
+# end card: swell, low bell on the mark, shimmer as the icons orbit in
+place(sfx, whoosh(1.1), 16.6, 0.18)
+place(sfx, bell(mtof(53), 3.0), 17.45, 0.16); place(sfx, bell(mtof(65), 2.4), 17.5, 0.12); place(sfx, bell(mtof(77), 2.0), 17.55, 0.07)
+for j, m in enumerate([84, 88, 91, 96]): place(sfx, bell(mtof(m), 1.0), 17.6 + j * 0.12, 0.035, -0.45 + 0.3 * j)
 place(sfx, bell(mtof(84), 1.6), 18.82, 0.05, 0.2)
 
 # ---------- voiceover ----------
