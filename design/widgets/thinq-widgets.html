@@ -5,180 +5,179 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Thinq Widgets</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --ink:#121216; --ink-2:#3a3a42; --muted:#80808a; --soft:#b6b6be;
-  --pink:#f7b6d2; --lilac:#c9b6ff; --blue:#a9cdfd; --violet:#7a5cff; --peach:#ffd8c4; --butter:#f6eaa6;
-  --ease:cubic-bezier(.2,.7,.2,1);
+  /* iOS semantic colours */
+  --label:#1d1d1f; --label-2:rgba(60,60,67,.62); --label-3:rgba(60,60,67,.32); --sep:rgba(60,60,67,.12);
+  --fill:#f2f2f7; --blue:#0a84ff; --orange:#ff9500; --red:#ff3b30; --yellow:#ffcc00;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:"Geist",system-ui,-apple-system,sans-serif;background:#e9e9ee;color:var(--ink);-webkit-font-smoothing:antialiased;letter-spacing:-.015em;
+body{font-family:"Inter",-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;font-optical-sizing:auto;
+  background:#d9d9de;color:var(--label);-webkit-font-smoothing:antialiased;letter-spacing:-.011em;
   display:flex;flex-wrap:wrap;gap:40px;justify-content:center;padding:40px 16px}
 svg{display:block}
-.num{font-variant-numeric:tabular-nums}
-
-/* 3:4 artboard */
+.tn{font-variant-numeric:tabular-nums}
 .frame{width:900px;height:1200px;position:relative;overflow:hidden;flex:none;isolation:isolate}
 @media (max-width:960px){.frame{zoom:calc((100vw - 32px)/900px)}}
-.grain{position:absolute;inset:0;z-index:50;pointer-events:none;opacity:.07;mix-blend-mode:overlay;
-  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
 
-/* liquid glass recipe */
-.glass{position:relative;
-  background:linear-gradient(165deg,rgba(255,255,255,.5) 0%,rgba(255,255,255,.16) 45%,rgba(255,255,255,.26) 100%);
-  -webkit-backdrop-filter:blur(26px) saturate(180%);backdrop-filter:blur(26px) saturate(180%);
-  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.95),inset 0 -1px 0 rgba(255,255,255,.35),inset 0 0 24px rgba(255,255,255,.35),
-    0 1px 2px rgba(30,20,70,.06),0 40px 80px -36px rgba(40,24,110,.45)}
-.glass::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1.5px;pointer-events:none;
-  background:linear-gradient(150deg,rgba(255,255,255,.95),rgba(255,255,255,.15) 38%,rgba(255,255,255,.05) 60%,rgba(255,255,255,.7));
-  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+/* Liquid Glass: clear body, lit rim, faint lensing at the edges */
+.lg{position:relative;
+  background:linear-gradient(180deg,rgba(255,255,255,.30),rgba(255,255,255,.14));
+  -webkit-backdrop-filter:blur(22px) saturate(185%);backdrop-filter:blur(22px) saturate(185%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.28),
+    inset 1.5px 1.5px 0 -.5px rgba(255,255,255,.95),
+    inset -1px -1px 0 -.5px rgba(255,255,255,.55),
+    inset 0 0 34px 0 rgba(255,255,255,.22),
+    0 2px 6px rgba(0,0,0,.04),0 24px 48px -24px rgba(0,0,0,.22)}
+.lg::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:radial-gradient(120% 70% at 18% -10%,rgba(255,255,255,.42),transparent 46%),
+             radial-gradient(90% 60% at 100% 120%,rgba(255,255,255,.18),transparent 50%)}
 
 /* =============== 1 · Morning brief =============== */
-.f1{background:
-  radial-gradient(55% 45% at 12% 8%,var(--peach) 0,transparent 70%),
-  radial-gradient(50% 45% at 92% 18%,var(--lilac) 0,transparent 70%),
-  radial-gradient(70% 55% at 85% 100%,var(--blue) 0,transparent 70%),
-  radial-gradient(60% 50% at 0% 85%,var(--pink) 0,transparent 70%),#efe8f7}
-.f1 .stage{position:absolute;left:70px;right:70px;top:520px}
-.fan{position:absolute;inset:-150px 40px auto;height:200px}
-.mini{position:absolute;top:0;width:172px;height:176px;background:#fff;border-radius:26px;padding:20px 18px;
-  box-shadow:0 1px 1px rgba(20,10,50,.05),0 18px 34px -16px rgba(40,24,110,.35);transform-origin:50% 100%}
-.mini b{display:block;font-weight:600;font-size:21px;letter-spacing:-.03em;line-height:1.1}
-.mini small{display:block;font-size:12.5px;color:var(--muted);margin-top:5px}
-.mini i{display:block;height:6px;border-radius:6px;background:#eeeef2;margin-top:14px}
-.mini i+i{margin-top:8px;width:70%}
-.mini .tag{display:inline-block;margin-top:12px;font-size:11px;font-style:normal;padding:4px 9px;border-radius:99px;background:#f2efff;color:#5b43e0}
-.brief{border-radius:72px;height:340px;padding:56px 60px 56px 56px;display:grid;grid-template-columns:132px 1fr;column-gap:40px;overflow:hidden}
-.brief .iris{position:absolute;inset:0;border-radius:inherit;pointer-events:none;filter:blur(30px);opacity:.75;
-  background:radial-gradient(28% 40% at 44% 92%,rgba(247,182,210,.85),transparent 70%),radial-gradient(26% 46% at 84% 70%,rgba(201,182,255,.95),transparent 70%),radial-gradient(22% 36% at 64% 10%,rgba(255,216,196,.6),transparent 70%)}
-.orb{width:132px;height:132px;border-radius:50%;position:relative;display:grid;place-items:center;color:var(--ink);
-  background:radial-gradient(circle at 35% 28%,#fff 0,rgba(255,255,255,.92) 40%,rgba(240,236,252,.85) 100%);
-  box-shadow:inset 0 -6px 14px rgba(122,92,255,.12),inset 0 2px 0 #fff,0 18px 36px -14px rgba(60,30,140,.4)}
-.brief .body{position:relative}
-.brief h2{font-weight:400;font-size:42px;letter-spacing:-.035em;display:flex;align-items:center;justify-content:space-between;margin-top:22px}
-.brief p{font-size:31px;line-height:1.32;color:var(--ink-2);margin-top:30px;max-width:21ch;font-weight:350;letter-spacing:-.025em}
+.f1{background:linear-gradient(180deg,#eebf9b 0%,#f4d8bf 30%,#efe4da 52%,#d6e0ee 76%,#b3c8e6 100%)}
+.f1 .sun{position:absolute;left:-180px;top:-260px;width:820px;height:820px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,240,205,.95) 0,rgba(255,214,160,.55) 35%,transparent 68%)}
+.f1 .hill{position:absolute;left:-10%;right:-10%;border-radius:50%;filter:blur(40px)}
+.f1 .stage{position:absolute;left:68px;right:68px;top:540px}
+.fan{position:absolute;left:34px;right:34px;top:-148px;height:200px}
+.n{position:absolute;top:0;width:182px;height:178px;background:#fff;border-radius:30px;padding:18px 18px 0;transform-origin:50% 120%;
+  box-shadow:0 0 0 .5px rgba(0,0,0,.05),0 12px 28px -14px rgba(60,30,10,.35)}
+.n .app{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--label-2);font-weight:500}
+.n .app i{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;flex:none}
+.n b{display:block;font-size:17px;font-weight:600;letter-spacing:-.022em;margin-top:12px}
+.n p{font-size:13.5px;line-height:1.3;color:var(--label-2);margin-top:3px}
+.brief{border-radius:80px;height:312px;padding:52px 56px;display:grid;grid-template-columns:124px 1fr;column-gap:36px}
+.disc{width:124px;height:124px;border-radius:50%;display:grid;place-items:center;
+  background:linear-gradient(180deg,#fff,#f6f3f0);box-shadow:inset 0 -1px 0 rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.06),0 14px 28px -14px rgba(80,40,10,.35)}
+.brief .hd{display:flex;align-items:center;margin-top:18px}
+.brief h2{font-size:38px;font-weight:600;letter-spacing:-.026em;flex:1}
+.brief .when{font-size:24px;color:rgba(29,29,31,.5);margin-right:14px}
+.brief p{font-size:29px;line-height:1.3;letter-spacing:-.02em;color:rgba(29,29,31,.82);margin-top:16px;max-width:24ch;text-wrap:balance}
 
 /* =============== 2 · Approvals =============== */
-.f2{background:#fbfbfd}
-.ap{position:absolute;left:96px;right:96px;top:150px;height:860px;border-radius:120px;overflow:hidden;
-  box-shadow:inset 0 2px 0 rgba(255,255,255,.7),0 50px 90px -50px rgba(70,40,170,.55)}
-.ap-bg{position:absolute;inset:-80px;filter:blur(40px) saturate(120%);
-  background:
-   radial-gradient(40% 35% at 18% 22%,#7a5cff 0,transparent 70%),
-   radial-gradient(45% 40% at 70% 10%,#f7b6d2 0,transparent 70%),
-   radial-gradient(40% 50% at 100% 55%,#8fc0ff 0,transparent 70%),
-   radial-gradient(55% 45% at 10% 80%,#c9b6ff 0,transparent 70%),
-   radial-gradient(40% 40% at 70% 95%,#ffd8c4 0,transparent 70%),#b7a6ff}
-.ap-streak{position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.4) 46%,transparent 58%);filter:blur(18px)}
-.ap-head{position:absolute;left:42px;right:42px;top:42px;display:flex;align-items:center;gap:26px}
-.ap-head .ic{width:104px;height:104px;border-radius:50%;background:#fff;display:grid;place-items:center;box-shadow:0 10px 30px -12px rgba(50,20,140,.5)}
-.ap-head h2{font-weight:300;font-size:56px;color:#fff;letter-spacing:-.04em;flex:1;text-shadow:0 1px 20px rgba(60,30,150,.25)}
-.ap-head .go{width:104px;height:104px;border-radius:50%;background:#fff;display:grid;place-items:center;color:var(--ink)}
-.sheets{position:absolute;left:42px;right:42px;bottom:42px;height:560px}
-.sheet{position:absolute;inset:0;border-radius:84px;background:#fff}
-.sheet.g2{transform:translateY(-58px) scaleX(.86);background:rgba(255,255,255,.35);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
-.sheet.g1{transform:translateY(-30px) scaleX(.93);background:rgba(255,255,255,.6);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
-.sheet.front{box-shadow:0 -10px 30px -20px rgba(60,30,140,.4);padding:48px 44px}
-.sheet h3{font-weight:400;font-size:42px;letter-spacing:-.035em}
-.chip{position:absolute;left:44px;bottom:44px;font-size:19px;color:var(--ink-2);border:1.5px solid #e2e2e8;border-radius:99px;padding:10px 22px}
-.doc{position:absolute;width:232px;height:286px;border-radius:40px;background:#fff;padding:24px;
-  box-shadow:0 0 0 1px rgba(20,10,60,.05),0 26px 46px -20px rgba(40,20,110,.45)}
-.doc .row{display:flex;align-items:center;gap:10px}
-.doc .av{width:34px;height:34px;border-radius:50%;flex:none}
-.doc .t{font-size:15px;font-weight:600;letter-spacing:-.02em}
-.doc .s{font-size:12.5px;color:var(--muted)}
-.doc .ln{height:7px;border-radius:7px;background:#efeff3;margin-top:11px}
-.doc .btn{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:#fff;background:linear-gradient(180deg,#2a2a30,#121216);padding:8px 14px;border-radius:99px;margin-top:20px}
-.doc.inv{background:linear-gradient(180deg,#fff,#faf8ff)}
-.date{width:68px;border-radius:16px;overflow:hidden;text-align:center;box-shadow:0 0 0 1px #ece9f7}
-.date .m{background:var(--violet);color:#fff;font-size:12px;font-weight:600;padding:4px 0}
-.date .d{font-size:30px;font-weight:600;padding:2px 0 6px;letter-spacing:-.04em}
-.hl{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;color:var(--ink-2)}
-.hl em{font-style:normal;background:#fff1c7;padding:2px 7px;border-radius:6px;font-weight:500}
-.f2 .mark{position:absolute;left:50%;bottom:72px;transform:translateX(-50%);color:var(--ink)}
+.f2{background:#f5f5f7}
+.ap{position:absolute;left:100px;right:100px;top:140px;height:880px;border-radius:116px;overflow:hidden;
+  background:linear-gradient(160deg,#ffd84d 0%,#ffc21a 38%,#ffcb52 62%,#f9dca0 82%,#cfe0f7 100%);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.35),inset 0 2px 0 rgba(255,255,255,.6),0 40px 80px -46px rgba(150,90,0,.55)}
+.ap .sheen{position:absolute;inset:0;filter:blur(36px);
+  background:radial-gradient(40% 30% at 82% 22%,rgba(255,255,255,.7),transparent 70%),radial-gradient(30% 50% at 105% 70%,rgba(170,205,255,.9),transparent 70%),radial-gradient(40% 30% at 10% 45%,rgba(255,180,0,.55),transparent 70%)}
+.ap-head{position:absolute;left:40px;right:40px;top:40px;display:flex;align-items:center;gap:24px}
+.circ{width:100px;height:100px;border-radius:50%;background:#fff;display:grid;place-items:center;box-shadow:0 8px 20px -10px rgba(120,70,0,.45)}
+.ap-head h2{flex:1;font-size:54px;font-weight:500;letter-spacing:-.032em;color:#fff;text-shadow:0 1px 12px rgba(160,90,0,.25)}
+.sheets{position:absolute;left:40px;right:40px;bottom:40px;height:570px}
+.sh{position:absolute;inset:0;border-radius:76px;background:#fff}
+.sh.b2{transform:translateY(-54px) scaleX(.84);opacity:.45}
+.sh.b1{transform:translateY(-28px) scaleX(.92);opacity:.7}
+.sh.fr{padding:46px 44px;box-shadow:0 -8px 24px -18px rgba(120,70,0,.35)}
+.sh h3{font-size:40px;font-weight:500;letter-spacing:-.028em}
+.sh .sub{font-size:21px;color:var(--label-2);margin-top:6px}
+.tag{position:absolute;left:44px;bottom:44px;font-size:19px;color:var(--label-2);padding:9px 20px;border-radius:99px;box-shadow:inset 0 0 0 1.5px var(--sep)}
+.it{position:absolute;width:236px;height:296px;border-radius:32px;background:#fff;padding:20px;overflow:hidden;
+  box-shadow:0 0 0 .5px rgba(0,0,0,.06),0 2px 4px rgba(0,0,0,.04),0 22px 40px -20px rgba(80,50,0,.4)}
+.it .k{font-size:12px;color:var(--label-2)}
+.it .t{font-size:15.5px;font-weight:600;letter-spacing:-.02em;margin-top:2px}
+.it .body{font-size:12px;line-height:1.42;color:rgba(29,29,31,.78);margin-top:10px}
+.it .cap{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;color:#fff;background:var(--blue);padding:7px 14px;border-radius:99px}
+.it .rule{height:1px;background:var(--sep);margin:12px -20px}
+.ev{margin-top:12px;border-radius:10px;background:rgba(10,132,255,.12);border-left:4px solid var(--blue);padding:8px 10px}
+.ev b{display:block;font-size:13.5px;color:#0a5fc2;font-weight:600}
+.ev span{font-size:12px;color:#3a78c8}
+.pdf{font-size:8.4px;line-height:1.55;color:rgba(29,29,31,.7)}
+.pdf h4{font-size:11px;font-weight:700;color:var(--label);margin-bottom:6px;letter-spacing:-.01em}
+.pdf mark{background:rgba(255,204,0,.45);color:var(--label);border-radius:2px;padding:0 1px}
+.f2 .logo{position:absolute;left:50%;bottom:66px;transform:translateX(-50%);color:var(--label)}
 
-/* =============== 3 · Widget grid =============== */
-.f3{background:radial-gradient(80% 60% at 50% 40%,#e9eff7 0,#d9e2ee 100%)}
-.grid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:grid;grid-template-columns:repeat(2,360px);gap:30px}
-.w{width:360px;height:360px;border-radius:68px;position:relative;overflow:hidden;
-  box-shadow:inset 0 2px 0 rgba(255,255,255,.55),0 1px 2px rgba(20,30,60,.08),0 30px 50px -30px rgba(30,40,90,.45)}
-/* routines folder */
-.w1{background:linear-gradient(160deg,#9a86ff,#6c55e8)}
-.w1 .back{position:absolute;left:18px;right:18px;top:40px;bottom:18px;border-radius:44px;background:linear-gradient(180deg,#5a43d6,#7b66f0)}
-.w1 .back::before{content:"";position:absolute;left:0;top:-16px;width:120px;height:40px;border-radius:20px 26px 0 0;background:#5a43d6}
-.pk{position:absolute;width:150px;height:160px;border-radius:26px;background:#fff;padding:16px;box-shadow:0 14px 26px -10px rgba(20,10,80,.5)}
-.pk b{font-size:14px;font-weight:600;display:block;letter-spacing:-.02em}
-.pk small{font-size:11px;color:var(--muted)}
-.bars{display:flex;align-items:flex-end;gap:6px;height:62px;margin-top:14px}
-.bars span{flex:1;border-radius:5px;background:linear-gradient(180deg,#c9b6ff,#7a5cff)}
-.w1 .flap{position:absolute;left:18px;right:18px;bottom:18px;height:176px;border-radius:44px;
-  background:linear-gradient(170deg,rgba(255,255,255,.42),rgba(255,255,255,.14));-webkit-backdrop-filter:blur(16px) saturate(160%);backdrop-filter:blur(16px) saturate(160%);
-  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.8),inset 0 0 20px rgba(255,255,255,.2)}
-.pill{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;white-space:nowrap;
-  font-size:20px;font-weight:500;color:#fff;padding:13px 22px;border-radius:99px;background:rgba(255,255,255,.2);box-shadow:inset 0 1px 0 rgba(255,255,255,.55)}
+/* =============== 3 · Widget set =============== */
+.f3{background:#e6ebf1}
+.grid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:grid;grid-template-columns:repeat(2,356px);gap:30px}
+.w{width:356px;height:356px;border-radius:66px;position:relative;overflow:hidden;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.25),0 1px 2px rgba(0,0,0,.05),0 22px 44px -26px rgba(20,40,80,.4)}
+/* folder */
+.w1{background:linear-gradient(180deg,#6aa9e3,#4a8ed6)}
+.w1 .bk{position:absolute;left:16px;right:16px;top:38px;bottom:16px;border-radius:50px;background:linear-gradient(180deg,#2f72bf,#3a80cf)}
+.w1 .bk::before{content:"";position:absolute;left:0;top:-14px;width:118px;height:44px;border-radius:22px 28px 0 0;background:#2f72bf}
+.pk{position:absolute;width:150px;height:170px;border-radius:24px;background:#fff;padding:15px;box-shadow:0 10px 22px -10px rgba(0,30,80,.55)}
+.pk b{display:block;font-size:13.5px;font-weight:600;letter-spacing:-.015em}
+.pk small{font-size:11px;color:var(--label-2)}
+.pk .ch{display:flex;align-items:flex-end;gap:7px;height:56px;margin-top:12px}
+.pk .ch span{flex:1;border-radius:4px;background:var(--blue)}
+.pk .ch span.o{background:#cfe3fb}
+.pk .dl{display:flex;justify-content:space-between;font-size:9px;color:var(--label-3);margin-top:5px;padding:0 3px}
+.pk p{font-size:10.5px;line-height:1.38;color:rgba(29,29,31,.75);margin-top:9px}
+.w1 .flap{position:absolute;left:16px;right:16px;bottom:16px;height:170px;border-radius:50px}
+.w1 .flap.lg{background:linear-gradient(180deg,rgba(255,255,255,.3),rgba(255,255,255,.12));-webkit-backdrop-filter:blur(18px) saturate(105%);backdrop-filter:blur(18px) saturate(105%)}
+.cap2{position:absolute;left:50%;bottom:36px;transform:translateX(-50%);display:flex;align-items:center;gap:9px;white-space:nowrap;z-index:2;
+  font-size:19px;font-weight:500;color:#fff;padding:12px 20px 12px 16px;border-radius:99px;background:rgba(255,255,255,.18);box-shadow:inset 0 0 0 1px rgba(255,255,255,.3),inset 1px 1px 0 rgba(255,255,255,.5)}
 /* reply */
-.w2{background:linear-gradient(180deg,#cfe0fc,#8fb2e8)}
-.w2 .top{position:absolute;left:14px;right:14px;top:14px;height:184px;border-radius:54px;background:#fff;padding:26px 26px;box-shadow:0 10px 20px -14px rgba(20,40,90,.4)}
+.w2{background:linear-gradient(180deg,#c9dcf5,#8eb1e0)}
+.w2 .top{position:absolute;left:14px;right:14px;top:14px;height:186px;border-radius:52px;background:#fff;padding:24px 26px}
 .w2 .who{display:flex;align-items:center;gap:12px}
-.w2 .av{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#f7b6d2,#c9b6ff);display:grid;place-items:center;font-size:16px;font-weight:600;color:#fff}
-.w2 .who b{font-size:17px;font-weight:600;display:block;letter-spacing:-.02em}
-.w2 .who small{font-size:13px;color:var(--muted)}
-.w2 .q{font-size:17px;line-height:1.35;color:var(--ink-2);margin-top:16px}
-.w2 .bot{position:absolute;left:14px;right:14px;bottom:14px;height:132px;border-radius:50px;display:flex;align-items:center;justify-content:space-between;padding:0 22px 0 30px;
-  background:linear-gradient(170deg,rgba(255,255,255,.4),rgba(255,255,255,.12));-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);box-shadow:inset 0 1.5px 0 rgba(255,255,255,.7)}
-.w2 .bot b{display:block;font-size:24px;font-weight:500;color:#fff;letter-spacing:-.03em}
-.w2 .bot small{font-size:16px;color:rgba(255,255,255,.85)}
-.w2 .send{width:76px;height:76px;border-radius:50%;background:#fff;display:grid;place-items:center;color:#4c7fd6;box-shadow:0 10px 20px -10px rgba(20,40,90,.5)}
-/* ring */
-.w3{background:
-  radial-gradient(60% 50% at 20% 20%,#ffd8c4 0,transparent 70%),radial-gradient(60% 60% at 90% 30%,#c9b6ff 0,transparent 70%),
-  radial-gradient(70% 60% at 30% 100%,#a9cdfd 0,transparent 70%),radial-gradient(50% 50% at 90% 95%,#f7b6d2 0,transparent 70%),#e7dcf5}
-.w3 .lbl{position:absolute;top:24px;left:0;right:0;display:flex;justify-content:center;align-items:center;gap:7px;font-size:16px;font-weight:500;color:#fff;text-shadow:0 1px 8px rgba(60,30,120,.3)}
+.av{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:15px;font-weight:600;letter-spacing:0;
+  background:linear-gradient(180deg,#a5abb8,#858b98)}
+.w2 .who b{display:block;font-size:16.5px;font-weight:600;letter-spacing:-.02em}
+.w2 .who small{font-size:13px;color:var(--label-2)}
+.w2 .msg{font-size:16.5px;line-height:1.34;color:rgba(29,29,31,.85);margin-top:14px;letter-spacing:-.015em}
+.w2 .bot{position:absolute;left:14px;right:14px;bottom:14px;height:128px;border-radius:52px;display:flex;align-items:center;justify-content:space-between;padding:0 18px 0 28px}
+.w2 .bot b{display:block;font-size:23px;font-weight:600;color:#fff;letter-spacing:-.025em}
+.w2 .bot small{font-size:16px;color:rgba(255,255,255,.82)}
+.w2 .go{width:74px;height:74px;border-radius:50%;background:#fff;display:grid;place-items:center;color:var(--blue);box-shadow:0 6px 16px -8px rgba(0,40,100,.45)}
+/* ring over a scene */
+.w3{background:linear-gradient(180deg,#f3b58e 0%,#f6c9a6 30%,#e9cdbb 46%,#7fa7c9 47%,#5d8db8 70%,#3f6f9e 100%)}
+.w3 .scene{position:absolute;inset:0;filter:blur(3px)}
+.w3 .lbl{position:absolute;top:22px;left:0;right:0;display:flex;justify-content:center;align-items:center;gap:6px;font-size:15px;font-weight:600;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.18)}
 .w3 svg.ring{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
-.w3 .core{position:absolute;left:50%;top:50%;width:150px;height:150px;transform:translate(-50%,-50%);border-radius:50%;text-align:center;display:grid;place-content:center;
-  background:rgba(255,255,255,.38);-webkit-backdrop-filter:blur(14px) saturate(160%);backdrop-filter:blur(14px) saturate(160%);color:var(--ink);box-shadow:inset 0 1.5px 0 rgba(255,255,255,.9),0 10px 24px -12px rgba(60,30,140,.35)}
-.w3 .core small{font-size:13px;color:var(--ink-2)}
-.w3 .core b{font-size:50px;font-weight:600;letter-spacing:-.05em;line-height:1}
-.w3 .time{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);font-size:14px;font-weight:500;color:#fff;padding:5px 12px;border-radius:99px;background:rgba(40,24,90,.22);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
-/* player */
+.w3 .core{position:absolute;left:50%;top:50%;width:148px;height:148px;transform:translate(-50%,-50%);border-radius:50%;display:grid;place-content:center;text-align:center;color:#fff}
+.w3 .core.lg{background:rgba(255,255,255,.12)}
+.w3 .core small{font-size:13px;font-weight:500;opacity:.92}
+.w3 .core b{font-size:52px;font-weight:600;letter-spacing:-.045em;line-height:1.02}
+.w3 .time{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);font-size:14px;font-weight:600;color:#fff;padding:5px 12px;border-radius:99px}
+.w3 .time.lg{background:rgba(255,255,255,.14)}
+/* now playing */
 .w4{background:#fff}
-.w4 .art{position:absolute;inset:0 0 auto;height:170px;overflow:hidden;
-  background:radial-gradient(60% 90% at 20% 100%,#f7b6d2 0,transparent 70%),radial-gradient(60% 90% at 80% 0%,#7a5cff 0,transparent 70%),radial-gradient(50% 80% at 90% 100%,#a9cdfd 0,transparent 70%),#b49cff}
-.wave{position:absolute;left:30px;right:30px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:5px;height:80px}
-.wave span{flex:1;border-radius:4px;background:rgba(255,255,255,.9)}
-.wave span.d{background:rgba(255,255,255,.4)}
-.w4 .meta{position:absolute;left:0;right:0;top:186px;text-align:center}
-.w4 .meta b{font-size:23px;font-weight:600;letter-spacing:-.03em}
-.w4 .meta small{display:block;font-size:16px;color:var(--muted);margin-top:3px}
-.ctr{position:absolute;bottom:24px;left:0;right:0;display:flex;justify-content:center;align-items:center;gap:30px;color:#8a8a94}
-.ctr .pp{width:64px;height:64px;border-radius:50%;background:#f1f1f4;display:grid;place-items:center;color:#5a5a64}
+.w4 .art{position:absolute;left:14px;right:14px;top:14px;height:156px;border-radius:52px;overflow:hidden;
+  background:linear-gradient(135deg,#ffb36b 0%,#ff7a59 45%,#e2577a 100%)}
+.w4 .art::before{content:"";position:absolute;inset:0;background:radial-gradient(60% 90% at 85% 10%,rgba(255,230,170,.8),transparent 60%),radial-gradient(70% 90% at 0% 100%,rgba(140,60,140,.55),transparent 60%)}
+.wave{position:absolute;left:34px;right:34px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:5px;height:72px}
+.wave span{flex:1;border-radius:99px;background:#fff}
+.wave span.d{opacity:.42}
+.w4 .meta{position:absolute;left:28px;right:28px;top:186px;text-align:center}
+.w4 .meta b{display:block;font-size:21px;font-weight:600;letter-spacing:-.025em}
+.w4 .meta small{font-size:15px;color:var(--label-2)}
+.prog{position:absolute;left:36px;right:36px;top:254px;height:5px;border-radius:5px;background:var(--fill)}
+.prog i{position:absolute;inset:0 54% 0 0;border-radius:5px;background:var(--label)}
+.ctr{position:absolute;bottom:22px;left:0;right:0;display:flex;justify-content:center;align-items:center;gap:30px;color:var(--label)}
+.ctr .pp{width:58px;height:58px;border-radius:50%;background:var(--fill);display:grid;place-items:center}
 
-/* =============== 4 · Today card =============== */
-.f4{background:linear-gradient(180deg,#6aa6ee 0%,#9cc7f7 45%,#cfe3fb 100%)}
-.cloud{position:absolute;border-radius:50%;background:#fff;filter:blur(28px);opacity:.85}
-.today{position:absolute;left:150px;right:150px;top:200px;border-radius:84px;padding:14px 14px 0;
-  background:linear-gradient(180deg,rgba(246,246,250,.78),rgba(240,240,246,.62));-webkit-backdrop-filter:blur(30px) saturate(170%);backdrop-filter:blur(30px) saturate(170%);
-  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.95),0 50px 90px -40px rgba(20,50,110,.55)}
-.today .card{background:#fff;border-radius:72px;padding:28px 40px 46px;text-align:center;box-shadow:0 1px 2px rgba(20,30,60,.06),0 14px 30px -20px rgba(20,30,60,.25)}
-.island{width:176px;height:50px;border-radius:99px;background:#f0f0f3;margin:0 auto}
-.streak{display:inline-flex;align-items:center;gap:7px;margin-top:34px;font-size:19px;font-weight:500;padding:8px 16px;border-radius:99px;border:1.5px solid #ececf1;color:var(--ink)}
-.greet{font-size:46px;line-height:1.24;letter-spacing:-.04em;font-weight:500;margin-top:24px}
-.greet .sub{color:#b8b8c0}
-.greet .avatar{display:inline-grid;place-items:center;width:58px;height:58px;border-radius:18px;vertical-align:-10px;margin-right:12px;color:#fff;font-size:26px;
-  background:linear-gradient(135deg,#f7b6d2,#7a5cff);box-shadow:0 0 0 2px #fff,0 0 0 3.5px #ececf1}
-.plan{display:inline-flex;align-items:center;gap:14px;padding:6px 8px 6px 20px;border-radius:20px;border:1.5px solid #ececf1;color:var(--ink);vertical-align:2px;box-shadow:0 6px 16px -10px rgba(20,30,60,.25)}
-.plan .cal{width:52px;height:52px;border-radius:14px;background:linear-gradient(160deg,#f3efff,#e6efff);display:grid;place-items:center;color:var(--violet)}
-.rule{height:1.5px;background:#f0f0f3;margin:40px 0 34px}
-.big{font-size:104px;font-weight:600;letter-spacing:-.06em;line-height:.95}
-.big+small{display:block;font-size:22px;color:var(--muted);margin-top:8px}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);margin-top:40px}
-.stats b{display:block;font-size:31px;font-weight:500;letter-spacing:-.035em}
-.stats small{font-size:19px;color:var(--muted)}
-.today .foot{padding:40px 0 34px;text-align:center}
-.cta{display:inline-flex;align-items:center;gap:12px;font-size:24px;font-weight:500;color:#fff;padding:22px 40px;border-radius:99px;
-  background:linear-gradient(180deg,#8f76ff,#6a4cf5);box-shadow:inset 0 1.5px 0 rgba(255,255,255,.4),inset 0 -2px 0 rgba(40,10,140,.25),0 0 0 6px rgba(122,92,255,.12),0 18px 30px -14px rgba(90,60,230,.7)}
-.fine{display:flex;justify-content:center;align-items:center;gap:7px;font-size:16px;color:#9a9aa4;margin-top:22px}
+/* =============== 4 · Today =============== */
+.f4{background:linear-gradient(180deg,#5f9be3 0%,#86b6ee 35%,#b4d2f6 70%,#d9e8fb 100%)}
+.cl{position:absolute;filter:blur(14px)}
+.cl span{position:absolute;border-radius:50%;background:#fff}
+.today{position:absolute;left:156px;right:156px;top:178px;border-radius:84px;padding:12px 12px 0}
+.today.lg{background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(246,247,250,.78))}
+.today .card{position:relative;z-index:1;background:#fff;border-radius:72px;padding:22px 40px 44px;text-align:center;box-shadow:0 0 0 .5px rgba(0,0,0,.04),0 10px 26px -18px rgba(20,40,80,.35)}
+.island{width:170px;height:48px;border-radius:99px;background:var(--fill);margin:0 auto}
+.streak{display:inline-flex;align-items:center;gap:6px;margin-top:34px;font-size:19px;font-weight:600;padding:7px 15px 7px 12px;border-radius:99px;box-shadow:inset 0 0 0 1.5px var(--sep)}
+.greet{font-size:44px;line-height:1.26;letter-spacing:-.032em;font-weight:600;margin-top:22px}
+.greet .g{color:#c4c4ca}
+.greet .r1{display:flex;justify-content:center;align-items:center;gap:14px}
+.greet .av{width:56px;height:56px;font-size:21px;box-shadow:0 0 0 3px #fff,0 2px 8px rgba(0,0,0,.12)}
+.plan{display:inline-flex;align-items:center;gap:14px;padding:6px 6px 6px 18px;border-radius:20px;vertical-align:3px;
+  box-shadow:inset 0 0 0 1.5px var(--sep),0 6px 14px -10px rgba(0,0,0,.3)}
+.calico{width:54px;height:54px;border-radius:13px;background:#fff;box-shadow:0 0 0 1px var(--sep);overflow:hidden;text-align:center;line-height:1}
+.calico i{display:block;font-style:normal;font-size:10px;font-weight:600;color:var(--red);padding-top:7px;letter-spacing:0}
+.calico b{display:block;font-size:26px;font-weight:400;letter-spacing:-.03em;margin-top:2px}
+.hr{height:1px;background:var(--sep);margin:38px 0 32px}
+.big{font-size:108px;font-weight:600;letter-spacing:-.05em;line-height:.95}
+.big+small{display:block;font-size:21px;color:var(--label-2);margin-top:8px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);margin-top:38px}
+.stats b{display:block;font-size:30px;font-weight:600;letter-spacing:-.03em}
+.stats small{font-size:18px;color:var(--label-2)}
+.today .foot{position:relative;z-index:1;padding:38px 0 32px;text-align:center}
+.btn{display:inline-flex;align-items:center;gap:12px;font-size:23px;font-weight:600;letter-spacing:-.02em;color:#fff;padding:21px 38px 21px 32px;border-radius:99px;background:var(--label);
+  box-shadow:0 1px 2px rgba(0,0,0,.2),0 12px 24px -12px rgba(0,0,0,.45)}
+.fine{display:flex;justify-content:center;align-items:center;gap:6px;font-size:15.5px;color:var(--label-3);margin-top:20px}
 </style>
 </head>
 <body>
@@ -188,161 +187,182 @@ svg{display:block}
     <circle cx="5.6" cy="5.6" r="1.7"/><circle cx="18.4" cy="5.6" r="1.7"/><circle cx="5.6" cy="18.4" r="1.7"/><circle cx="18.4" cy="18.4" r="1.7"/>
     <circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="7.5" r="1.5"/><circle cx="12" cy="16.5" r="1.5"/><circle cx="7.5" cy="12" r="1.5"/><circle cx="16.5" cy="12" r="1.5"/>
   </g></symbol>
+  <symbol id="env" viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="3" fill="#fff"/><path d="m4.5 7.5 7.5 5.5 7.5-5.5" fill="none" stroke="#1a82f5" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="chev" viewBox="0 0 12 20"><path d="m2.5 2.5 7.5 7.5-7.5 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 </svg>
 
 <!-- 1 · Morning brief -->
 <section class="frame f1" id="f1" aria-label="Morning brief widget">
+  <div class="sun"></div>
+  <div class="hill" style="top:840px;height:520px;background:#c7d6ec;opacity:.8"></div>
+  <div class="hill" style="top:960px;height:520px;left:20%;right:-30%;background:#a9c1e4;opacity:.8"></div>
   <div class="stage">
     <div class="fan" aria-hidden="true">
-      <div class="mini" style="left:0;transform:rotate(-9deg) translateY(30px)"><b>Re: Q3 budget</b><small>Maya Chen · 7:52</small><i></i><i></i></div>
-      <div class="mini" style="left:140px;transform:rotate(-4deg) translateY(8px)"><b class="num">2:00 → 3:30</b><small>Priya moved your sync</small><i></i><i></i></div>
-      <div class="mini" style="left:290px;transform:rotate(1deg)"><b>Draft ready</b><small>Reply to Jonah</small><span class="tag">Waiting for you</span></div>
-      <div class="mini" style="left:440px;transform:rotate(5deg) translateY(10px)"><b class="num">$4,280</b><small>Invoice due Friday</small><i></i><i></i></div>
-      <div class="mini" style="left:566px;transform:rotate(9deg) translateY(30px)"><b class="num">8:00 AM</b><small>Routine finished</small><i></i><i></i></div>
+      <div class="n" style="left:0;transform:rotate(-8deg) translateY(26px)">
+        <div class="app"><i style="background:linear-gradient(180deg,#3fa9ff,#1a6ff0)"><svg width="18" height="18"><use href="#env"/></svg></i>Mail</div>
+        <b>Maya Chen</b><p>Can you sign off on the Q3 budget by 11?</p></div>
+      <div class="n" style="left:140px;transform:rotate(-3.5deg) translateY(6px)">
+        <div class="app"><i style="background:#fff;box-shadow:0 0 0 1px var(--sep);flex-direction:column;line-height:1"><span style="font-size:6px;color:#ff3b30;font-weight:700;margin-top:3px">TUE</span><span style="font-size:11px;font-weight:500;color:#1d1d1f">18</span></i>Calendar</div>
+        <b class="tn">3:30 PM</b><p>Sync with Priya, moved from 2:00</p></div>
+      <div class="n" style="left:282px;transform:rotate(.8deg)">
+        <div class="app"><i style="background:#1d1d1f;color:#fff"><svg width="15" height="15"><use href="#mark"/></svg></i>Thinq</div>
+        <b>Draft ready</b><p>Reply to Jonah about the contract</p></div>
+      <div class="n" style="left:424px;transform:rotate(4.5deg) translateY(8px)">
+        <div class="app"><i style="background:linear-gradient(180deg,#3fa9ff,#1a6ff0)"><svg width="18" height="18"><use href="#env"/></svg></i>Mail</div>
+        <b class="tn">$4,280</b><p>Invoice from Studio Nord, due Friday</p></div>
+      <div class="n" style="left:560px;transform:rotate(8deg) translateY(20px)">
+        <div class="app"><i style="background:#1d1d1f;color:#fff"><svg width="15" height="15"><use href="#mark"/></svg></i>Thinq</div>
+        <b>Weekly recap</b><p>Your Monday routine has finished</p></div>
     </div>
-    <div class="brief glass">
-      <div class="iris"></div>
-      <div class="orb"><svg width="52" height="52"><use href="#mark"/></svg></div>
-      <div class="body">
-        <h2>Morning brief
-          <svg width="22" height="38" viewBox="0 0 12 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 2 8 8-8 8"/></svg></h2>
-        <p>Three emails need a reply before 11. Your call with Priya moved to 3:30.</p>
+    <div class="brief lg">
+      <div class="disc">
+        <svg width="62" height="62" viewBox="0 0 32 32"><path d="M8 20.5a8 8 0 0 1 16 0z" fill="#ff9500"/><g stroke="#ff9500" stroke-width="2.2" stroke-linecap="round"><path d="M16 5.5v3.2M6.2 9.6l2.2 2.2M25.8 9.6l-2.2 2.2M2.8 20.5h3M26.2 20.5h3"/><path d="M5.5 25h21" stroke="#1d1d1f" stroke-opacity=".85"/></g></svg>
+      </div>
+      <div>
+        <div class="hd"><h2>Morning brief</h2><span class="when tn">7:30 AM</span><svg width="14" height="24" style="color:rgba(29,29,31,.35)"><use href="#chev"/></svg></div>
+        <p>Three emails need a reply before 11. Priya moved your call to 3:30.</p>
       </div>
     </div>
   </div>
-  <div class="grain"></div>
 </section>
 
 <!-- 2 · Approvals -->
 <section class="frame f2" id="f2" aria-label="Approvals widget">
   <div class="ap">
-    <div class="ap-bg"></div><div class="ap-streak"></div>
+    <div class="sheen"></div>
     <div class="ap-head">
-      <div class="ic"><svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#121216" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5 20 5.5v6c0 5-3.4 8.8-8 10-4.6-1.2-8-5-8-10v-6z"/><path d="m8.5 12 2.4 2.4L15.8 9.5"/></svg></div>
+      <div class="circ"><svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#1d1d1f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.6 19.6 5.4v5.9c0 4.9-3.2 8.6-7.6 10.1-4.4-1.5-7.6-5.2-7.6-10.1V5.4z"/><path d="m8.6 12.1 2.3 2.3 4.5-4.6"/></svg></div>
       <h2>Approvals</h2>
-      <div class="go"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M7 17 17 7M8.5 7H17v8.5"/></svg></div>
+      <div class="circ"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#1d1d1f" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8.5 7H17v8.5"/></svg></div>
     </div>
     <div class="sheets">
-      <div class="sheet g2"></div><div class="sheet g1"></div>
-      <div class="sheet front">
-        <h3>Drafts waiting</h3>
-        <!-- invite -->
-        <div class="doc inv" style="left:96px;top:150px;transform:rotate(-9deg)">
-          <div class="row"><div class="date"><div class="m">Thu</div><div class="d num">14</div></div>
-            <div><div class="t">Q3 planning</div><div class="s num">3:30 – 4:00 PM</div></div></div>
-          <div class="ln"></div><div class="ln" style="width:60%"></div>
-          <div class="row" style="margin-top:22px">
-            <span class="av" style="background:linear-gradient(135deg,#f7b6d2,#ffd8c4)"></span>
-            <span class="av" style="background:linear-gradient(135deg,#a9cdfd,#c9b6ff);margin-left:-18px;box-shadow:0 0 0 3px #fff"></span>
-            <span class="s">Priya, you</span></div>
-          <div class="btn">Add to calendar</div>
+      <div class="sh b2"></div><div class="sh b1"></div>
+      <div class="sh fr">
+        <h3>Waiting for you</h3>
+        <p class="sub">Nothing goes out until you say so</p>
+
+        <div class="it" style="left:84px;top:178px;transform:rotate(-8deg)">
+          <div style="display:flex;gap:14px;align-items:flex-start">
+            <div style="line-height:1"><div style="font-size:12px;font-weight:600;color:var(--red)">Thursday</div><div class="tn" style="font-size:46px;font-weight:300;letter-spacing:-.04em;margin-top:2px">14</div></div>
+          </div>
+          <div class="ev"><b>Q3 planning</b><span class="tn">3:30 – 4:00 PM</span></div>
+          <div class="body">With Priya Shah</div>
+          <div class="rule"></div>
+          <span class="cap">Add to Calendar</span>
         </div>
-        <!-- contract -->
-        <div class="doc" style="left:372px;top:96px;transform:rotate(7deg)">
-          <div class="row"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#7a5cff" stroke-width="1.6" stroke-linejoin="round"><path d="M6 2.5h8l4.5 4.5v14.5H6z"/><path d="M14 2.5V7h4.5"/></svg>
-            <div><div class="t">Lease 2027.pdf</div><div class="s">Key dates</div></div></div>
-          <div class="hl"><em class="num">Jan 1</em>Lease starts</div>
-          <div class="hl"><em class="num">Mar 15</em>Rent review</div>
-          <div class="hl"><em class="num">Nov 30</em>Notice due</div>
-          <div class="ln" style="margin-top:18px"></div><div class="ln" style="width:70%"></div>
+
+        <div class="it" style="left:384px;top:126px;transform:rotate(7deg);padding:20px 20px">
+          <div class="pdf">
+            <h4>Lease Agreement</h4>
+            This agreement begins on <mark>January 1, 2027</mark> and runs for twelve months between the landlord and tenant named below.<br><br>
+            Rent is reviewed once a year, on <mark>March 15</mark>, with no more than three per cent increase.<br><br>
+            Either party may end the agreement with written notice no later than <mark>November 30</mark>.<br><br>Keys are returned on the final day of the term.
+          </div>
         </div>
-        <!-- email -->
-        <div class="doc" style="left:236px;top:228px;transform:rotate(-1.5deg)">
-          <div class="row"><span class="av" style="background:linear-gradient(135deg,#c9b6ff,#7a5cff)"></span>
-            <div><div class="t">To Jonah</div><div class="s">Re: Contract review</div></div></div>
-          <div class="ln"></div><div class="ln"></div><div class="ln" style="width:80%"></div><div class="ln" style="width:50%"></div>
-          <div class="btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12 20 4l-5 16-3-7z"/></svg>Send</div>
+
+        <div class="it" style="left:222px;top:262px;height:282px;transform:rotate(-1.5deg)">
+          <div class="k">To: Jonah Park</div>
+          <div class="t">Re: Contract review</div>
+          <div class="rule" style="margin:10px -20px"></div>
+          <div class="body" style="margin-top:0">Hi Jonah,<br><br>Thanks for sending this over. I’ve read section 4 and I’m happy with the changes.<br><br>Shall we sign on Thursday?</div>
+          <div style="position:absolute;left:20px;bottom:18px"><span class="cap"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 11.2 20 3.6c.6-.3 1.2.3.9.9l-7.6 16.6c-.3.7-1.3.6-1.4-.1l-1.3-6.3-6.3-1.3c-.7-.1-.8-1.1-.1-1.4z"/></svg>Send</span></div>
         </div>
-        <div class="chip num">3 to review</div>
+
+        <div class="tag tn">3 to review</div>
       </div>
     </div>
   </div>
-  <svg class="mark" width="48" height="48"><use href="#mark"/></svg>
-  <div class="grain"></div>
+  <svg class="logo" width="44" height="44"><use href="#mark"/></svg>
 </section>
 
-<!-- 3 · Widget grid -->
+<!-- 3 · Widget set -->
 <section class="frame f3" id="f3" aria-label="Thinq widget set">
   <div class="grid">
     <div class="w w1">
-      <div class="back"></div>
-      <div class="pk" style="left:52px;top:62px;transform:rotate(-8deg)"><b>Weekly recap</b><small>Mon 8:00 AM</small>
-        <div class="bars"><span style="height:40%"></span><span style="height:70%"></span><span style="height:52%"></span><span style="height:90%"></span><span style="height:64%"></span></div></div>
-      <div class="pk" style="left:160px;top:48px;transform:rotate(7deg)"><b>Unread digest</b><small>Weekdays 7:30</small>
-        <div class="ln" style="height:7px;border-radius:7px;background:#efeff3;margin-top:16px"></div><div style="height:7px;border-radius:7px;background:#efeff3;margin-top:9px;width:70%"></div><div style="height:7px;border-radius:7px;background:#efeff3;margin-top:9px;width:85%"></div></div>
-      <div class="flap"></div>
-      <div class="pill"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5"/></svg>Your routines</div>
+      <div class="bk"></div>
+      <div class="pk" style="left:46px;top:58px;transform:rotate(-7deg)"><b>Weekly recap</b><small>Mondays at 8:00</small>
+        <div class="ch"><span style="height:46%"></span><span style="height:72%"></span><span style="height:58%"></span><span style="height:94%"></span><span class="o" style="height:30%"></span></div>
+        <div class="dl"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span></div></div>
+      <div class="pk" style="left:160px;top:46px;transform:rotate(6deg)"><b>Unread digest</b><small>Weekdays at 7:30</small>
+        <p>4 need a reply. Maya on the budget, Jonah on the contract, two invoices.</p></div>
+      <div class="flap lg"></div>
+      <div class="cap2"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2.5 20.5 6 17 9.5"/><path d="M3.5 11.5V10a4 4 0 0 1 4-4h13M7 21.5 3.5 18 7 14.5"/><path d="M20.5 12.5V14a4 4 0 0 1-4 4h-13"/></svg>Your routines</div>
     </div>
 
     <div class="w w2">
       <div class="top">
         <div class="who"><div class="av">MC</div><div><b>Maya Chen</b><small>Needs a reply</small></div></div>
-        <p class="q">“Could we move the budget review to Thursday?”</p>
+        <p class="msg">“Could we move the budget review to Thursday?”</p>
       </div>
-      <div class="bot">
-        <div><b>Reply drafted</b><small>Thursday works</small></div>
-        <div class="send" aria-label="Review reply"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></div>
+      <div class="bot lg">
+        <div><b>Reply drafted</b><small>“Thursday works for me”</small></div>
+        <div class="go"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19.5v-15M5.5 11 12 4.5 18.5 11"/></svg></div>
       </div>
     </div>
 
     <div class="w w3">
-      <div class="lbl"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 9.5 5.5 3h13L21 9.5V20H3zM3 9.5h5l1.5 2.5h5L16 9.5h5"/></svg>Inbox today</div>
-      <svg class="ring" width="290" height="290" viewBox="0 0 290 290">
-        <circle cx="145" cy="145" r="112" fill="none" stroke="rgba(40,24,90,.14)" stroke-width="40"/>
-        <circle cx="145" cy="145" r="112" fill="none" stroke="#f6eaa6" stroke-width="40" stroke-linecap="round" stroke-dasharray="250 704" transform="rotate(-90 145 145)"/>
-        <circle cx="145" cy="145" r="112" fill="none" stroke="#8fb9fb" stroke-width="40" stroke-linecap="round" stroke-dasharray="215 704" transform="rotate(52 145 145)"/>
+      <svg class="scene" viewBox="0 0 356 356" preserveAspectRatio="none" aria-hidden="true">
+        <circle cx="250" cy="150" r="34" fill="#ffe7c2" opacity=".9"/>
+        <path d="M0 160 C60 140 110 150 160 158 L160 168 L0 168Z" fill="#9f7f86" opacity=".55"/>
+        <rect y="166" width="356" height="190" fill="url(#sea)"/>
+        <path d="M180 172 h140 M200 190 h90 M230 210 h60" stroke="#ffe0bd" stroke-width="3" opacity=".55" stroke-linecap="round"/>
+        <defs><linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7ea6c7"/><stop offset="1" stop-color="#2f5e8e"/></linearGradient></defs>
       </svg>
-      <div class="core"><small>Replies sent</small><b class="num">18</b><small class="num">of 24</small></div>
-      <div class="time num">4:12 PM</div>
+      <div class="lbl"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M5.2 4h13.6l2.7 8.3V18a2 2 0 0 1-2 2h-15a2 2 0 0 1-2-2v-5.7zm.9 2-2 6.5h4.6l1.3 2.3h4l1.3-2.3h4.6l-2-6.5z"/></svg>Inbox today</div>
+      <svg class="ring" width="292" height="292" viewBox="0 0 292 292">
+        <defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#ffe2b8"/></linearGradient></defs>
+        <circle cx="146" cy="146" r="116" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="30"/>
+        <circle cx="146" cy="146" r="116" fill="none" stroke="url(#rg)" stroke-width="30" stroke-linecap="round" stroke-dasharray="546.6 728.8" transform="rotate(-90 146 146)"/>
+      </svg>
+      <div class="core lg"><small>Replies sent</small><b class="tn">18</b><small class="tn">of 24</small></div>
+      <div class="time lg tn">4:12 PM</div>
     </div>
 
     <div class="w w4">
       <div class="art"><div class="wave" aria-hidden="true">
-        <span style="height:30%"></span><span style="height:55%"></span><span style="height:80%"></span><span style="height:45%"></span><span style="height:95%"></span><span style="height:60%"></span><span style="height:35%"></span><span style="height:70%"></span><span style="height:50%"></span><span style="height:85%"></span><span class="d" style="height:40%"></span><span class="d" style="height:65%"></span><span class="d" style="height:30%"></span><span class="d" style="height:55%"></span><span class="d" style="height:75%"></span><span class="d" style="height:38%"></span><span class="d" style="height:25%"></span><span class="d" style="height:48%"></span>
+        <span style="height:26%"></span><span style="height:48%"></span><span style="height:74%"></span><span style="height:40%"></span><span style="height:92%"></span><span style="height:58%"></span><span style="height:34%"></span><span style="height:68%"></span><span style="height:84%"></span><span style="height:46%"></span><span class="d" style="height:62%"></span><span class="d" style="height:30%"></span><span class="d" style="height:52%"></span><span class="d" style="height:76%"></span><span class="d" style="height:38%"></span><span class="d" style="height:22%"></span><span class="d" style="height:44%"></span><span class="d" style="height:28%"></span>
       </div></div>
-      <div class="meta"><b>Your day, read aloud</b><small class="num">Morning brief · 1:42</small></div>
+      <div class="meta"><b>Your day, read aloud</b><small class="tn">Morning brief</small></div>
+      <div class="prog"><i></i></div>
       <div class="ctr">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg>
-        <div class="pp"><svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1.4"/><rect x="14" y="5" width="4" height="14" rx="1.4"/></svg></div>
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg>
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M11 6.8v10.4c0 .8-.9 1.3-1.5.8L3 13a1.2 1.2 0 0 1 0-2l6.5-5c.6-.5 1.5 0 1.5.8zm10 0v10.4c0 .8-.9 1.3-1.5.8L13 13a1.2 1.2 0 0 1 0-2l6.5-5c.6-.5 1.5 0 1.5.8z"/></svg>
+        <div class="pp"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="5.5" y="4.5" width="4.4" height="15" rx="1.3"/><rect x="14.1" y="4.5" width="4.4" height="15" rx="1.3"/></svg></div>
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M3 6.8v10.4c0 .8.9 1.3 1.5.8L11 13a1.2 1.2 0 0 0 0-2L4.5 6c-.6-.5-1.5 0-1.5.8zm10 0v10.4c0 .8.9 1.3 1.5.8L21 13a1.2 1.2 0 0 0 0-2l-6.5-5c-.6-.5-1.5 0-1.5.8z"/></svg>
       </div>
     </div>
   </div>
-  <div class="grain"></div>
 </section>
 
 <!-- 4 · Today -->
 <section class="frame f4" id="f4" aria-label="Today summary widget">
-  <div class="cloud" style="width:520px;height:220px;left:-120px;top:60px"></div>
-  <div class="cloud" style="width:380px;height:170px;left:560px;top:120px;opacity:.7"></div>
-  <div class="cloud" style="width:300px;height:140px;left:720px;top:520px;opacity:.75"></div>
-  <div class="cloud" style="width:460px;height:200px;left:-140px;top:700px;opacity:.8"></div>
-  <div class="cloud" style="width:700px;height:260px;left:150px;top:1040px"></div>
-  <div class="cloud" style="width:260px;height:120px;left:40px;top:430px;opacity:.6"></div>
+  <div class="cl" style="left:-60px;top:70px;width:520px;height:220px"><span style="left:0;top:90px;width:260px;height:120px"></span><span style="left:120px;top:20px;width:220px;height:180px"></span><span style="left:260px;top:70px;width:240px;height:140px"></span></div>
+  <div class="cl" style="left:600px;top:150px;width:420px;height:200px;opacity:.85"><span style="left:0;top:80px;width:200px;height:100px"></span><span style="left:90px;top:20px;width:180px;height:150px"></span><span style="left:210px;top:60px;width:220px;height:120px"></span></div>
+  <div class="cl" style="left:-120px;top:620px;width:400px;height:200px;opacity:.75"><span style="left:0;top:70px;width:240px;height:110px"></span><span style="left:110px;top:10px;width:180px;height:150px"></span></div>
+  <div class="cl" style="left:700px;top:560px;width:360px;height:180px;opacity:.7"><span style="left:0;top:60px;width:200px;height:100px"></span><span style="left:100px;top:0;width:180px;height:150px"></span></div>
+  <div class="cl" style="left:40px;top:1000px;width:900px;height:300px"><span style="left:0;top:110px;width:360px;height:180px"></span><span style="left:200px;top:30px;width:300px;height:240px"></span><span style="left:430px;top:80px;width:380px;height:200px"></span></div>
 
-  <div class="today">
+  <div class="today lg">
     <div class="card">
       <div class="island"></div>
-      <div class="streak"><svg width="18" height="18" viewBox="0 0 16 16"><path d="M8 0c.6 4.2 3.8 7.4 8 8-4.2.6-7.4 3.8-8 8-.6-4.2-3.8-7.4-8-8 4.2-.6 7.4-3.8 8-8z" fill="#7a5cff"/></svg><span class="num">12-day inbox streak</span></div>
+      <div class="streak"><svg width="20" height="20" viewBox="0 0 24 24"><path d="M12.5 2.5c.4 3.2 2.6 4.8 4.2 6.7 1.4 1.7 2.3 3.6 2.3 5.8 0 3.9-3.1 6.9-7 6.9s-7-3-7-6.9c0-2.6 1.3-4.6 3-6.1.3 1.5 1.1 2.6 2.3 3.1-.3-3.6.7-6.9 2.2-9.5z" fill="#ff9500"/><path d="M12 21c-1.9 0-3.3-1.4-3.3-3.2 0-1.6 1.1-2.6 2.2-3.6.3 1 .9 1.6 1.7 1.8 0-1.2.4-2.3 1-3.1 1.1 1.3 1.7 2.6 1.7 4 0 2.4-1.5 4.1-3.3 4.1z" fill="#ffcc00"/></svg><span class="tn">12</span></div>
       <div class="greet">
-        <div><span class="avatar">A</span>Hi Alex,</div>
-        <div class="sub">Today’s plan is</div>
-        <div><span class="sub">set to:</span> <span class="plan"><span class="num">4 meetings</span><span class="cal"><svg width="26" height="26" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="2" y="3" width="12" height="11" rx="2.5"/><path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3"/></svg></span></span></div>
+        <div class="r1"><span class="av">AM</span>Hi Alex,</div>
+        <div class="g">Today’s plan is</div>
+        <div><span class="g">set to:</span> <span class="plan"><span class="tn">4 meetings</span><span class="calico"><i>TUE</i><b class="tn">18</b></span></span></div>
       </div>
-      <div class="rule"></div>
-      <div class="big num">23</div><small>Emails handled</small>
+      <div class="hr"></div>
+      <div class="big tn">23</div><small>Emails handled</small>
       <div class="stats">
-        <div><b class="num">5</b><small>Drafts</small></div>
-        <div><b class="num">2</b><small>Invites</small></div>
-        <div><b class="num">48 min</b><small>Time saved</small></div>
+        <div><b class="tn">5</b><small>Drafts</small></div>
+        <div><b class="tn">2</b><small>Invites</small></div>
+        <div><b class="tn">48 min</b><small>Saved</small></div>
       </div>
     </div>
     <div class="foot">
-      <div class="cta"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Review 5 drafts</div>
-      <div class="fine"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M8 1.5 13.5 3.5v4c0 3.3-2.3 5.9-5.5 7-3.2-1.1-5.5-3.7-5.5-7v-4z"/></svg>Nothing sends until you approve it</div>
+      <div class="btn"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m4.5 12.5 5 5 10-11"/></svg>Review 5 drafts</div>
+      <div class="fine"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10V7.5a5 5 0 0 1 10 0V10h.5A2.5 2.5 0 0 1 20 12.5v7a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 19.5v-7A2.5 2.5 0 0 1 6.5 10zm2 0h6V7.5a3 3 0 0 0-6 0z"/></svg>Nothing sends until you approve it</div>
     </div>
   </div>
-  <div class="grain"></div>
 </section>
 </body>
 </html>
