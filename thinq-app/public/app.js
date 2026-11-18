@@ -58,6 +58,7 @@ async function api(path, opts = {}) {
 async function refresh() {
   state = await api("/api/state");
   $("#botsTabBtn").hidden = !state.telegram;
+  applyAttention(state.attention);
   api("/api/routines").then((r) => { routinesData = r.routines; const w = routinesData.filter((x) => x.status === "needs_ok").length; $("#rtBadge").hidden = !w; $("#rtBadge").textContent = w; if (!$("#tab-routines").hidden) renderRoutines(); }).catch(() => {});
   renderAccount(); renderConn(); renderWhatsApp(); renderWaSync(); renderMeetings(); renderNotify(); renderNotes(); renderConvos(); renderApprovals(); renderGreeting();
 }
@@ -742,7 +743,7 @@ function renderNotes() {
 function renderConvos() {
   const list = state.conversations;
   $("#convos").innerHTML = list.length
-    ? `<div class="label">Recent</div>` + list.map((c) => `<div class="convo"${c.id === conversationId ? ' data-current' : ""}><a href="#${c.id}" data-id="${c.id}" ${c.id === conversationId ? 'aria-current="true"' : ""} title="${esc(c.title)}">${esc(c.title)}</a><button class="del" data-del="${c.id}" aria-label="Delete “${esc(c.title)}”" title="Delete chat">${icon("i-trash", 14)}</button></div>`).join("")
+    ? `<div class="label">Recent</div>` + list.map((c) => `<div class="convo"${c.id === conversationId ? ' data-current' : ""}><a href="#${c.id}" data-id="${c.id}" ${c.id === conversationId ? 'aria-current="true"' : ""} class="${state.attention?.unreadChats?.includes(c.id) && c.id !== conversationId ? "unread" : ""}" title="${esc(c.title)}">${esc(c.title)}</a><button class="del" data-del="${c.id}" aria-label="Delete “${esc(c.title)}”" title="Delete chat">${icon("i-trash", 14)}</button></div>`).join("")
     : `<p class="none">Your chats will appear here.</p>`;
 }
 
@@ -760,6 +761,32 @@ async function loadSuggestions() {
   box.innerHTML = list.map((t) => `<button>${esc(t)}</button>`).join("");
 }
 
+// ---------------- "needs your attention" counts: app icon, tab title, unread chats ----------------
+// total = drafts waiting in Approvals + routines waiting for Turn on + chats with a result you haven't opened.
+let attentionNow = null;
+function applyAttention(a) {
+  if (!a) return;
+  attentionNow = a;
+  try {
+    if ("setAppBadge" in navigator) (a.total ? navigator.setAppBadge(a.total) : navigator.clearAppBadge()).catch(() => {});
+  } catch { /* not supported in this browser */ }
+  document.title = a.total ? `(${a.total > 99 ? "99+" : a.total}) Thinq AI` : "Thinq AI";
+  const rb = $("#rtBadge"); if (rb) { rb.hidden = !a.routines; rb.textContent = a.routines; }
+  document.querySelectorAll("#convos a[data-id]").forEach((el) => el.classList.toggle("unread", a.unreadChats.includes(el.dataset.id)));
+}
+async function checkAttention() {
+  try {
+    const a = await api("/api/attention");
+    const changed = !attentionNow || a.total !== attentionNow.total || a.approvals !== attentionNow.approvals;
+    applyAttention(a);
+    if (changed && state) refresh(); // something new arrived: bring Approvals, chats and routines up to date
+  } catch { /* offline - try again later */ }
+}
+setInterval(() => { if (document.visibilityState === "visible") checkAttention(); }, 60_000);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkAttention(); });
+// A push notification arrived while Thinq is open.
+navigator.serviceWorker?.addEventListener("message", (e) => { if (e.data?.type === "push") checkAttention(); });
+
 // ---------------- conversations ----------------
 async function openConversation(id) {
   conversationId = id;
@@ -771,6 +798,7 @@ async function openConversation(id) {
   }
   try {
     const c = await api(`/api/conversations/${id}`);
+    if (attentionNow?.unreadChats.includes(id)) { attentionNow.unreadChats = attentionNow.unreadChats.filter((x) => x !== id); attentionNow.total--; if (state) state.attention = attentionNow; applyAttention(attentionNow); }
     $("#title").textContent = c.title;
     $("#empty").hidden = c.messages.length > 0;
     c.messages.forEach((m) => addMessage(m.role, m.text, "", m.attachments || []));

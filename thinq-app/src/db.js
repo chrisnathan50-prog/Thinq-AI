@@ -317,6 +317,7 @@ async function migrate() {
       expires_at timestamptz not null
     );
     alter table messages add column if not exists attachments jsonb;
+    alter table conversations add column if not exists unread boolean not null default false;
     alter table users add column if not exists tour_done_at timestamptz;
     create index if not exists documents_conv on documents(conversation_id);
     create index if not exists conversations_user on conversations(user_id, created_at desc);

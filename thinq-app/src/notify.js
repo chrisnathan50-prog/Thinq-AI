@@ -89,7 +89,9 @@ export async function notify(userId, { title, body = "", url = "/app", tag }, ki
   if (kind === "calendar" && !prefs.calendar) return 0;
   if (kind === "meetings" && !prefs.meetings) return 0;
   await keys();
-  const payload = JSON.stringify({ title: clip(title, 80), body: clip(body, 300), url, tag: tag || `${kind}-${Date.now()}` });
+  // badge: the "needs your attention" count, so the app icon updates even while Thinq is closed.
+  const badge = await import("./attention.js").then((m) => m.attention(userId)).then((a) => a.total).catch(() => null);
+  const payload = JSON.stringify({ title: clip(title, 80), body: clip(body, 300), url, tag: tag || `${kind}-${Date.now()}`, badge });
   let reached = 0;
   for (const d of await devicesOf(userId)) {
     try {

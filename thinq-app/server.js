@@ -5,6 +5,7 @@
 //   /auth/...    Google sign-in, connecting Gmail & Calendar, log out
 import * as bots from "./src/bots.js";
 import * as routines from "./src/routines.js";
+import { attention, markRead } from "./src/attention.js";
 import { mountTelegram, startTelegram, telegramConfigured, botUsername } from "./src/telegram.js";
 import express from "express";
 import fs from "node:fs";
@@ -97,6 +98,7 @@ api.get("/state", async (req, res) => {
     model: MODEL,
     usage: { today: await store.usageToday(req.user.id), limit: DAILY_LIMIT },
     voiceAvailable: voiceAvailable(),
+    attention: await attention(req.user.id).catch(() => null),
     telegram: telegramConfigured() ? { username: botUsername() } : null,
     admin: isAdmin(req.user.email) ? { pendingTesters: (await store.listTesters()).filter((t) => t.status === "pending").length } : null,
     speechAvailable: speechAvailable(),
@@ -140,6 +142,7 @@ api.get("/suggestions", async (req, res) => {
 });
 api.get("/conversations/:id", async (req, res) => {
   const c = await store.getConversation(req.user.id, req.params.id);
+  if (c) await markRead(req.user.id, c.id); // opening a chat clears its "new result" dot
   c ? res.json(c) : res.status(404).json({ error: "Not found" });
 });
 
@@ -322,6 +325,8 @@ api.put("/meetings/settings", async (req, res) => {
 // ---------- routines (tasks on a schedule) ----------
 const routineErr = (res, err) => (err instanceof routines.RoutineError || err.userFacing || err instanceof TurnError ? res.status(400).json({ error: err.message }) : (console.error(err), res.status(500).json({ error: friendlyError(err) })));
 api.get("/routines", async (req, res) => res.json({ routines: await routines.listRoutines(req.user.id) }));
+// Just the counts, for keeping the app icon and tab title up to date without reloading everything.
+api.get("/attention", async (req, res) => res.json(await attention(req.user.id)));
 // Turning a routine on is only ever done here, by the user's own click - the AI has no tool for it.
 api.post("/routines/:id/on", async (req, res) => {
   try { res.json(await routines.turnOn(req.user.id, req.params.id, { autoSend: req.body?.autoSend === true })); } catch (err) { routineErr(res, err); }

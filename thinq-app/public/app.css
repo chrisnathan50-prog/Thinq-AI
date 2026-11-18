@@ -512,3 +512,7 @@ table.people .muted{color:var(--soft);font-size:12px}
 .ai-chain li .state{color:var(--muted)}
 .ai-chain li.ok .state{color:#14662f}
 .ai-chain li.bad .state{color:#b91c1c}
+
+/* chats with a result you haven't opened yet */
+.convos a.unread{color:var(--ink);font-weight:500;padding-left:22px;position:relative}
+.convos a.unread::before{content:"";position:absolute;left:9px;top:50%;width:7px;height:7px;margin-top:-3.5px;border-radius:50%;background:var(--violet,#7c5cff)}

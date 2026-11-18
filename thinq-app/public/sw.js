@@ -25,6 +25,10 @@ self.addEventListener("push", (event) => {
       await note({ ok: false, error: `${err.name}: ${err.message}` });
       await self.registration.showNotification("Thinq", { body: data.body || data.title || "You have a new notification." });
     }
+    // The number on the app icon (iPhone Home Screen app, installed desktop app): what needs attention.
+    if (typeof data.badge === "number" && "setAppBadge" in self.navigator) {
+      try { await (data.badge > 0 ? self.navigator.setAppBadge(data.badge) : self.navigator.clearAppBadge()); } catch {}
+    }
     // Let an open Thinq tab know too.
     for (const c of await self.clients.matchAll({ type: "window" })) c.postMessage({ type: "push", title: data.title });
   })());

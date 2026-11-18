@@ -22,6 +22,7 @@ import { AI_PROVIDER, MODEL } from "./agent.js";
 import Anthropic from "@anthropic-ai/sdk";
 import { publicUrl } from "./providers/google.js";
 import { friendlyError } from "./errors.js";
+import { markUnread } from "./attention.js";
 
 export const MAX_ROUTINES = 20;
 export class RoutineError extends Error {}
@@ -198,6 +199,7 @@ export async function runRoutine(r, { manual = false } = {}) {
       text: `[Routine "${r.title}" - ${manual ? "run now by the user" : `running automatically, ${when}`}]\n${r.instruction}`,
     });
     const preview = reply.text.replace(/[*#_`>|]/g, "").replace(/\s+/g, " ").trim();
+    if (!manual) await markUnread(convId); // shows as a new result (dot on the chat, count on the app icon)
     await notify(user.id, { title: r.title, body: preview, url: `/app#${convId}`, tag: `routine-${r.id}` }, "reminder").catch(() => 0);
     if (r.email_me) {
       const p = await providerFor(user);
@@ -265,4 +267,10 @@ export function startRoutineWorker() {
   const safe = () => runDue().catch((e) => console.warn("[routines]", e.message));
   setInterval(safe, 30_000);
   setTimeout(safe, 8_000);
+}
+
+// How many message routines are waiting for the person to tap Turn on (for the attention count).
+export async function countNeedingOk(userId) {
+  await ensureSchema();
+  return (await one(`select count(*)::int as n from routines where user_id = $1 and status = 'needs_ok'`, [userId])).n;
 }
