@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Thinq Explainer</title>
+<meta name="viewport" content="width=1080">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..600&family=Geist+Mono:wght@400;500&display=block" rel="stylesheet">
+<style>
+/* Style as numbers. Tokens come from src/pages/index.html. */
+:root{
+  --bg:#f7f7f8; --card:#ffffff; --ink:#0b0b0c; --ink-2:#3a3a3d; --muted:#7d7d83; --soft:#b1b1b6;
+  --line:#ececee; --line-2:#f3f3f5; --violet:#7a5cff; --lilac:#c9b6ff; --pink:#f7b6d2; --blue:#a9cdfd;
+  --shadow:0 2px 4px rgba(11,11,12,.04), 0 28px 56px -24px rgba(11,11,12,.22);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1080px;height:1920px;overflow:hidden;background:var(--bg)}
+body{font-family:Geist,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;font-feature-settings:"ss01"}
+#stage{position:absolute;inset:0;overflow:hidden;background:var(--bg)}
+.abs{position:absolute;left:0;top:0;will-change:transform,opacity}
+/* Swiss column grid: 12 columns between 108px margins */
+#grid{position:absolute;inset:0;pointer-events:none}
+#grid i{position:absolute;top:0;bottom:0;width:1px;background:var(--line-2)}
+
+/* Headline */
+#eyebrow{left:108px;top:236px;font:500 26px/1 "Geist Mono",monospace;letter-spacing:.06em;color:var(--muted);text-transform:uppercase;display:flex;gap:18px}
+#eyebrow b{color:var(--ink);font-weight:500}
+.hl{left:108px;top:292px;width:880px;font-weight:600;font-size:100px;line-height:1.02;letter-spacing:-.045em}
+.hl .ln{display:block;white-space:nowrap}
+.hl .w{display:inline-block;overflow:hidden;vertical-align:top;padding-bottom:.12em;margin-bottom:-.12em}
+.hl .w>span{display:inline-block}
+.hl .muted{color:var(--muted)}
+
+/* Source cards (shot 1) that become chips (shot 2) */
+.src{background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow);overflow:hidden}
+.src .full{position:absolute;left:0;top:0;width:760px;height:176px;display:flex;align-items:center;gap:30px;padding:0 36px}
+.src .ico{width:104px;height:104px;border-radius:28px;display:grid;place-items:center;flex:none}
+.src .ico svg{width:52px;height:52px}
+.src .tx{flex:1;display:flex;flex-direction:column;gap:16px}
+.src .t{font-weight:600;font-size:40px;letter-spacing:-.03em}
+.src .bars{display:flex;gap:10px}
+.src .bars i{height:14px;border-radius:7px;background:var(--line)}
+.src .badge{min-width:76px;height:60px;padding:0 18px;border-radius:30px;background:var(--ink);color:#fff;font:600 30px/60px Geist;text-align:center;font-variant-numeric:tabular-nums}
+.src .chip{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:12px;font:500 25px/1 Geist;letter-spacing:-.01em;color:var(--ink-2)}
+.src .chip i{width:12px;height:12px;border-radius:6px;background:var(--violet)}
+
+/* Thinq window */
+#win{left:108px;top:640px;width:864px;height:880px;background:var(--card);border:1px solid var(--line);border-radius:44px;box-shadow:var(--shadow);overflow:hidden}
+#win .head{position:absolute;left:40px;top:38px;display:flex;align-items:center;gap:16px;font-weight:600;font-size:36px;letter-spacing:-.03em}
+#win .head .sp{width:44px;height:44px;color:var(--violet)}
+#win .tab{position:absolute;right:40px;top:44px;font:500 24px/1 "Geist Mono";letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+#win .rule{position:absolute;left:0;right:0;top:206px;height:1px;background:var(--line)}
+#input{position:absolute;left:32px;right:32px;bottom:32px;height:104px;border-radius:52px;background:var(--bg);border:1px solid var(--line);display:flex;align-items:center;padding:0 22px 0 38px;font-size:32px;letter-spacing:-.01em}
+#input .ph{color:#8a8a90}
+#input .caret{display:inline-block;width:3px;height:40px;background:var(--violet);margin-left:3px;vertical-align:-8px}
+#input .send{margin-left:auto;width:64px;height:64px;border-radius:32px;background:var(--ink);display:grid;place-items:center}
+
+/* Chat */
+#empty{left:0;top:300px;width:862px;display:flex;flex-direction:column;align-items:center;gap:32px;text-align:center;font-weight:500;font-size:44px;line-height:1.15;letter-spacing:-.03em;color:var(--ink-2)}
+#empty svg{width:96px;height:96px;color:var(--lilac)}
+#ubub{right:72px;top:268px;left:auto;background:var(--ink);color:#fff;font-size:34px;font-weight:500;letter-spacing:-.02em;padding:24px 34px;border-radius:40px 40px 12px 40px}
+#dots{left:72px;top:400px;display:flex;gap:10px;padding:26px 30px;background:var(--bg);border-radius:12px 36px 36px 36px}
+#dots i{width:14px;height:14px;border-radius:7px;background:var(--soft)}
+#reply{left:72px;top:400px;width:720px}
+#reply .rh{display:flex;align-items:center;gap:14px;font-weight:500;font-size:30px;color:var(--ink-2);margin-bottom:22px}
+#reply .rh svg{width:30px;height:30px;color:var(--violet)}
+.row{display:flex;align-items:center;gap:26px;height:104px;padding:0 28px;border-radius:26px;background:var(--bg);margin-bottom:14px}
+.row .tm{font:500 26px/1 "Geist Mono";color:var(--muted);width:92px}
+.row .nm{font-weight:500;font-size:32px;letter-spacing:-.02em;flex:1}
+.row .tag{font-weight:500;font-size:22px;padding:10px 18px;border-radius:20px;background:#efeaff;color:#5a3fd6}
+.row .bar{height:14px;border-radius:7px;background:var(--line)}
+
+/* Approvals sheet */
+#sheet{left:140px;top:820px;width:800px;background:var(--card);border:1px solid var(--line);border-radius:40px;box-shadow:0 2px 4px rgba(11,11,12,.05),0 40px 80px -24px rgba(11,11,12,.35);padding:40px}
+#sheet .sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:30px}
+#sheet .sh b{font-weight:600;font-size:36px;letter-spacing:-.03em}
+#sheet .sh span{font:500 22px/1 "Geist Mono";letter-spacing:.06em;text-transform:uppercase;color:#5a3fd6;background:#efeaff;padding:12px 16px;border-radius:18px}
+#sheet .meta{font:400 26px/1.5 Geist;color:var(--muted);border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom:24px}
+#sheet .meta em{font-style:normal;color:var(--ink)}
+#sheet .body{font-size:32px;line-height:1.4;letter-spacing:-.015em;color:var(--ink-2)}
+#sheet .bars{margin:22px 0 36px;display:flex;flex-direction:column;gap:14px}
+#sheet .bars i{height:14px;border-radius:7px;background:var(--line-2)}
+#sheet .btns{display:flex;gap:16px;justify-content:flex-end}
+.btn{height:84px;padding:0 40px;border-radius:42px;font:500 30px/84px Geist;letter-spacing:-.01em}
+.btn.ghost{border:1px solid var(--line);color:var(--ink-2)}
+#send{background:var(--ink);color:#fff;position:relative;overflow:hidden;min-width:190px;text-align:center}
+#send .ok{position:absolute;inset:0;background:var(--violet);display:flex;align-items:center;justify-content:center;gap:10px}
+
+/* Routine */
+#rout{left:72px;top:262px;width:720px}
+#rout .card{border-radius:30px;background:var(--bg);padding:34px}
+#rout .when{display:flex;align-items:center;justify-content:space-between}
+#rout .when b{font-weight:600;font-size:38px;letter-spacing:-.03em}
+#rout .what{margin-top:16px;font-size:30px;line-height:1.35;color:var(--muted);letter-spacing:-.01em;width:560px}
+.tog{width:112px;height:64px;border-radius:32px;background:var(--line);position:relative}
+.tog i{position:absolute;top:6px;left:6px;width:52px;height:52px;border-radius:26px;background:#fff;box-shadow:0 2px 6px rgba(11,11,12,.18)}
+#week{display:flex;gap:14px;margin-top:30px}
+#week .d{flex:1;height:168px;border-radius:26px;border:1px solid var(--line);position:relative;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:24px 0}
+#week .d span{font:500 24px/1 "Geist Mono";color:var(--muted);letter-spacing:.04em}
+#week .d .ck{width:56px;height:56px;border-radius:28px;background:var(--violet);display:grid;place-items:center}
+#week .d .ck svg{width:28px;height:28px}
+#wk-label{margin-top:24px;font:500 24px/1 "Geist Mono";letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+
+/* Cursor */
+#cur{width:56px;height:56px;left:0;top:0}
+
+/* End card */
+#end{left:0;top:0;width:1080px;height:1920px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+#end .mark{width:180px;height:180px;color:var(--violet);margin-bottom:56px}
+#end .wm{font-weight:600;font-size:150px;letter-spacing:-.055em;line-height:1}
+#end .tg{margin-top:28px;font-weight:400;font-size:56px;letter-spacing:-.03em;color:var(--muted)}
+#end .cta{margin-top:84px;height:112px;padding:0 60px;border-radius:56px;background:var(--ink);color:#fff;font:500 38px/112px Geist;letter-spacing:-.015em;display:flex;align-items:center;gap:18px}
+#end .cta svg{width:30px;height:30px}
+#end .src-row{margin-top:40px;display:flex;gap:14px}
+#end .src-row span{font:500 24px/1 Geist;color:var(--muted);padding:14px 22px;border:1px solid var(--line);border-radius:24px;background:#fff}
+
+/* Footer */
+#foot{left:108px;top:1724px;width:864px;display:flex;align-items:center;justify-content:space-between;font:500 24px/1 "Geist Mono";letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+#foot .b{display:flex;align-items:center;gap:12px;color:var(--ink);font:600 30px/1 Geist;letter-spacing:-.02em;text-transform:none}
+#foot .b svg{width:30px;height:30px;color:var(--violet)}
+#prog{position:absolute;left:108px;top:1780px;width:864px;height:2px;background:var(--line)}
+#prog i{position:absolute;left:0;top:0;bottom:0;background:var(--ink)}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="grid"></div>
+
+  <div id="eyebrow" class="abs"><b id="eb-n">01</b><span id="eb-t">Sources</span></div>
+  <div id="hls"></div>
+
+  <div id="win" class="abs">
+    <div class="head"><svg class="sp" id="win-sp" viewBox="0 0 16 16"><path d="M8 0c.6 4.2 3.8 7.4 8 8-4.2.6-7.4 3.8-8 8-.6-4.2-3.8-7.4-8-8 4.2-.6 7.4-3.8 8-8z" fill="currentColor"/></svg>Thinq</div>
+    <div class="tab" id="win-tab">Chat</div>
+    <div class="rule"></div>
+
+    <div id="empty" class="abs"><svg viewBox="0 0 16 16"><path d="M8 0c.6 4.2 3.8 7.4 8 8-4.2.6-7.4 3.8-8 8-.6-4.2-3.8-7.4-8-8 4.2-.6 7.4-3.8 8-8z" fill="currentColor"/></svg><div>What can I take<br>off your plate?</div></div>
+    <div id="ubub" class="abs">Plan my day</div>
+    <div id="dots" class="abs"><i></i><i></i><i></i></div>
+    <div id="reply" class="abs">
+      <div class="rh"><svg viewBox="0 0 16 16"><path d="M8 0c.6 4.2 3.8 7.4 8 8-4.2.6-7.4 3.8-8 8-.6-4.2-3.8-7.4-8-8 4.2-.6 7.4-3.8 8-8z" fill="currentColor"/></svg>Here’s your day</div>
+      <div class="row" id="r0"><span class="tm">09:30</span><span class="nm">Design review</span><i class="bar" style="width:90px"></i></div>
+      <div class="row" id="r1"><span class="tm">11:00</span><span class="nm">Reply to Priya</span><span class="tag">Draft ready</span></div>
+      <div class="row" id="r2"><span class="tm">14:00</span><span class="nm">Focus block</span><i class="bar" style="width:120px"></i></div>
+    </div>
+
+    <div id="rout" class="abs">
+      <div class="card">
+        <div class="when"><b>Every weekday · 8:00</b><div class="tog" id="tog"><i id="tog-k"></i></div></div>
+        <div class="what">Summarise my unread email and tell me what needs a reply.</div>
+      </div>
+      <div id="week"></div>
+      <div id="wk-label">Runs by itself · Reports to you</div>
+    </div>
+
+    <div id="input"><span id="in-tx"></span><span class="caret" id="in-caret"></span><span class="ph" id="in-ph">Ask Thinq anything</span>
+      <div class="send" id="in-send"><svg width="26" height="26" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="1.6"><path d="M6 10V2M2.5 5.5 6 2l3.5 3.5"/></svg></div></div>
+  </div>
+
+  <div id="srcs"></div>
+
+  <div id="sheet" class="abs">
+    <div class="sh"><b>Approvals</b><span>Waiting for you</span></div>
+    <div class="meta">To <em>Priya</em> · Re: <em>30 minutes this week</em></div>
+    <div class="body">Hi Priya — Thursday at 3pm works. I’ve added an invite for you.</div>
+    <div class="bars"><i style="width:92%"></i><i style="width:64%"></i></div>
+    <div class="btns"><div class="btn ghost">Edit</div><div class="btn" id="send"><span>Send</span><div class="ok" id="send-ok"><svg width="28" height="28" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2"><path d="M3 8.5 6.5 12 13 4.5"/></svg>Sent</div></div></div>
+  </div>
+
+  <svg id="cur" class="abs" viewBox="0 0 28 28"><path d="M6 3.5v19.2l5-4.6 3.3 7.4 3.4-1.5-3.3-7.3h6.8z" fill="#0b0b0c" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>
+
+  <div id="end" class="abs">
+    <svg class="mark" id="end-mark" viewBox="0 0 16 16"><path d="M8 0c.6 4.2 3.8 7.4 8 8-4.2.6-7.4 3.8-8 8-.6-4.2-3.8-7.4-8-8 4.2-.6 7.4-3.8 8-8z" fill="currentColor"/></svg>
+    <div class="wm" id="end-wm">Thinq AI</div>
+    <div class="tg" id="end-tg">Works where you are.</div>
+    <div class="src-row" id="end-src"><span>Gmail</span><span>Calendar</span><span>WhatsApp</span><span>Telegram</span></div>
+    <div class="cta" id="end-cta">Become a tester<svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.8"><path d="M3 8h10M9 4l4 4-4 4"/></svg></div>
+  </div>
+
+  <div id="foot" class="abs"><div class="b"><svg viewBox="0 0 16 16"><path d="M8 0c.6 4.2 3.8 7.4 8 8-4.2.6-7.4 3.8-8 8-.6-4.2-3.8-7.4-8-8 4.2-.6 7.4-3.8 8-8z" fill="currentColor"/></svg>Thinq</div><span id="foot-r">Works where you are</span></div>
+  <div id="prog"><i id="prog-i"></i></div>
+</div>
+
+<script>
+// ---------- timing ----------
+const DUR = 20.4;            // seconds
+const BEAT = 0.6;            // 100 BPM
+// Shot boundaries sit on the beat grid: 0, 6, 11, 17, 24, 29 beats
+const S = [0, 3.6, 6.6, 10.2, 14.4, 17.4, DUR];
+
+// ---------- easing ----------
+function bez(x1,y1,x2,y2){
+  const A=(a,b)=>1-3*b+3*a, B=(a,b)=>3*b-6*a, C=a=>3*a;
+  const f=(t,a,b)=>((A(a,b)*t+B(a,b))*t+C(a))*t, d=(t,a,b)=>3*A(a,b)*t*t+2*B(a,b)*t+C(a);
+  return x=>{ if(x<=0) return 0; if(x>=1) return 1; let t=x;
+    for(let i=0;i<8;i++){ const s=d(t,x1,x2); if(Math.abs(s)<1e-6) break; t-=(f(t,x1,x2)-x)/s; }
+    return f(t,y1,y2); };
+}
+const OUT = bez(.22,1,.36,1);     // entrances
+const IO  = bez(.65,0,.35,1);     // moves
+const IN  = bez(.55,0,1,.45);     // exits
+const POP = bez(.34,1.36,.64,1);  // the few things that land with weight
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const P=(t,a,b)=>cl((t-a)/(b-a));
+const L=(a,b,k)=>a+(b-a)*k;
+const $=id=>document.getElementById(id);
+const set=(el,o)=>{ for(const k in o) el.style[k]=o[k]; };
+const tf=(x,y,s=1,r=0)=>`translate(${x}px,${y}px) scale(${s}) rotate(${r}deg)`;
+
+// ---------- grid ----------
+{ const g=$('grid'); for(let i=0;i<=12;i++){ const x=108+i*72; const e=document.createElement('i'); e.style.left=x+'px'; g.appendChild(e);} }
+
+// ---------- headlines ----------
+// each: lines of [text, startTime, muted?]; in = per-word reveal, out = whole block exits
+const HL = [
+  {id:'h1', from:0, to:3.62, lines:[['Your inbox.',0.30],['Your calendar.',1.02],['Your chats.',1.80]]},
+  {id:'h2', from:3.62, to:6.62, lines:[['One assistant',3.86],['for all of it.',4.70,1]]},
+  {id:'h3', from:6.62, to:10.22, lines:[['Plan my day.',6.78]]},
+  {id:'h4', from:10.22, to:14.42, lines:[['Drafts it.',10.40],['Waits for',11.80,1],['your OK.',12.20,1]]},
+  {id:'h5', from:14.42, to:17.30, lines:[['Tell it once.',14.56],['It keeps going.',15.52,1]]},
+];
+const hls=$('hls');
+for(const h of HL){
+  const d=document.createElement('div'); d.className='hl abs'; d.id=h.id; h.el=d; h.words=[];
+  for(const [txt,t0,m] of h.lines){
+    const ln=document.createElement('span'); ln.className='ln'+(m?' muted':'');
+    txt.split(' ').forEach((w,i)=>{ const o=document.createElement('span'); o.className='w';
+      const n=document.createElement('span'); n.textContent=w; o.appendChild(n); ln.appendChild(o);
+      ln.appendChild(document.createTextNode(' ')); h.words.push({n, t:t0+i*0.1}); });
+    d.appendChild(ln);
+  }
+  hls.appendChild(d);
+}
+function drawHeadlines(t){
+  for(const h of HL){
+    const vis = t>=h.from-0.01 && t<h.to+0.4;
+    h.el.style.display = vis?'block':'none'; if(!vis) continue;
+    const ex = IN(P(t,h.to-0.22,h.to+0.08));
+    set(h.el,{transform:tf(0,-70*ex), opacity:1-ex});
+    for(const w of h.words){ const k=OUT(P(t,w.t,w.t+0.55)); w.n.style.transform=`translateY(${(1-k)*105}%)`; }
+  }
+}
+const EB=[['01','Sources'],['02','Thinq'],['03','Plan'],['04','Approve'],['05','Routines']];
+
+// ---------- source cards -> chips ----------
+const ICON = {
+  mail:'<svg viewBox="0 0 24 24" fill="none" stroke="#0b0b0c" stroke-width="1.7"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="m4 7 8 6 8-6"/></svg>',
+  cal:'<svg viewBox="0 0 24 24" fill="none" stroke="#0b0b0c" stroke-width="1.7"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><circle cx="12" cy="15" r="1.4" fill="#0b0b0c" stroke="none"/></svg>',
+  chat:'<svg viewBox="0 0 24 24" fill="none" stroke="#0b0b0c" stroke-width="1.7"><path d="M20 11.5a8 8 0 0 1-11.6 7.1L4 20l1.4-4.2A8 8 0 1 1 20 11.5z"/></svg>',
+  tg:'<svg viewBox="0 0 24 24" fill="none" stroke="#0b0b0c" stroke-width="1.7" stroke-linejoin="round"><path d="M21 4 3 11l6 2 2 6 3-4 5 4z"/><path d="m9 13 8-6"/></svg>',
+};
+// card layout (shot 1) and chip layout (shot 2+), in stage pixels
+const CW=760, CH=176, chipW=187, chipH=64, chipY=640+122, chipX0=108+40;
+const SRC = [
+  {k:'mail', name:'Inbox',    chip:'Gmail',    col:'#a9cdfd', t:0.10, x:108, y:720,  r:-2.5, n:[3,14]},
+  {k:'cal',  name:'Calendar', chip:'Calendar', col:'#c9b6ff', t:0.86, x:212, y:1010, r: 2.0, n:[2,6]},
+  {k:'chat', name:'WhatsApp', chip:'WhatsApp', col:'#f7b6d2', t:1.64, x:150, y:1300, r:-1.2, n:[5,27]},
+  {k:'tg',   name:'Telegram', chip:'Telegram', col:'#d6f0e4', t:4.55, x:0,   y:0,    r:0,    n:[0,0], late:1},
+];
+const srcs=$('srcs');
+SRC.forEach((s,i)=>{
+  const d=document.createElement('div'); d.className='src abs';
+  d.innerHTML=`<div class="full"><div class="ico" style="background:${s.col}">${ICON[s.k]}</div>
+    <div class="tx"><div class="t">${s.name}</div><div class="bars"><i style="width:${150+i*30}px"></i><i style="width:${90-i*10}px"></i></div></div>
+    <div class="badge">0</div></div><div class="chip"><i></i>${s.chip}</div>`;
+  srcs.appendChild(d); s.el=d; s.full=d.querySelector('.full'); s.chipEl=d.querySelector('.chip'); s.badge=d.querySelector('.badge');
+  s.cx = chipX0 + i*(chipW+12); s.cy = chipY;
+});
+function drawSources(t){
+  for(const [i,s] of SRC.entries()){
+    if(t>S[5]+0.2){ s.el.style.display='none'; continue; } s.el.style.display='block';
+    // morph progress card -> chip, staggered 2 frames per card
+    const m = IO(P(t, 3.62+i*0.07, 4.42+i*0.07));
+    let x,y,w,h,r,rad,op,sc;
+    if(s.late){
+      const k=POP(P(t,s.t,s.t+0.5));
+      x=s.cx; y=s.cy; w=chipW; h=chipH; r=0; rad=32; op=P(t,s.t,s.t+0.15); sc=0.6+0.4*k;
+    } else {
+      const k=POP(P(t,s.t,s.t+0.62));
+      const ox=s.x+90*(1-k), oy=s.y+140*(1-k);
+      x=L(ox,s.cx,m); y=L(oy,s.cy,m); w=L(CW,chipW,m); h=L(CH,chipH,m); r=L(s.r*k,0,m); rad=L(40,32,m);
+      op=P(t,s.t,s.t+0.12); sc=L(0.92+0.08*k,1,m);
+    }
+    // shot 5 -> 6 exit with the window
+    const ex=IN(P(t,17.22,17.6)); op*=1-ex;
+    set(s.el,{width:w+'px',height:h+'px',borderRadius:rad+'px',opacity:op,
+      transform:tf(x,y-60*ex,sc,r), boxShadow: m>0.5?'none':'', zIndex: s.late?3:3});
+    s.full.style.opacity = 1-P(m,0,0.35);
+    s.chipEl.style.opacity = s.late?1:P(m,0.6,1);
+    // unread counters climb while the hook plays
+    const c=Math.round(L(s.n[0],s.n[1],OUT(P(t,s.t+0.2,3.3))));
+    s.badge.textContent = s.k==='cal' ? c+' today' : c;
+  }
+}
+
+// ---------- week ----------
+{ const w=$('week'); ['Mon','Tue','Wed','Thu','Fri'].forEach((d,i)=>{ const e=document.createElement('div'); e.className='d';
+  e.innerHTML=`<span>${d}</span><div class="ck" id="ck${i}"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.2"><path d="M3 8.5 6.5 12 13 4.5"/></svg></div>`; w.appendChild(e);}); }
+
+// ---------- main ----------
+const TYPE='Plan my day';
+function renderAt(t){
+  t=cl(t,0,DUR);
+  drawHeadlines(t);
+  drawSources(t);
+
+  // eyebrow + footer + progress
+  const si = t<S[1]?0:t<S[2]?1:t<S[3]?2:t<S[4]?3:4;
+  $('eb-n').textContent=EB[si][0]+' / 05'; $('eb-t').textContent=EB[si][1];
+  const ebo = (1-IN(P(t,17.2,17.5))) * OUT(P(t,0,0.3));
+  set($('eyebrow'),{opacity:ebo});
+  set($('foot'),{opacity:ebo}); set($('prog'),{opacity:ebo});
+  $('prog-i').style.width = (864*P(t,0,S[5]))+'px';
+
+  // window: grows out of the converging cards
+  const wIn=IO(P(t,3.78,4.5)), wOut=IN(P(t,17.22,17.6));
+  set($('win'),{opacity:P(t,3.78,3.98)*(1-wOut), transform:`translateY(${(1-wIn)*40-60*wOut}px) scale(${0.94+0.06*wIn-0.04*wOut})`,
+    display:t<3.7?'none':'block'});
+  $('win-sp').style.transform=`rotate(${90*IO(P(t,4.9,5.6))}deg) scale(${1+0.25*Math.sin(Math.PI*P(t,4.9,5.6))})`;
+  $('win-tab').textContent = t<14.4?'Chat':'Routines';
+  set($('win-tab'),{opacity: t<14.4 ? P(t,4.6,4.9)*(1-P(t,14.1,14.4)) : P(t,14.5,14.8)});
+
+  const em=OUT(P(t,4.7,5.3)), emOut=IN(P(t,6.62,6.95));
+  set($('empty'),{opacity:em*(1-emOut), transform:tf(0,30*(1-em)-30*emOut)});
+  $('empty').firstChild.style.transform=`rotate(${90*IO(P(t,4.9,5.6))}deg)`;
+
+  // input typing
+  const typed = Math.floor(TYPE.length*P(t,6.82,7.5));
+  const cleared = t>=7.72;
+  $('in-tx').textContent = cleared?'':TYPE.slice(0,typed);
+  $('in-ph').style.display = (typed>0 && !cleared)?'none':'inline';
+  $('in-caret').style.opacity = (t>6.7 && !cleared && t<7.72) ? 1 : 0;
+  $('in-send').style.transform=`scale(${1-0.12*Math.sin(Math.PI*P(t,7.55,7.75))})`;
+  set($('input'),{opacity:1-P(t,14.2,14.45)});
+
+  // chat bubble, typing dots, reply rows. All slide away for routines.
+  const chatOut = IN(P(t,10.55,10.85));
+  const ub=OUT(P(t,7.72,8.12));
+  set($('ubub'),{opacity:ub*(1-chatOut), transform:tf(0,30*(1-ub)-40*chatOut,0.9+0.1*ub)});
+  const dotsOn = t>7.95 && t<8.5;
+  set($('dots'),{opacity: dotsOn? P(t,7.95,8.05)*(1-P(t,8.4,8.5)) : 0});
+  [...$('dots').children].forEach((d,i)=>{ d.style.transform=`translateY(${-8*Math.max(0,Math.sin((t*7-i*0.9)))}px)`; });
+  const rh=OUT(P(t,8.45,8.9));
+  set($('reply'),{opacity:P(t,8.45,8.6)*(1-chatOut), transform:tf(0,-40*chatOut)});
+  $('reply').querySelector('.rh').style.transform=`translateY(${20*(1-rh)}px)`;
+  [0,1,2].forEach(i=>{ const k=OUT(P(t,8.62+i*0.3,9.2+i*0.3));
+    set($('r'+i),{opacity:k, transform:`translateY(${36*(1-k)}px)`}); });
+  // the "Draft ready" row lifts as the sheet comes for it
+  const lift=IO(P(t,10.1,10.5));
+  $('r1').style.background = lift>0.5 ? '#efeaff' : '';
+
+  // approvals sheet
+  const shIn=OUT(P(t,10.28,10.98)), shOut=IN(P(t,13.95,14.35));
+  set($('sheet'),{display:(t>10.2&&t<14.4)?'block':'none', opacity:P(t,10.28,10.45)*(1-shOut),
+    transform:tf(0,(1-shIn)*520-80*shOut,1-0.04*shOut)});
+  const press=Math.sin(Math.PI*P(t,13.02,13.22));
+  $('send').style.transform=`scale(${1-0.06*press})`;
+  const sent=OUT(P(t,13.14,13.5));
+  set($('send-ok'),{transform:`translateY(${(1-sent)*100}%)`});
+
+  // cursor: two tasks, Send then the routine toggle
+  const sendX=140+40+800-80-190+95, sendY=820+410+42; // centre of Send button (approx, sheet coords)
+  let cx=1200, cy=1700, co=0, cs=1;
+  if(t>11.9 && t<13.9){
+    const k=IO(P(t,12.0,12.95)); cx=L(980,sendX,k); cy=L(1600,sendY+80,k)-80*k; co=P(t,11.9,12.1)*(1-P(t,13.55,13.85));
+    cs=1-0.12*press;
+  } else if(t>14.6 && t<15.9){
+    const tgX=108+72+34+720-68-112+56, tgY=640+262+34+32;
+    const k=IO(P(t,14.65,15.12)); cx=L(990,tgX,k); cy=L(1500,tgY,k); co=P(t,14.6,14.75)*(1-P(t,15.55,15.85));
+    cs=1-0.12*Math.sin(Math.PI*P(t,15.14,15.32));
+  }
+  set($('cur'),{opacity:co, transform:tf(cx-14,cy-6,cs)});
+
+  // routine card
+  const ro=OUT(P(t,14.45,15.0)), rOut=IN(P(t,17.22,17.6));
+  set($('rout'),{display:t>14.3?'block':'none', opacity:P(t,14.45,14.65)*(1-rOut), transform:tf(0,40*(1-ro))});
+  const on=IO(P(t,15.2,15.42));
+  $('tog').style.background = on>0.5 ? '#7a5cff' : '#ececee';
+  $('tog-k').style.transform=`translateX(${48*on}px)`;
+  for(let i=0;i<5;i++){ const t0=15.62+i*0.3; const k=POP(P(t,t0,t0+0.42));
+    set($('ck'+i),{opacity:P(t,t0,t0+0.08), transform:`scale(${0.4+0.6*k})`});
+    $('ck'+i).parentElement.style.borderColor = k>0.3 ? '#c9b6ff' : '#ececee'; }
+  set($('wk-label'),{opacity:P(t,16.9,17.15)});
+
+  // end card
+  const e1=OUT(P(t,17.5,18.25)), e2=OUT(P(t,17.72,18.3)), e3=OUT(P(t,18.32,18.85)), e4=OUT(P(t,18.6,19.1)), e5=OUT(P(t,18.8,19.3));
+  set($('end'),{display:t>17.4?'flex':'none'});
+  set($('end-mark'),{opacity:P(t,17.5,17.7), transform:`rotate(${-90*(1-e1)}deg) scale(${0.5+0.5*e1})`});
+  set($('end-wm'),{opacity:e2, transform:`translateY(${40*(1-e2)}px)`});
+  set($('end-tg'),{opacity:e3, transform:`translateY(${30*(1-e3)}px)`});
+  set($('end-src'),{opacity:e4, transform:`translateY(${24*(1-e4)}px)`});
+  set($('end-cta'),{opacity:e5, transform:`translateY(${30*(1-e5)}px) scale(${0.96+0.04*e5})`});
+}
+window.renderAt=renderAt;
+window.DURATION=DUR;
+window.ready=(async()=>{ await document.fonts.load('600 100px Geist'); await document.fonts.load('400 30px Geist');
+  await document.fonts.load('500 30px Geist'); await document.fonts.load('500 24px "Geist Mono"'); await document.fonts.ready; renderAt(0); return true; })();
+
+// preview loop (skipped when rendering)
+if(!location.search.includes('render')){
+  window.ready.then(()=>{ const t0=performance.now(); const loop=()=>{ renderAt(((performance.now()-t0)/1000)%(DUR+0.6)); requestAnimationFrame(loop); }; loop(); });
+}
+</script>
+</body>
+</html>
