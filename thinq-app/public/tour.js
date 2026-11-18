@@ -14,7 +14,7 @@ const store = {
 };
 
 /**
- * ctx: { state(), openConn(pane), fillInput(text), turnOnPush(), pushSupport(), pushOn() }
+ * ctx: { state(), openConn(pane), fillInput(text), turnOnPush(), pushSupport(), pushOn(), showTab(tab) }
  */
 export function createTour(ctx) {
   let steps = [], i = 0, layer, ring, card, target = null, raf = 0;
@@ -40,6 +40,8 @@ export function createTour(ctx) {
           ${meet ? `<li>${ico("i-video", 15)}<span><b>Meeting notes</b> Record a meeting, get the summary and to-dos</span></li>` : ""}
           ${notif ? `<li>${ico("i-bell", 15)}<span><b>Reminders</b> Get pinged on your phone at the right time</span></li>` : ""}
           <li>${ico("i-doc", 15)}<span><b>Documents${s.images?.available ? " & images" : ""}</b> Summarize files${s.images?.available ? ", create pictures" : ""}</span></li>
+          <li>${ico("i-repeat", 15)}<span><b>Routines</b> Tasks Thinq does on a schedule, like a morning email summary</span></li>
+          ${s.telegram ? `<li>${ico("i-bot", 15)}<span><b>Group bots</b> Bots for your Telegram groups that answer questions and send reminders</span></li>` : ""}
         </ul>
         <p class="tour-safe">${ico("i-check", 14)}Thinq never sends an email, message or invite without your OK.</p>`,
       next: "Show me around",
@@ -113,12 +115,40 @@ export function createTour(ctx) {
       title: "Approvals: you're always in control",
       body: `<p>When Thinq drafts an email, a WhatsApp reply or a calendar invite, it waits <b>here</b>. You can read it, edit it, and then <b>Send</b> or <b>Decline</b>.</p>
         <p class="tour-small">Nothing goes out until you approve it.</p>`,
+      onShow: () => ctx.showTab?.("approvals"),
       next: "Next",
     });
 
+    list.push({
+      id: "routines",
+      target: () => (panelIsDrawer() ? "#openPanel" : '[data-tab="routines"]'),
+      title: "Routines: Thinq does it for you",
+      body: `<p>Tell Thinq once and it keeps doing it, on a schedule, without you asking again:</p>
+        <ul class="tour-opts">
+          <li><b>Reports to you</b><span><i>“Every weekday at 8am, summarise my emails and tell me what needs a reply.”</i> The result arrives as a notification and in its own chat.</span></li>
+          <li><b>Messages to others</b><span><i>“Every evening at 9, send Mum a goodnight message on WhatsApp.”</i> These only start after you tap <b>Turn on</b> in the Routines tab, so you see exactly who gets what and when.</span></li>
+        </ul>
+        <p class="tour-small">Find, test (Run now), pause or delete them in the Routines tab, or just ask Thinq to change one.</p>`,
+      onShow: () => ctx.showTab?.("routines"),
+      next: "Next",
+    });
+
+    if (s.telegram) {
+      list.push({
+        id: "bots",
+        target: () => (panelIsDrawer() ? "#openPanel" : "#botsTabBtn"),
+        title: "Group bots for Telegram",
+        body: `<p>Ask Thinq to <b>build a bot</b> for a Telegram group, for example <i>“a bot for my running club that answers questions about our runs and reminds everyone every Friday at 6pm.”</i></p>
+          <p>Add it to the group, send the <b>/link</b> code Thinq gives you, and it answers members' questions and posts the reminders.</p>
+          <p class="tour-small">Bots only know what you tell them, never your email or calendar. Manage them in the Bots tab.</p>`,
+        onShow: () => ctx.showTab?.("bots"),
+        next: "Next",
+      });
+    }
+
     const tries = google
-      ? ["What's important in my inbox today?", "What's on my calendar this week?", "Find 30 minutes for a call with Sam on Thursday"]
-      : ["What's in my inbox today?", "What's on my calendar this week?", "Draft a friendly follow-up to my last email"];
+      ? ["What's important in my inbox today?", "What's on my calendar this week?", "Every weekday at 8am, summarise my emails"]
+      : ["What's in my inbox today?", "What's on my calendar this week?", "Every weekday at 8am, summarise my emails"];
     list.push({
       id: "chat",
       target: "#composer",
@@ -180,6 +210,7 @@ export function createTour(ctx) {
           : `<button type="button" class="btn sm" data-tour="next">${esc(step.next === "Later" ? "Next" : step.next)}</button>`}
       </div>`;
     layer.classList.toggle("centered", !step.target);
+    try { step.onShow?.(); } catch { /* the tab may not exist */ }
     target = null;
     // Wait for the drawer to slide in before measuring where things are.
     setTimeout(() => { target = step.target ? resolveTarget(step) : null; target?.scrollIntoView?.({ block: "nearest" }); place(); }, sliding ? 320 : 0);
@@ -248,6 +279,7 @@ export function createTour(ctx) {
   function finish(stepId, skipped = false) {
     store.del(RESUME_KEY);
     unmount();
+    try { ctx.showTab?.("approvals"); } catch {}
     fetch("/api/tour", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ done: true, step: skipped ? `skip:${stepId}` : stepId }) }).catch(() => {});
     const s = ctx.state(); if (s?.user) s.user.tourDone = true;
   }

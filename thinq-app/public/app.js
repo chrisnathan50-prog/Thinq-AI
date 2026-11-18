@@ -577,6 +577,7 @@ const tour = createTour({
   turnOnPush: async (onWaiting) => { await turnOnPush(onWaiting); renderNotify(); },
   pushSupport: () => pushSupport(),
   pushOn: () => pushHere,
+  showTab: (tab) => showTab(tab),
 });
 
 // ---------------- notifications (Web Push: reminders, email alerts, calendar heads-ups) ----------------
