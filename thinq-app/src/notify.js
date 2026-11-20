@@ -84,14 +84,17 @@ export async function setPrefs(userId, p) {
  * WhatsApp if they chose that). kind: "reminder" | "email" | "calendar" | "meetings" | "test".
  * Returns how many places it reached.
  */
-export async function notify(userId, { title, body = "", url = "/app", tag }, kind = "reminder") {
+export async function notify(userId, { title, body = "", url = "/app", tag, approvalId }, kind = "reminder") {
   const prefs = await getPrefs(userId);
   if (kind === "calendar" && !prefs.calendar) return 0;
   if (kind === "meetings" && !prefs.meetings) return 0;
   await keys();
   // badge: the "needs your attention" count, so the app icon updates even while Thinq is closed.
   const badge = await import("./attention.js").then((m) => m.attention(userId)).then((a) => a.total).catch(() => null);
-  const payload = JSON.stringify({ title: clip(title, 80), body: clip(body, 300), url, tag: tag || `${kind}-${Date.now()}`, badge });
+  // A draft waiting in Approvals gets Send / Discard buttons right on the notification (where the system supports
+  // them: Chrome, Edge and Firefox on computers and Android). Tapping the notification itself opens Approvals.
+  const actions = approvalId ? [{ action: "send", title: "Send" }, { action: "discard", title: "Discard" }] : undefined;
+  const payload = JSON.stringify({ title: clip(title, 80), body: clip(body, 300), url, tag: tag || `${kind}-${Date.now()}`, badge, approvalId, actions });
   let reached = 0;
   for (const d of await devicesOf(userId)) {
     try {
@@ -111,6 +114,16 @@ export async function notify(userId, { title, body = "", url = "/app", tag }, ki
   if (prefs.whatsapp && kind !== "test") reached += await toWhatsApp(userId, title, body);
   return reached;
 }
+// "Ready to send" for one draft, with Send / Discard buttons.
+export function notifyApproval(userId, a, title) {
+  const p = a.payload || {};
+  const body = a.kind === "email" ? `To ${(p.to || []).join(", ")}: ${p.subject || ""}\n${String(p.body || "").replace(/\s+/g, " ")}`
+    : a.kind === "whatsapp" ? `To ${p.chat}: ${p.text}`
+    : a.kind === "event" ? `${p.title} - ${new Date(p.start).toLocaleString("en-US", { timeZone: p.timeZone || "UTC", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
+    : a.summary || "";
+  return notify(userId, { title: title || `Ready to send: ${a.summary || "a draft"}`, body, url: "/app#approvals", tag: `approval-${a.id}`, approvalId: a.id }, "reminder");
+}
+
 const clip = (s, n) => (String(s || "").length > n ? String(s).slice(0, n - 1) + "…" : String(s || ""));
 
 async function toWhatsApp(userId, title, body) {

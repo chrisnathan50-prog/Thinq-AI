@@ -22,6 +22,7 @@ import { id } from "./secrets.js";
 import { publicUrl } from "./providers/google.js";
 import { providerFor } from "./providers/index.js";
 import { completeText, hasApiKey, SUMMARY_CHUNK_CHARS } from "./agent.js";
+import { suggestFromMeeting } from "./tasks.js";
 
 const env = (k) => String(process.env[k] || "").trim();
 const BASE = () => env("ATTENDEE_URL").replace(/\/$/, "");
@@ -283,7 +284,8 @@ export async function summarize(meetingId) {
     if (!hasApiKey()) { await setMeeting(m.id, { status: "done", error: "The transcript is saved, but no summary: the server's AI isn't set up." }); return; }
     await setMeeting(m.id, { status: "summarizing", error: null });
     const header = `Meeting: ${m.title} (${m.platform}), ${new Date(m.started_at || m.join_at || m.created_at).toUTCString()}`
-      + (m.source === "recording" ? `\nThis is an audio recording transcribed without speaker names, and lines from different people run together. Don't guess who said something. Only name an action item's owner when the words make it clear (e.g. "I will…" right after someone is asked by name, or "Sam will…"); otherwise write "Owner unclear". The person who recorded it is ${m.recorder_name || "the user"}.` : "");
+      + (m.source === "recording" && /you \+ meeting tab/.test(m.platform || "") ? `\nThis is a recording with two audio tracks: lines labelled "${String(m.recorder_name || "").split(/\s+/)[0] || "You"}" are the person who recorded it (their microphone - they are the user), and lines labelled "Others in the call" come from the meeting tab and can be several different people. Attribute what the user said to them by name. For "Others in the call", only name a specific person when the words make it clear (e.g. "Thanks Sam" right before, or "This is Priya"); otherwise write "someone on the call". For action items, the owner is the user when they said "I'll…"; otherwise "Owner unclear" unless a name is clear.`
+        : m.source === "recording" ? `\nThis is an audio recording transcribed without speaker names, and lines from different people run together. Don't guess who said something. Only name an action item's owner when the words make it clear (e.g. "I will…" right after someone is asked by name, or "Sam will…"); otherwise write "Owner unclear". The person who recorded it is ${m.recorder_name || "the user"}.` : "");
     // Long meetings: take notes on each part, then combine them.
     const chunks = [];
     let rest = m.transcript;
@@ -303,6 +305,8 @@ export async function summarize(meetingId) {
       summary = await completeText({ system: SUMMARY_SYSTEM, prompt: `${header}\nBelow are notes on each part of one long meeting, in order. Combine them into one set of notes for the whole meeting.\n\n${parts.map((p, i) => `<part n="${i + 1}">\n${p}\n</part>`).join("\n\n")}`, maxTokens: 2000 });
     }
     await setMeeting(m.id, { summary: summary || "(No summary could be written.)", status: "done", error: null });
+    // The user's action items become suggestions in the Tasks tab (Add / Dismiss).
+    if (summary) await suggestFromMeeting({ id: m.id, title: m.title, summary }, await store.getUser(m.user_id)).catch((e) => console.warn("[tasks] meeting suggestions failed:", e.message));
     import("./notify.js").then((n) => n.notify(m.user_id, { title: "Meeting notes ready", body: m.title || "Your meeting", url: "/app", tag: `meeting-${m.id}` }, "meetings")).catch(() => {});
     await store.logAction(m.user_id, "meeting_summarized", { meetingId: m.id, chars: m.transcript.length, parts: chunks.length });
   } catch (err) {

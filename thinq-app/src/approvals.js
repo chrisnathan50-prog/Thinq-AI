@@ -5,6 +5,7 @@ import { providerFor } from "./providers/index.js";
 import { friendlyError } from "./errors.js";
 import { sendToChat } from "./whatsapp-sync.js";
 import { sendNotetaker } from "./meetings.js";
+import { trackReply } from "./tasks.js";
 
 const SENT_LOG = { email: "email_sent", event: "event_created", whatsapp: "whatsapp_sent", notetaker: "notetaker_approved" };
 
@@ -26,6 +27,11 @@ export async function approveItem(user, approvalId, via = "app") {
       mode = p.mode;
     }
     await store.logAction(user.id, SENT_LOG[a.kind] || "approved", { approvalId: a.id, summary: a.summary, mode, via });
+    // "Let me know if they don't reply": the sent email becomes a waiting-on task tied to its thread.
+    if (a.kind === "email" && a.payload.followUpDays && result?.threadId) {
+      await trackReply(user, { threadId: result.threadId, to: a.payload.to, subject: a.payload.subject, days: a.payload.followUpDays, timeZone: a.payload.timeZone })
+        .catch((e) => console.warn("[tasks] couldn't track the reply:", e.message));
+    }
     return { ok: true, approval: await store.updateApproval(user.id, a.id, { status: "done", result, mode }) };
   } catch (err) {
     console.error(err);

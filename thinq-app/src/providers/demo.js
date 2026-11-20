@@ -96,6 +96,10 @@ return {
     return fmt({ ...e });
   },
 
+  async threadReplies() {
+    return []; // nobody replies to the sample inbox
+  },
+
   async listEvents({ timeMin, timeMax }) {
     const a = new Date(timeMin), b = new Date(timeMax);
     return events.filter((e) => e.end > a && e.start < b).sort((x, y) => x.start - y.start).map(fmtEv);
