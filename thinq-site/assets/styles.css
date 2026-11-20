@@ -592,3 +592,7 @@ footer.site{margin-top:136px;position:relative;overflow:hidden}
 .tester-asks > div{align-items:flex-start;background:#fff;border:1px solid var(--line);padding:20px}
 @media (max-width:900px){.tester-asks{grid-template-columns:1fr}}
 .hero .btn + .btn,.cta .btn + .btn{margin-left:10px}
+
+/* Phones and tablets: 16px text in every field. iPhone Safari zooms the page in whenever you tap a field with
+   smaller text, and leaves it zoomed. 16px stops that without blocking pinch-to-zoom. */
+@media (pointer:coarse){input,textarea,select{font-size:16px!important}}

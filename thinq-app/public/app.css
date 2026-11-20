@@ -562,3 +562,8 @@ table.people .muted{color:var(--soft);font-size:12px}
 .hit-top small{font-size:11px;color:var(--soft);white-space:nowrap}
 .hit-snip{font-size:12px;line-height:1.45;color:var(--muted);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .hit-snip mark{background:#fff1b8;color:inherit;border-radius:3px;padding:0 1px}
+
+/* Phones and tablets: 16px text in every field. iPhone Safari zooms the page in whenever you tap a field with
+   smaller text, and leaves it zoomed. 16px stops that without blocking pinch-to-zoom. */
+@media (pointer:coarse){input,textarea,select{font-size:16px!important}}
+@media (pointer:coarse){.tk-add #tkAddDate{width:136px}}
