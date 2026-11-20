@@ -18,8 +18,11 @@ const apiKey = () => String(process.env.ELEVENLABS_API_KEY || "").trim();
 const elevenLabsOn = () => Boolean(apiKey()) && process.env.SPEECH_PROVIDER !== "cloudflare";
 const freeVoiceOn = () => cloudflareReady() && process.env.SPEECH_FREE_VOICE !== "off";
 export const speechAvailable = () => elevenLabsOn() || freeVoiceOn();
-// Live voice mode only ever uses the free voice (ElevenLabs bills per character, which adds up fast in a conversation).
+// Live voice mode uses the same voices as Read aloud: ElevenLabs while it has credits, then the free Cloudflare
+// voice. LIVE_VOICE=free keeps voice mode on the free voice only (ElevenLabs bills per character).
 export const freeVoiceAvailable = () => freeVoiceOn();
+export const liveFreeOnly = () => String(process.env.LIVE_VOICE || "").toLowerCase() === "free";
+export const liveServerVoice = () => (liveFreeOnly() ? freeVoiceOn() : speechAvailable());
 
 export class SpeechError extends Error {
   constructor(message, { status = 0, quota = false } = {}) { super(message); this.status = status; this.quota = quota; }

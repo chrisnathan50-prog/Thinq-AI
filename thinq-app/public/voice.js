@@ -5,9 +5,14 @@
 //   hear    - that piece of audio goes to /api/transcribe?live=1 (Groq's free Whisper) and comes back as text.
 //   think   - the text goes to /api/chat with channel "voice": the same Thinq with all its tools, told to answer
 //             in a few short spoken sentences. One spoken exchange counts as one request.
-//   speak   - the reply is read out with the free Cloudflare voice when the server has it, otherwise the device's
-//             own voice. Never ElevenLabs (it bills per character).
-//   ...and back to listening. Tap the orb to interrupt; with the server voice you can also just start talking.
+//   speak   - the reply is read out with the same voices as Read aloud: ElevenLabs while it has credits, then
+//             Cloudflare's free voice, then the device's own voice (LIVE_VOICE=free on the server skips ElevenLabs).
+//   ...and back to listening. Tap the orb to interrupt; with the server voice you can also just start talking
+//   (not on iPhone, where the microphone is released while Thinq speaks so its voice plays at full volume).
+//
+// Phones are fussy about audio: playing Thinq's voice can silence or suspend the microphone, and the device voice
+// sometimes never reports that it finished. So every time Thinq starts listening it checks the microphone and gets
+// a fresh one if needed, and speaking always ends after a safety timer.
 //
 // ctx: { state(), api(path, opts), timeZone, conversationId(), setConversation(id), openConversation(id), refresh(), notice(text, kind), icon(name, size) }
 
@@ -17,6 +22,8 @@ const MAX_TURN_MS = 45_000;   // one turn is cut here
 const IDLE_RESTART_MS = 14_000; // no speech for this long: start a fresh recording so it doesn't grow
 const SILENT = "data:audio/wav;base64,UklGRnQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YVAAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==";
 // Whisper sometimes "hears" these in near-silence; treat them as nothing.
+const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const MIC = { audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } };
 const PHANTOM = /^(thank(s| you)( (so much|very much))?( for watching)?|you|bye|okay|\.+|subtitles by .*|thanks for listening)[.!]?$/i;
 
 export function createVoiceMode(ctx) {
@@ -64,17 +71,14 @@ export function createVoiceMode(ctx) {
     // Unlock audio inside the tap (iPhone only allows sound that a tap started).
     v.player = new Audio(); v.player.playsInline = true; v.player.src = SILENT; v.player.play().catch(() => {});
     try { speechSynthesis?.speak(new SpeechSynthesisUtterance("")); } catch {}
-    try {
-      v.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
-    } catch {
-      stop(); return ctx.notice("Thinq couldn't use your microphone. Allow microphone access for this site and try again.");
-    }
-    if (!v) { return; }
     const AC = window.AudioContext || window.webkitAudioContext;
     v.ac = new AC(); v.ac.resume?.();
     v.analyser = v.ac.createAnalyser(); v.analyser.fftSize = 1024;
-    v.ac.createMediaStreamSource(v.stream).connect(v.analyser);
     v.buf = new Float32Array(v.analyser.fftSize);
+    if (!(await ensureMic(true))) {
+      stop(); return ctx.notice("Thinq couldn't use your microphone. Allow microphone access for this site and try again.");
+    }
+    if (!v) return;
     try { v.wake = await navigator.wakeLock?.request("screen"); } catch {}
     if (!ctx.conversationId()) {
       try { ctx.setConversation((await ctx.api("/api/conversations", { method: "POST" })).id); } catch (err) { stop(); return ctx.notice(err.message); }
@@ -86,7 +90,7 @@ export function createVoiceMode(ctx) {
   function stop() {
     if (!v) return;
     const cur = v; v = null;
-    cancelAnimationFrame(cur.raf); clearTimeout(cur.timer);
+    stopLoop(cur); clearTimeout(cur.timer);
     try { cur.recorder?.state !== "inactive" && cur.recorder?.stop(); } catch {}
     cur.stream?.getTracks().forEach((t) => t.stop());
     cur.ac?.close().catch(() => {});
@@ -99,52 +103,89 @@ export function createVoiceMode(ctx) {
     if (cur.convId && cur.turns) ctx.openConversation(cur.convId).then(() => ctx.refresh()).catch(() => {});
   }
 
+  // ---------- the microphone ----------
+  // A working microphone feeding the level meter: reuse the current one, or get a fresh one when the phone
+  // has stopped or silenced it (after Thinq spoke, after the app was in the background...).
+  async function ensureMic(force = false) {
+    if (!v) return false;
+    if (v.ac.state !== "running") { try { await v.ac.resume(); } catch {} }
+    const track = v.stream?.getAudioTracks()[0];
+    if (!force && track && track.readyState === "live" && !track.muted && track.enabled) return true;
+    v.stream?.getTracks().forEach((t) => t.stop());
+    try { v.stream = await navigator.mediaDevices.getUserMedia(MIC); } catch { return false; }
+    if (!v) return false;
+    try { v.source?.disconnect(); } catch {}
+    v.source = v.ac.createMediaStreamSource(v.stream);
+    v.source.connect(v.analyser);
+    return true;
+  }
+  const releaseMic = () => { v?.stream?.getTracks().forEach((t) => t.stop()); };
+
   // ---------- listening ----------
   const level = () => {
     v.analyser.getFloatTimeDomainData(v.buf);
     let sum = 0; for (const x of v.buf) sum += x * x;
     return Math.sqrt(sum / v.buf.length);
   };
+  // A steady loop every 30ms, timed in real milliseconds. (Animation frames run at different speeds on 120Hz
+  // screens, in low-power mode and in background tabs, which would change how long "a pause" is.)
+  function every(fn) {
+    stopLoop();
+    let last = performance.now();
+    const id = setInterval(() => {
+      if (!v || v.loop !== id) return clearInterval(id);
+      const now = performance.now(), dt = Math.min(200, now - last); last = now;
+      if (fn(now, dt) === false && v && v.loop === id) stopLoop();
+    }, 30);
+    v.loop = id;
+  }
+  function stopLoop(cur = v) { if (cur?.loop) { clearInterval(cur.loop); cur.loop = null; } }
+
   // Half a second of the room's own noise, to know what "quiet" is here.
   function calibrate() {
     const samples = [], t0 = performance.now();
-    const tick = () => {
-      if (!v) return;
+    every((now) => {
       samples.push(level());
-      if (performance.now() - t0 < 500) { v.raf = requestAnimationFrame(tick); return; }
+      if (now - t0 < 500) return;
       const floor = samples.sort((a, b) => a - b)[Math.floor(samples.length / 2)] || 0.005;
       v.threshold = Math.min(0.08, Math.max(0.012, floor * 3));
-      listen();
-    };
-    tick();
+      stopLoop(); listen(); return;
+    });
   }
 
-  function listen() {
+  async function listen(retried = false) {
     if (!v) return;
     setMode("listening");
     if (v.muted) return;
+    const session = v.session;
+    if (!(await ensureMic())) return fail("Thinq lost the microphone. Tap the orb to try again.");
+    if (!v || v.session !== session || v.mode !== "listening" || v.muted) return;
     const type = recMime();
     const chunks = [];
     const rec = new MediaRecorder(v.stream, { ...(type ? { mimeType: type } : {}), audioBitsPerSecond: 32000 });
     v.recorder = rec;
     rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
     rec.start(250);
-    const session = v.session;
-    let speechStart = 0, lastLoud = 0, loudFor = 0;
+    let speechStart = 0, lastLoud = 0, loudFor = 0, deadSince = 0;
+    const checkDead = v.afterSpeech && !retried; v.afterSpeech = false;
     const began = performance.now();
-    const tick = () => {
-      if (!v || v.session !== session || v.recorder !== rec || v.mode !== "listening") return;
-      const now = performance.now(), lv = level();
+    every((now, dt) => {
+      if (v.session !== session || v.recorder !== rec || v.mode !== "listening") return false;
+      const lv = level();
+      // Right after Thinq spoke, a microphone giving exactly nothing for 2s has been cut off by the phone:
+      // get a fresh one (once). Only then, so a very quiet room is never mistaken for a broken microphone.
+      if (checkDead && !speechStart) {
+        deadSince = lv === 0 ? deadSince || now : 0;
+        if (deadSince && now - deadSince > 2000) { rec.onstop = null; try { rec.stop(); } catch {} ensureMic(true).then(() => v && v.session === session && listen(true)); return false; }
+      }
       $("#voice").style.setProperty("--level", Math.min(1, lv / (v.threshold * 6)).toFixed(3));
-      if (lv > v.threshold) { loudFor += 16; lastLoud = now; if (!speechStart && loudFor > 90) speechStart = now - loudFor; }
-      else loudFor = Math.max(0, loudFor - 8);
+      if (lv > v.threshold) { loudFor += dt; lastLoud = now; if (!speechStart && loudFor > 90) speechStart = now - loudFor; }
+      else loudFor = Math.max(0, loudFor - dt / 2);
       const spoke = speechStart && lastLoud - speechStart > MIN_SPEECH_MS;
-      if (spoke && now - lastLoud > SILENCE_MS) return finishTurn(rec, chunks, type);
-      if (speechStart && now - speechStart > MAX_TURN_MS) return finishTurn(rec, chunks, type);
-      if (!speechStart && now - began > IDLE_RESTART_MS) { rec.onstop = () => { if (v && v.recorder === rec) listen(); }; rec.stop(); return; }
-      v.raf = requestAnimationFrame(tick);
-    };
-    v.raf = requestAnimationFrame(tick);
+      if (spoke && now - lastLoud > SILENCE_MS) { finishTurn(rec, chunks, type); return false; }
+      if (speechStart && now - speechStart > MAX_TURN_MS) { finishTurn(rec, chunks, type); return false; }
+      if (!speechStart && now - began > IDLE_RESTART_MS) { rec.onstop = () => { if (v && v.recorder === rec) listen(); }; rec.stop(); return false; }
+    });
   }
 
   function finishTurn(rec, chunks, type) {
@@ -222,20 +263,24 @@ export function createVoiceMode(ctx) {
     if (!v || !text) return listen();
     const session = v.session;
     setMode("speaking");
-    const done = () => { if (v && v.session === session && v.mode === "speaking") { stopSpeaking(v); listen(); } };
+    const done = () => { if (v && v.session === session && v.mode === "speaking") { stopSpeaking(v); v.afterSpeech = true; listen(); } };
+    // Whatever happens, speaking ends: about 2.3 words a second, plus a margin.
+    v.speechGuard = setTimeout(done, (text.split(/\s+/).length / 2.3 + 6) * 1000);
+    // On iPhone a live microphone turns Thinq's voice down (or into the earpiece): let go of it while speaking.
+    if (IOS) releaseMic();
     const st = ctx.state() || {};
-    if (st.liveVoice?.freeVoice && !v.serverVoiceOff) {
+    if (st.liveVoice?.serverVoice && !v.serverVoiceOff) {
       try {
         const res = await fetch("/api/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, live: true }) });
         if (!res.ok) throw Object.assign(new Error("server voice unavailable"), { off: true });
         const url = URL.createObjectURL(await res.blob());
         if (!v || v.session !== session || v.mode !== "speaking") { URL.revokeObjectURL(url); return; }
-        v.canBargeIn = true; render(); // the page's own audio is removed by echo cancellation, so talking over it works
+        v.canBargeIn = !IOS; render(); // the page's own audio is removed by echo cancellation, so talking over it works
         v.player.onended = () => { URL.revokeObjectURL(url); done(); };
         v.player.onerror = () => { URL.revokeObjectURL(url); speakWithDevice(text, session, done); };
         v.player.src = url;
         await v.player.play();
-        watchForBargeIn(session);
+        if (!IOS) watchForBargeIn(session);
         return;
       } catch (err) {
         if (err.off) v.serverVoiceOff = true; // use the device's voice for the rest of this session
@@ -257,6 +302,7 @@ export function createVoiceMode(ctx) {
     const parts = text.match(/[^.!?]+[.!?]*\s*/g) || [text];
     const voice = pickVoice();
     let i = 0;
+    v.utts = []; // kept so the browser can't throw them away mid-sentence (which loses the "finished" signal)
     const next = () => {
       if (!v || v.session !== session || v.mode !== "speaking") return;
       if (i >= parts.length) return done();
@@ -264,28 +310,35 @@ export function createVoiceMode(ctx) {
       if (voice) u.voice = voice;
       u.rate = 1.04;
       u.onend = next; u.onerror = next;
+      v.utts.push(u);
       speechSynthesis.speak(u);
     };
     speechSynthesis.cancel();
     next();
+    // Some phones never fire "finished": if the voice has been silent for a moment, move on.
+    let quiet = 0;
+    v.speechPoll = setInterval(() => {
+      if (!v || v.session !== session || v.mode !== "speaking") return clearInterval(v?.speechPoll);
+      quiet = speechSynthesis.speaking || speechSynthesis.pending ? 0 : quiet + 400;
+      if (quiet >= 1600) done();
+    }, 400);
   }
   function stopSpeaking(cur = v) {
     if (!cur) return;
+    clearTimeout(cur.speechGuard); clearInterval(cur.speechPoll);
     try { cur.player && (cur.player.onended = cur.player.onerror = null, cur.player.pause()); } catch {}
     try { speechSynthesis.cancel(); } catch {}
   }
   // While the server voice plays: if you start talking, Thinq stops and listens.
   function watchForBargeIn(session) {
     let loudFor = 0;
-    const tick = () => {
-      if (!v || v.session !== session || v.mode !== "speaking") return;
+    every((now, dt) => {
+      if (v.session !== session || v.mode !== "speaking") return false;
       const lv = level();
-      $("#voice").style.setProperty("--level", (0.35 + 0.25 * Math.sin(performance.now() / 180)).toFixed(3));
-      if (!v.muted && lv > Math.max(0.05, v.threshold * 4)) loudFor += 16; else loudFor = Math.max(0, loudFor - 10);
-      if (loudFor > 320) { interrupt(); return; }
-      v.raf = requestAnimationFrame(tick);
-    };
-    v.raf = requestAnimationFrame(tick);
+      $("#voice").style.setProperty("--level", (0.35 + 0.25 * Math.sin(now / 180)).toFixed(3));
+      if (!v.muted && lv > Math.max(0.05, v.threshold * 4)) loudFor += dt; else loudFor = Math.max(0, loudFor - dt * 0.6);
+      if (loudFor > 320) { interrupt(); return false; }
+    });
   }
   function interrupt() {
     if (!v) return;
@@ -293,18 +346,8 @@ export function createVoiceMode(ctx) {
     else if (v.mode === "thinking") { v.abort?.abort(); listen(); }
     else if (v.mode === "paused") resume();
   }
-  // After the app was in the background the phone may have closed the microphone: get a fresh one.
-  async function resume() {
-    if (!v) return;
-    v.ac?.resume?.();
-    if (!v.stream?.getAudioTracks().some((t) => t.readyState === "live")) {
-      try {
-        v.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
-        v.ac.createMediaStreamSource(v.stream).connect(v.analyser);
-      } catch { return fail("Thinq couldn't use your microphone. Allow microphone access and tap the orb again."); }
-    }
-    listen();
-  }
+  // After the app was in the background: listen() gets a fresh microphone if the phone closed it.
+  function resume() { if (v) listen(); }
 
   function fail(message) {
     if (!v) return;
@@ -321,7 +364,7 @@ export function createVoiceMode(ctx) {
   $("#voiceMute").addEventListener("click", () => {
     if (!v) return;
     v.muted = !v.muted;
-    if (v.muted && v.mode === "listening") { cancelAnimationFrame(v.raf); try { v.recorder.onstop = null; v.recorder.stop(); } catch {} v.recorder = null; $("#voice").style.setProperty("--level", "0"); render(); }
+    if (v.muted && v.mode === "listening") { stopLoop(); try { v.recorder.onstop = null; v.recorder.stop(); } catch {} v.recorder = null; $("#voice").style.setProperty("--level", "0"); render(); }
     else if (!v.muted && v.mode === "listening") listen();
     else render();
   });
@@ -331,7 +374,7 @@ export function createVoiceMode(ctx) {
   // Phones stop the microphone when the app goes to the background: pause, and carry on when it's back.
   document.addEventListener("visibilitychange", () => {
     if (!v) return;
-    if (document.visibilityState === "hidden") { stopSpeaking(); v.abort?.abort(); cancelAnimationFrame(v.raf); try { v.recorder?.stop(); } catch {} setMode("paused"); }
+    if (document.visibilityState === "hidden") { stopSpeaking(); v.abort?.abort(); stopLoop(); try { v.recorder?.stop(); } catch {} setMode("paused"); }
   });
 
   return { start, stop, supported, active: () => Boolean(v) };

@@ -455,3 +455,19 @@ body.voice-on{overflow:hidden}
 [data-theme="dark"] .voice-btn[aria-pressed="true"]{color:#ff6b62}
 @media (prefers-reduced-motion:reduce){.voice-mark,.voice-orb{animation:none!important}.voice-orb{transition:none}}
 @media (prefers-reduced-transparency:reduce){.voice{background:var(--frost)}}
+
+/* ---------- phones: a tidy message box ----------
+   Five controls don't fit in one row at phone width. The Talk button sits where Send is while the box is empty,
+   and Send takes its place as soon as there's text or a file (like other chat apps). Controls are a little smaller. */
+@media (max-width:560px){
+  .composer{padding:6px 6px 6px 8px}
+  .composer .row{gap:4px;align-items:center}
+  .composer .tool{width:34px;height:34px}
+  .composer .send{width:38px;height:38px}
+  .composer:not(.has-text) .send{display:none}
+  .composer.has-text .tool.talk{display:none}
+  .composer .tool.talk:not([hidden]){width:38px;height:38px;color:#fff;
+    background:radial-gradient(60% 45% at 35% 22%,rgba(255,255,255,.45),rgba(255,255,255,0) 70%),linear-gradient(170deg,#3a3a41,#0b0b0c 72%);
+    border-color:rgba(255,255,255,.4);box-shadow:inset 0 1px 1px rgba(255,255,255,.35),0 6px 14px -6px rgba(12,12,16,.5)}
+  [data-theme="dark"] .composer .tool.talk:not([hidden]){color:#0b0b0c;background:radial-gradient(60% 45% at 35% 22%,#fff,rgba(255,255,255,0) 70%),linear-gradient(170deg,#fff,#c6c7cd 75%)}
+}

@@ -1301,6 +1301,7 @@ const MAX_DOC_BYTES = 10 * 1024 * 1024;
 let pending = []; // documents attached to the message being written
 
 function renderPending() {
+  queueMicrotask(() => syncComposer());
   const box = $("#atts");
   box.hidden = pending.length === 0;
   box.innerHTML = pending.map((a) => `<span class="att${a.status === "error" ? " err" : ""}">${a.status === "uploading" ? `<span class="spin"></span>` : icon("i-doc", 13)}<span class="nm" title="${esc(a.name)}">${esc(a.name)}</span><span class="meta">${a.status === "uploading" ? "Reading…" : a.status === "error" ? esc(a.error) : fileMeta(a)}</span><button type="button" data-remove="${a.key}" aria-label="Remove ${esc(a.name)}">${icon("i-x", 11)}</button></span>`).join("");
@@ -1558,7 +1559,9 @@ $("#composer").addEventListener("submit", (e) => {
   const t = $("#input").value; $("#input").value = ""; autosize(); send(t);
 });
 $("#input").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("#composer").requestSubmit(); } });
-const autosize = () => { const t = $("#input"); t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 200) + "px"; };
+// "has-text": on phones the Talk button sits where Send is until there's something to send (see glass.css).
+const syncComposer = () => $("#composer").classList.toggle("has-text", Boolean($("#input").value.trim()) || pending.length > 0);
+const autosize = () => { const t = $("#input"); t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 200) + "px"; syncComposer(); };
 $("#input").addEventListener("input", autosize);
 addEventListener("resize", autosize);
 $("#messages").addEventListener("load", (e) => { if (e.target.tagName === "IMG") e.target.dataset.loaded = ""; }, true);

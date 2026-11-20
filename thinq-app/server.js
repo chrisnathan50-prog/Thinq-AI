@@ -22,7 +22,7 @@ import { attachUser, requireUser, mountAuth } from "./src/auth.js";
 import { extractDocument, DocumentError, acceptedTypes, MAX_UPLOAD_BYTES, partCount } from "./src/documents.js";
 import { transcribe, voiceAvailable, MAX_AUDIO_BYTES } from "./src/llm/transcribe.js";
 import { imagesAvailable, IMAGE_DAILY_LIMIT } from "./src/llm/images.js";
-import { speechAvailable, freeVoiceAvailable, synthesize, trimForSpeech } from "./src/llm/speech.js";
+import { speechAvailable, liveServerVoice, liveFreeOnly, synthesize, trimForSpeech } from "./src/llm/speech.js";
 import { Readable } from "node:stream";
 import { suggestionsFor } from "./src/suggestions.js";
 import { friendlyError } from "./src/errors.js";
@@ -104,7 +104,7 @@ api.get("/state", async (req, res) => {
     telegram: telegramConfigured() ? { username: botUsername() } : null,
     admin: isAdmin(req.user.email) ? { pendingTesters: (await store.listTesters()).filter((t) => t.status === "pending").length } : null,
     speechAvailable: speechAvailable(),
-    liveVoice: { available: voiceAvailable(), freeVoice: freeVoiceAvailable() }, // live voice mode (hearing needs Groq)
+    liveVoice: { available: voiceAvailable(), serverVoice: liveServerVoice() }, // live voice mode (hearing needs Groq)
     whatsapp: await whatsappState(req.user.id),
     whatsappSync: await syncState(req.user.id),
     meetings: await meetingsState(req.user.id),
@@ -433,19 +433,20 @@ function liveHearing(userId) {
 // The browser falls back to its built-in voice whenever this returns an error.
 api.post("/speak", async (req, res) => {
   if (!speechAvailable()) return res.status(400).json({ error: "Read aloud voices aren't set up on this server." });
-  // live: a spoken reply in voice mode - free voice only, part of the exchange already counted, short.
+  // live: a spoken reply in voice mode - part of the exchange already counted, kept short. Same voices as Read
+  // aloud (ElevenLabs, then Cloudflare's free voice), or free only with LIVE_VOICE=free.
   const live = req.body?.live === true;
   const text = trimForSpeech(live ? String(req.body?.text || "").slice(0, 900) : req.body?.text);
   if (!text) return res.status(400).json({ error: "Nothing to read." });
   if (live) {
-    if (!freeVoiceAvailable()) return res.status(400).json({ error: "No free server voice; using the device's voice.", fallback: true });
+    if (!liveServerVoice()) return res.status(400).json({ error: "No server voice; using the device's voice.", fallback: true });
     if (!liveHearing(req.user.id)) return res.status(429).json({ error: "Voice mode is done for today.", fallback: true });
   } else {
     const usage = await store.useRequest(req.user.id, DAILY_LIMIT);
     if (!usage.allowed) return res.status(429).json({ error: `You've used today's ${DAILY_LIMIT} requests. Your limit resets tomorrow.` });
   }
   try {
-    const { voice, body } = await synthesize(text, { freeOnly: live });
+    const { voice, body } = await synthesize(text, { freeOnly: live && liveFreeOnly() });
     await store.logAction(req.user.id, live ? "voice_live_spoke" : "read_aloud", { chars: text.length, voice });
     res.set({ "Content-Type": "audio/mpeg", "Cache-Control": "no-store", "X-Thinq-Voice": voice });
     if (Buffer.isBuffer(body)) return res.send(body);
