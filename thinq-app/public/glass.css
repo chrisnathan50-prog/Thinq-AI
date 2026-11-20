@@ -382,3 +382,76 @@ html.theme-switching *,html.theme-switching *::before,html.theme-switching *::af
   [data-theme="dark"]{--rim:rgba(255,255,255,.4)}
   [data-theme="dark"] .sidebar,[data-theme="dark"] .panel,[data-theme="dark"] .composer,[data-theme="dark"] .apv,[data-theme="dark"] .bot,[data-theme="dark"] .event,[data-theme="dark"] .tk-add{background:#141417}
 }
+
+/* =========================================================
+   Live voice mode (voice.js): a full-screen frosted layer, one big glass orb that swells with your voice
+   (--level, 0..1), captions underneath, and two round controls.
+   ========================================================= */
+.voice{
+  position:fixed;inset:0;z-index:70;display:grid;grid-template-rows:auto 1fr auto auto;gap:12px;
+  padding:max(20px,env(safe-area-inset-top)) 20px max(22px,env(safe-area-inset-bottom));
+  background:rgba(238,240,243,.62);-webkit-backdrop-filter:blur(34px) saturate(1.4);backdrop-filter:blur(34px) saturate(1.4);
+  color:var(--ink);--level:0;animation:voice-in .3s var(--ease);
+}
+@keyframes voice-in{from{opacity:0}}
+body.voice-on{overflow:hidden}
+.voice-top{display:grid;justify-items:center;gap:2px;text-align:center}
+.voice-title{font-size:15px;font-weight:500;letter-spacing:-.015em}
+.voice-free{font-size:12.5px;color:var(--muted)}
+.voice-stage{display:grid;place-content:center;justify-items:center;gap:18px;min-height:0}
+.voice-orb{
+  --size:clamp(150px,34vmin,230px);
+  width:var(--size);height:var(--size);border-radius:50%;display:grid;place-items:center;color:#fff;cursor:pointer;position:relative;
+  background:
+    radial-gradient(48% 36% at 34% 20%,rgba(255,255,255,.55),rgba(255,255,255,0) 72%),
+    radial-gradient(70% 45% at 60% 100%,rgba(255,255,255,.16),transparent 70%),
+    linear-gradient(170deg,#3a3a41,#0b0b0c 72%);
+  box-shadow:inset 0 3px 3px rgba(255,255,255,.35),inset 0 -14px 30px rgba(255,255,255,.08),0 0 0 1px rgba(255,255,255,.6),
+    0 30px 60px -20px rgba(12,12,16,.55),0 0 0 calc(var(--level) * 26px) rgba(12,12,16,.08),0 0 0 calc(var(--level) * 52px) rgba(12,12,16,.04);
+  transform:scale(calc(1 + var(--level) * .07));
+  transition:transform .12s linear,box-shadow .12s linear;
+}
+.voice-orb:focus-visible{outline:2px solid var(--ink);outline-offset:8px}
+.voice-mark{display:grid;place-items:center;opacity:.95}
+/* thinking: the mark turns slowly; speaking: a gentle breathing glow */
+.voice[data-mode="thinking"] .voice-mark,.voice[data-mode="hearing"] .voice-mark{animation:voice-turn 2.4s linear infinite}
+@keyframes voice-turn{to{transform:rotate(360deg)}}
+.voice[data-mode="speaking"] .voice-orb{animation:voice-breathe 1.6s ease-in-out infinite}
+@keyframes voice-breathe{50%{box-shadow:inset 0 3px 3px rgba(255,255,255,.35),inset 0 -14px 30px rgba(255,255,255,.08),0 0 0 1px rgba(255,255,255,.6),0 30px 60px -20px rgba(12,12,16,.55),0 0 0 18px rgba(12,12,16,.06),0 0 0 40px rgba(12,12,16,.03)}}
+.voice[data-mode="paused"] .voice-orb,.voice[data-mode="listening"][data-muted] .voice-orb{opacity:.6}
+.voice-state{font-size:clamp(24px,4vw,34px);font-weight:300;letter-spacing:-.04em;text-align:center;min-height:1.2em}
+.voice-hint{font-size:13.5px;color:var(--muted);text-align:center;min-height:1.3em}
+.voice-caps{width:min(640px,100%);margin:0 auto;display:grid;gap:8px;align-content:end;max-height:34vh;overflow:hidden;
+  -webkit-mask:linear-gradient(180deg,transparent,#000 28%);mask:linear-gradient(180deg,transparent,#000 28%)}
+.voice-caps .cap{font-size:15px;line-height:1.5;color:var(--ink-2)}
+.voice-caps .cap span{display:block;font-size:12px;color:var(--muted);margin-bottom:1px}
+.voice-caps .cap.thinq{color:var(--ink)}
+.voice-caps .cap:not(:last-child){opacity:.55}
+.voice-chip{display:inline-flex;margin-left:6px;font:inherit;font-size:12.5px;padding:3px 10px;border-radius:999px;cursor:pointer;
+  color:var(--leaf-ink);background:linear-gradient(180deg,var(--leaf-milk),#9be0b1);border:1px solid rgba(255,255,255,.8)}
+.voice-controls{display:flex;justify-content:center;gap:28px}
+.voice-btn{
+  width:60px;height:60px;border-radius:50%;display:grid;place-items:center;color:var(--ink);
+  background:radial-gradient(70% 55% at 32% 22%,#fff,rgba(255,255,255,.55) 55%,rgba(255,255,255,.3));
+  border:1px solid rgba(255,255,255,.9);
+  box-shadow:inset 0 2px 2px #fff,0 10px 22px -10px rgba(12,12,16,.45);
+  transition:transform .3s var(--spring);
+}
+.voice-btn:active{transform:scale(.93)}
+.voice-btn[aria-pressed="true"]{color:var(--alert)}
+.voice-btn.end{color:#fff;background:radial-gradient(60% 45% at 35% 22%,rgba(255,255,255,.5),rgba(255,255,255,0) 70%),linear-gradient(180deg,var(--alert-hi),var(--alert));border-color:rgba(255,255,255,.5);box-shadow:inset 0 -4px 8px rgba(80,0,0,.25),0 10px 22px -8px rgba(229,37,27,.6)}
+.tool.talk{color:var(--ink)}
+
+[data-theme="dark"] .voice{background:rgba(12,12,14,.72)}
+[data-theme="dark"] .voice-orb{ /* inverse: a white glass sphere */
+  color:#0b0b0c;
+  background:radial-gradient(48% 36% at 34% 20%,#fff,rgba(255,255,255,0) 72%),radial-gradient(70% 45% at 60% 100%,rgba(0,0,0,.12),transparent 70%),linear-gradient(170deg,#fff,#c6c7cd 75%);
+  box-shadow:inset 0 3px 3px #fff,inset 0 -14px 30px rgba(0,0,0,.14),0 0 0 1px rgba(255,255,255,.35),
+    0 30px 60px -20px rgba(0,0,0,.8),0 0 0 calc(var(--level) * 26px) rgba(255,255,255,.07),0 0 0 calc(var(--level) * 52px) rgba(255,255,255,.035);
+}
+[data-theme="dark"] .voice[data-mode="speaking"] .voice-orb{animation-name:voice-breathe-dark}
+@keyframes voice-breathe-dark{50%{box-shadow:inset 0 3px 3px #fff,inset 0 -14px 30px rgba(0,0,0,.14),0 0 0 1px rgba(255,255,255,.35),0 30px 60px -20px rgba(0,0,0,.8),0 0 0 18px rgba(255,255,255,.06),0 0 0 40px rgba(255,255,255,.03)}}
+[data-theme="dark"] .voice-btn:not(.end){color:#fff;background:radial-gradient(70% 55% at 32% 22%,rgba(255,255,255,.3),rgba(255,255,255,.1) 55%,rgba(255,255,255,.04));border-color:rgba(255,255,255,.18);box-shadow:inset 0 1px 1px rgba(255,255,255,.3),0 10px 22px -10px rgba(0,0,0,.8)}
+[data-theme="dark"] .voice-btn[aria-pressed="true"]{color:#ff6b62}
+@media (prefers-reduced-motion:reduce){.voice-mark,.voice-orb{animation:none!important}.voice-orb{transition:none}}
+@media (prefers-reduced-transparency:reduce){.voice{background:var(--frost)}}

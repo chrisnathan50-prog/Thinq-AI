@@ -18,6 +18,8 @@ const apiKey = () => String(process.env.ELEVENLABS_API_KEY || "").trim();
 const elevenLabsOn = () => Boolean(apiKey()) && process.env.SPEECH_PROVIDER !== "cloudflare";
 const freeVoiceOn = () => cloudflareReady() && process.env.SPEECH_FREE_VOICE !== "off";
 export const speechAvailable = () => elevenLabsOn() || freeVoiceOn();
+// Live voice mode only ever uses the free voice (ElevenLabs bills per character, which adds up fast in a conversation).
+export const freeVoiceAvailable = () => freeVoiceOn();
 
 export class SpeechError extends Error {
   constructor(message, { status = 0, quota = false } = {}) { super(message); this.status = status; this.quota = quota; }
@@ -37,10 +39,11 @@ let elevenLabsPausedUntil = 0;
 const PAUSE_MS = { quota: 60 * 60_000, setup: 10 * 60_000 };
 
 // Returns { voice, body } where body is MP3 audio: a web stream (ElevenLabs) or a Buffer (Cloudflare).
-export async function synthesize(text) {
+export async function synthesize(text, { freeOnly = false } = {}) {
   if (!speechAvailable()) throw new SpeechError("Read aloud voices aren't set up on this server.");
+  if (freeOnly && !freeVoiceOn()) throw new SpeechError("The free voice isn't set up on this server.");
   let firstError = null;
-  if (elevenLabsOn() && Date.now() >= elevenLabsPausedUntil) {
+  if (!freeOnly && elevenLabsOn() && Date.now() >= elevenLabsPausedUntil) {
     try {
       return { voice: "elevenlabs", body: (await elevenLabs(text)).body };
     } catch (err) {

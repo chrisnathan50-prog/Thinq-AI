@@ -22,7 +22,7 @@ import { attachUser, requireUser, mountAuth } from "./src/auth.js";
 import { extractDocument, DocumentError, acceptedTypes, MAX_UPLOAD_BYTES, partCount } from "./src/documents.js";
 import { transcribe, voiceAvailable, MAX_AUDIO_BYTES } from "./src/llm/transcribe.js";
 import { imagesAvailable, IMAGE_DAILY_LIMIT } from "./src/llm/images.js";
-import { speechAvailable, synthesize, trimForSpeech } from "./src/llm/speech.js";
+import { speechAvailable, freeVoiceAvailable, synthesize, trimForSpeech } from "./src/llm/speech.js";
 import { Readable } from "node:stream";
 import { suggestionsFor } from "./src/suggestions.js";
 import { friendlyError } from "./src/errors.js";
@@ -104,6 +104,7 @@ api.get("/state", async (req, res) => {
     telegram: telegramConfigured() ? { username: botUsername() } : null,
     admin: isAdmin(req.user.email) ? { pendingTesters: (await store.listTesters()).filter((t) => t.status === "pending").length } : null,
     speechAvailable: speechAvailable(),
+    liveVoice: { available: voiceAvailable(), freeVoice: freeVoiceAvailable() }, // live voice mode (hearing needs Groq)
     whatsapp: await whatsappState(req.user.id),
     whatsappSync: await syncState(req.user.id),
     meetings: await meetingsState(req.user.id),
@@ -162,7 +163,8 @@ api.post("/chat", async (req, res) => {
   res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive", "X-Accel-Buffering": "no" });
   const send = (event) => res.write(`data: ${JSON.stringify(event)}\n\n`);
   try {
-    const reply = await chatTurn({ user: req.user, conversationId, text: text.trim(), timeZone, attachments, onStatus: (t) => send({ type: "status", text: t }) });
+    const channel = req.body?.channel === "voice" ? "voice" : "app"; // live voice mode: short spoken replies
+    const reply = await chatTurn({ user: req.user, conversationId, text: text.trim(), timeZone, attachments, channel, onStatus: (t) => send({ type: "status", text: t }) });
     send(reply);
   } catch (err) {
     if (!(err instanceof TurnError)) console.error(err);
@@ -397,12 +399,20 @@ api.get("/images/:id", async (req, res) => {
 api.post("/transcribe", rawBody(MAX_AUDIO_BYTES), async (req, res) => {
   if (!voiceAvailable()) return res.status(400).json({ error: "Voice notes aren't set up on this server (it needs GROQ_API_KEY)." });
   if (!req.body?.length || req.body.length < 1000) return res.status(400).json({ error: "That recording was too short. Hold on a little longer and try again." });
-  const usage = await store.useRequest(req.user.id, DAILY_LIMIT);
-  if (!usage.allowed) return res.status(429).json({ error: `You've used today's ${DAILY_LIMIT} requests. Your limit resets tomorrow.` });
+  // Live voice mode: hearing you is part of one spoken exchange, which counts once (when Thinq answers). It still
+  // needs requests left today, and has its own daily cap so it can't be used as unlimited free transcription.
+  const live = req.query.live === "1";
+  if (live) {
+    if (DAILY_LIMIT && (await store.usageToday(req.user.id)) >= DAILY_LIMIT) return res.status(429).json({ error: `You've used today's ${DAILY_LIMIT} requests. Your limit resets tomorrow.` });
+    if (!liveHearing(req.user.id)) return res.status(429).json({ error: "That's a lot of talking for one day. Voice mode will be back tomorrow." });
+  } else {
+    const usage = await store.useRequest(req.user.id, DAILY_LIMIT);
+    if (!usage.allowed) return res.status(429).json({ error: `You've used today's ${DAILY_LIMIT} requests. Your limit resets tomorrow.` });
+  }
   try {
     const text = await transcribe(req.body, req.get("content-type"));
     if (!text) return res.status(400).json({ error: "Couldn't hear any speech in that recording. Try again a little closer to the microphone." });
-    await store.logAction(req.user.id, "voice_note", { chars: text.length });
+    await store.logAction(req.user.id, live ? "voice_live_heard" : "voice_note", { chars: text.length });
     res.json({ text });
   } catch (err) {
     console.error(err);
@@ -410,17 +420,33 @@ api.post("/transcribe", rawBody(MAX_AUDIO_BYTES), async (req, res) => {
   }
 });
 
+// Live voice mode's own allowance: hearings (and spoken replies) per person per day, kept in memory.
+const LIVE_PER_DAY = Math.max(50, DAILY_LIMIT * 4);
+const liveCounts = new Map(); // userId -> { day, n }
+function liveHearing(userId) {
+  const day = new Date().toISOString().slice(0, 10), c = liveCounts.get(userId);
+  if (!c || c.day !== day) { liveCounts.set(userId, { day, n: 1 }); return true; }
+  return ++c.n <= LIVE_PER_DAY;
+}
+
 // ---------- read aloud (ElevenLabs, then Cloudflare's free voice) ----------
 // The browser falls back to its built-in voice whenever this returns an error.
 api.post("/speak", async (req, res) => {
   if (!speechAvailable()) return res.status(400).json({ error: "Read aloud voices aren't set up on this server." });
-  const text = trimForSpeech(req.body?.text);
+  // live: a spoken reply in voice mode - free voice only, part of the exchange already counted, short.
+  const live = req.body?.live === true;
+  const text = trimForSpeech(live ? String(req.body?.text || "").slice(0, 900) : req.body?.text);
   if (!text) return res.status(400).json({ error: "Nothing to read." });
-  const usage = await store.useRequest(req.user.id, DAILY_LIMIT);
-  if (!usage.allowed) return res.status(429).json({ error: `You've used today's ${DAILY_LIMIT} requests. Your limit resets tomorrow.` });
+  if (live) {
+    if (!freeVoiceAvailable()) return res.status(400).json({ error: "No free server voice; using the device's voice.", fallback: true });
+    if (!liveHearing(req.user.id)) return res.status(429).json({ error: "Voice mode is done for today.", fallback: true });
+  } else {
+    const usage = await store.useRequest(req.user.id, DAILY_LIMIT);
+    if (!usage.allowed) return res.status(429).json({ error: `You've used today's ${DAILY_LIMIT} requests. Your limit resets tomorrow.` });
+  }
   try {
-    const { voice, body } = await synthesize(text);
-    await store.logAction(req.user.id, "read_aloud", { chars: text.length, voice });
+    const { voice, body } = await synthesize(text, { freeOnly: live });
+    await store.logAction(req.user.id, live ? "voice_live_spoke" : "read_aloud", { chars: text.length, voice });
     res.set({ "Content-Type": "audio/mpeg", "Cache-Control": "no-store", "X-Thinq-Voice": voice });
     if (Buffer.isBuffer(body)) return res.send(body);
     Readable.fromWeb(body).on("error", () => res.destroy()).pipe(res);

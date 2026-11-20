@@ -1,4 +1,5 @@
 import { createTour } from "/app/tour.js";
+import { createVoiceMode } from "/app/voice.js";
 // Thinq app - browser side. Talks to the local server in server.js.
 const $ = (s, r = document) => r.querySelector(s);
 const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -1440,6 +1441,16 @@ async function finishRecording() {
   }
 }
 $("#micBtn").addEventListener("click", () => (rec ? stopRecording() : startRecording()));
+
+// ---------------- live voice mode (see voice.js) ----------------
+const voice = createVoiceMode({
+  state: () => state, api, timeZone, icon, notice, refresh,
+  conversationId: () => conversationId,
+  setConversation: (id) => { conversationId = id; history.replaceState(null, "", `#${id}`); },
+  openConversation: (id) => openConversation(id),
+  showApprovals: () => { showTab("approvals"); openPanel(true); },
+});
+$("#talkBtn").addEventListener("click", () => { if (rec) stopRecording(true); stopSpeaking(); voice.start(); });
 $("#recCancel").addEventListener("click", () => stopRecording(true));
 
 // ---------------- read aloud ----------------
@@ -1596,6 +1607,7 @@ if (g) {
 await refresh();
 $("#fileInput").accept = state.documentTypes || "";
 $("#micBtn").hidden = !(state.voiceAvailable && canRecord());
+$("#talkBtn").hidden = !(state.liveVoice?.available && voice.supported());
 if (state.images?.available) $("#input").placeholder = "Ask Thinq anything, attach a document, or ask for an image…";
 if (matchMedia("(max-width:560px)").matches) $("#input").placeholder = "Ask Thinq anything…"; // the long hint wraps on phones
 if (/image/.test(state.documentTypes || "")) { $("#attachBtn").title = "Attach a document or photo (PDF, Word, text, JPEG, PNG)"; $("#attachBtn").setAttribute("aria-label", "Attach a document or photo"); }
