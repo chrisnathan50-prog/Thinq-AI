@@ -47,7 +47,7 @@ function md(text) {
 }
 
 async function api(path, opts = {}) {
-  const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
+  const res = await fetch(path, { ...opts, headers: { "Content-Type": "application/json", "X-Time-Zone": timeZone, ...(opts.headers || {}) } });
   if (res.status === 401) { location.href = "/login.html"; throw new Error("Please sign in again."); }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
@@ -351,12 +351,18 @@ async function startMeetingRecording({ title, withTab }) {
   const dest = ctx.createMediaStreamDestination();
   const sources = [mic, tab].filter(Boolean);
   for (const s of sources) if (s.getAudioTracks().length) ctx.createMediaStreamSource(new MediaStream(s.getAudioTracks())).connect(dest);
+  // Microphone and meeting tab both on: record them as two tracks, so the notes can tell what you said from what
+  // the others on the call said. Otherwise one mixed track.
+  const separate = Boolean(mic && tab);
+  const tracks = separate
+    ? [{ track: "me", stream: new MediaStream(mic.getAudioTracks()) }, { track: "others", stream: new MediaStream(tab.getAudioTracks()) }]
+    : [{ track: "mixed", stream: dest.stream }];
 
   let r;
-  try { r = await api("/api/recordings", { method: "POST", body: JSON.stringify({ title, withTab: Boolean(tab) }) }); }
+  try { r = await api("/api/recordings", { method: "POST", body: JSON.stringify({ title, withTab: Boolean(tab), separate }) }); }
   catch (err) { sources.forEach((s) => s.getTracks().forEach((t) => t.stop())); ctx.close(); return notice(err.message); }
 
-  mrec = { id: r.id, title: r.title, started: Date.now(), ctx, dest, sources, n: 0, queue: [], uploading: false, stopping: false, tab: Boolean(tab), mic: Boolean(mic) };
+  mrec = { id: r.id, title: r.title, started: Date.now(), ctx, dest, sources, tracks, recorders: [], n: 0, queue: [], uploading: false, stopping: false, tab: Boolean(tab), mic: Boolean(mic) };
   // If they stop sharing the tab from Chrome's own bar, keep recording the microphone.
   tab?.getVideoTracks()[0]?.addEventListener("ended", () => { if (mrec && !mrec.stopping) { mrec.tab = false; notice(mic ? "Tab sharing stopped - still recording your microphone." : "Tab sharing stopped."); if (!mic) stopMeetingRecording(); } });
   try { mrec.wake = await navigator.wakeLock?.request("screen"); } catch { /* not supported */ }
@@ -369,17 +375,21 @@ async function startMeetingRecording({ title, withTab }) {
 }
 
 function nextPiece() {
-  const type = recMime();
-  const recorder = new MediaRecorder(mrec.dest.stream, { ...(type ? { mimeType: type } : {}), audioBitsPerSecond: 32000 });
-  const chunks = [], n = mrec.n++, offset = Date.now() - mrec.started;
-  recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
-  recorder.onstop = () => {
-    const blob = new Blob(chunks, { type: recorder.mimeType || type || "audio/webm" });
-    if (mrec && !mrec.cancelled && blob.size > 2000) { mrec.queue.push({ n, offset, blob }); uploadPieces(); }
-  };
-  recorder.start(10_000);
-  mrec.recorder = recorder;
-  mrec.rotate = setTimeout(() => { if (mrec && !mrec.stopping && recorder.state !== "inactive") { recorder.stop(); nextPiece(); } }, SEG_MS);
+  const type = recMime(), cur = mrec;
+  const n = cur.n++, offset = Date.now() - cur.started;
+  // One recorder per track (a track whose sharing has ended is skipped).
+  cur.recorders = cur.tracks.filter((t) => t.stream.getAudioTracks().some((a) => a.readyState === "live")).map(({ track, stream }) => {
+    const recorder = new MediaRecorder(stream, { ...(type ? { mimeType: type } : {}), audioBitsPerSecond: 32000 });
+    const chunks = [];
+    recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+    recorder.onstop = () => {
+      const blob = new Blob(chunks, { type: recorder.mimeType || type || "audio/webm" });
+      if (!cur.cancelled && blob.size > 2000) { cur.queue.push({ n, offset, blob, track }); uploadPieces(); }
+    };
+    recorder.start(10_000);
+    return recorder;
+  });
+  cur.rotate = setTimeout(() => { if (mrec === cur && !cur.stopping) { cur.recorders.forEach((r) => r.state !== "inactive" && r.stop()); nextPiece(); } }, SEG_MS);
 }
 
 async function uploadPieces() {
@@ -391,7 +401,7 @@ async function uploadPieces() {
     let ok = false;
     for (let attempt = 0; attempt < 4 && !ok; attempt++) {
       try {
-        const res = await fetch(`/api/recordings/${cur.id}/segments?n=${p.n}&offset=${p.offset}`, { method: "POST", headers: { "Content-Type": p.blob.type }, body: p.blob });
+        const res = await fetch(`/api/recordings/${cur.id}/segments?n=${p.n}&offset=${p.offset}&track=${p.track || "mixed"}`, { method: "POST", headers: { "Content-Type": p.blob.type }, body: p.blob });
         if (res.ok) ok = true;
         else if (res.status >= 400 && res.status < 500) { notice((await res.json().catch(() => ({}))).error || "Part of the recording couldn't be saved."); break; }
       } catch { /* offline - retry */ }
@@ -410,11 +420,11 @@ async function stopMeetingRecording({ cancel = false } = {}) {
   cur.stopping = true; cur.cancelled = cancel;
   clearTimeout(cur.rotate); clearInterval(cur.timer);
   renderRecBar();
-  await new Promise((resolve) => {
-    if (cur.recorder?.state === "inactive") return resolve();
-    cur.recorder.addEventListener("stop", () => setTimeout(resolve, 50), { once: true });
-    cur.recorder.stop();
-  });
+  await Promise.all((cur.recorders || []).map((rec) => new Promise((resolve) => {
+    if (rec.state === "inactive") return resolve();
+    rec.addEventListener("stop", () => setTimeout(resolve, 50), { once: true });
+    rec.stop();
+  })));
   cur.sources.forEach((s) => s.getTracks().forEach((t) => t.stop()));
   cur.ctx.close().catch(() => {});
   cur.wake?.release?.().catch(() => {});
@@ -509,7 +519,7 @@ function renderMeetings() {
        <p class="meta">Use the bar at the top of the chat to stop. Keep this tab open while you record.</p>`
     : `<form class="meet-rec" id="recForm">
         <input class="input" id="recTitle" type="text" maxlength="200" placeholder="Meeting name (optional)" aria-label="Meeting name">
-        ${canTab ? `<label class="meet-check"><input type="checkbox" id="recTab" checked><span>Also record a meeting tab's sound <small>(Google Meet, Zoom or Teams in your browser). Chrome asks which tab: pick the meeting and keep “Share tab audio” on.</small></span></label>` : ""}
+        ${canTab ? `<label class="meet-check"><input type="checkbox" id="recTab" checked><span>Also record a meeting tab's sound <small>(Google Meet, Zoom or Teams in your browser). Chrome asks which tab: pick the meeting and keep “Share tab audio” on. Your voice and the call are kept apart, so the notes show who said what.</small></span></label>` : ""}
         <button class="btn sm" type="submit">${icon("i-mic", 13)}Record meeting</button>
       </form>`;
   const botBlock = !s.bot ? "" : `
@@ -741,11 +751,46 @@ function renderNotes() {
 }
 
 function renderConvos() {
+  if (searchActive()) return; // the list is showing search results
   const list = state.conversations;
   $("#convos").innerHTML = list.length
     ? `<div class="label">Recent</div>` + list.map((c) => `<div class="convo"${c.id === conversationId ? ' data-current' : ""}><a href="#${c.id}" data-id="${c.id}" ${c.id === conversationId ? 'aria-current="true"' : ""} class="${state.attention?.unreadChats?.includes(c.id) && c.id !== conversationId ? "unread" : ""}" title="${esc(c.title)}">${esc(c.title)}</a><button class="del" data-del="${c.id}" aria-label="Delete “${esc(c.title)}”" title="Delete chat">${icon("i-trash", 14)}</button></div>`).join("")
     : `<p class="none">Your chats will appear here.</p>`;
 }
+
+// ---------------- search: past chats, meeting notes, documents ----------------
+let searchTimer = null, searchSeq = 0, searchHits = [];
+const searchActive = () => $("#searchBox").value.trim().length > 1;
+function highlight(text, q) {
+  const ws = q.toLowerCase().split(/\s+/).filter((w) => w.length > 1).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const safe = esc(text);
+  return ws.length ? safe.replace(new RegExp(`(${ws.map(esc).join("|")})`, "gi"), "<mark>$1</mark>") : safe;
+}
+async function runSearch() {
+  const q = $("#searchBox").value.trim(), mine = ++searchSeq;
+  if (q.length < 2) { renderConvos(); return; }
+  $("#convos").innerHTML = `<div class="label">Searching…</div>`;
+  let results = [];
+  try { results = (await api(`/api/search?q=${encodeURIComponent(q)}`)).results; } catch (err) { if (mine === searchSeq) $("#convos").innerHTML = `<p class="none">${esc(err.message)}</p>`; return; }
+  if (mine !== searchSeq) return;
+  searchHits = results;
+  const kindLabel = { chat: "Chat", meeting: "Meeting notes", document: "File" };
+  const when = (iso) => new Date(iso).toLocaleDateString([], { month: "short", day: "numeric", year: new Date(iso).getFullYear() === new Date().getFullYear() ? undefined : "numeric" });
+  $("#convos").innerHTML = results.length
+    ? `<div class="label">${results.length} result${results.length === 1 ? "" : "s"}</div>` + results.map((r, i) => `<button class="hit" data-hit="${i}">
+        <span class="hit-top"><b>${esc(r.title)}</b><small>${kindLabel[r.type]}${r.inTranscript ? " (transcript)" : ""} · ${esc(when(r.at))}</small></span>
+        <span class="hit-snip">${highlight(r.snippet, q)}</span></button>`).join("")
+    : `<p class="none">Nothing found for “${esc(q)}”.<br>Try fewer or different words.</p>`;
+}
+$("#searchBox").addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(runSearch, 250); });
+$("#searchBox").addEventListener("keydown", (e) => { if (e.key === "Escape") { e.target.value = ""; renderConvos(); } });
+$("#searchBox").addEventListener("search", () => { if (!searchActive()) renderConvos(); }); // the little ✕ in the box
+$("#convos").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-hit]"); if (!b) return;
+  const r = searchHits[Number(b.dataset.hit)]; if (!r) return;
+  if (r.type === "meeting") { meetOpen = r.id; renderMeetings(); openConn("meetings"); return; }
+  if (r.conversationId) { await openConversation(r.conversationId); closeDrawers(); }
+});
 
 // ---------------- starter suggestions (personal: from your inbox, calendar and memory) ----------------
 const FALLBACK = ["Plan my day", "What needs a reply from me?", "Draft replies to my unread emails", "What's on my calendar tomorrow?"];
@@ -772,6 +817,7 @@ function applyAttention(a) {
   } catch { /* not supported in this browser */ }
   document.title = a.total ? `(${a.total > 99 ? "99+" : a.total}) Thinq AI` : "Thinq AI";
   const rb = $("#rtBadge"); if (rb) { rb.hidden = !a.routines; rb.textContent = a.routines; }
+  const tb = $("#tkBadge"); if (tb) { tb.hidden = !a.tasks; tb.textContent = a.tasks; }
   document.querySelectorAll("#convos a[data-id]").forEach((el) => el.classList.toggle("unread", a.unreadChats.includes(el.dataset.id)));
 }
 async function checkAttention() {
@@ -1035,6 +1081,103 @@ $("#tab-routines").addEventListener("click", async (e) => {
   } catch (err) { notice(err.message); loadRoutines(); }
 });
 
+// ---------------- tasks and follow-ups ----------------
+let tasksData = { tasks: [], today: "" };
+async function loadTasks() {
+  try { tasksData = await api("/api/tasks"); } catch (err) { $("#tab-tasks").innerHTML = `<p class="none">${esc(err.message)}</p>`; return; }
+  renderTasks();
+}
+const addDaysYmd = (ymd, n) => { const d = new Date(`${ymd}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+function dueLabel(t, today) {
+  if (!t.dueDate) return "";
+  const day = t.dueDate === today ? "Today" : t.dueDate === addDaysYmd(today, 1) ? "Tomorrow" : t.dueDate === addDaysYmd(today, -1) ? "Yesterday"
+    : new Date(`${t.dueDate}T12:00:00Z`).toLocaleDateString([], { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" });
+  const time = t.dueTime ? ` ${new Date(`2000-01-01T${t.dueTime}:00`).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "";
+  return day + time;
+}
+const sinceLabel = (iso) => {
+  if (!iso) return "";
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 864e5);
+  return days <= 0 ? "since today" : days === 1 ? "since yesterday" : `for ${days} days`;
+};
+function taskRow(t, today) {
+  const overdue = t.kind === "todo" && t.dueDate && t.dueDate < today && t.status === "open";
+  const from = t.source === "meeting" ? `From meeting: ${t.sourceLabel || "notes"}` : t.source === "email" ? "Watching the email thread for a reply" : "";
+  const meta = [
+    t.dueDate && t.kind === "todo" ? `<span class="tk-due${overdue ? " late" : ""}">${esc(dueLabel(t, today))}</span>` : "",
+    t.kind === "waiting" ? `<span>${esc(t.person ? `Waiting on ${t.person}` : "Waiting")} ${esc(sinceLabel(t.waitingSince || t.createdAt))}</span>` : "",
+    t.kind === "waiting" && t.dueDate && t.status === "open" ? `<span class="tk-due${t.dueDate <= today ? " late" : ""}">Nudge ${esc(dueLabel(t, today))}</span>` : "",
+    t.status === "done" && t.replyFrom ? `<span>${esc(t.replyFrom)} replied</span>` : "",
+    from && t.status !== "done" ? `<span>${esc(from)}</span>` : "",
+  ].filter(Boolean).join("");
+  if (t.status === "suggested") {
+    return `<li class="tk sug" data-task="${esc(t.id)}"><div class="tk-main"><span class="tk-title">${esc(t.title)}</span>${t.notes ? `<small>${esc(t.notes)}</small>` : ""}</div>
+      <div class="tk-acts"><button class="btn sm" data-tkadd>Add</button><button class="mini" data-tkdismiss aria-label="Dismiss">${icon("i-x", 11)}</button></div></li>`;
+  }
+  const done = t.status === "done";
+  return `<li class="tk ${t.kind}${done ? " done" : ""}" data-task="${esc(t.id)}">
+    <button class="tk-check" data-tkcheck aria-label="${done ? "Mark as not done" : "Mark as done"}" aria-pressed="${done}">${done ? icon("i-check", 12) : ""}</button>
+    <div class="tk-main"><span class="tk-title">${esc(t.title)}</span>${meta ? `<small class="tk-meta">${meta}</small>` : ""}${t.notes && !done ? `<small>${esc(t.notes)}</small>` : ""}
+      ${t.kind === "waiting" && !done ? `<div class="tk-wait-acts"><button class="btn ghost sm" data-tknudge>Draft a nudge</button></div>` : ""}</div>
+    <button class="mini tk-del" data-tkdel aria-label="Delete task">${icon("i-trash", 12)}</button>
+  </li>`;
+}
+function renderTasks() {
+  const body = $("#tab-tasks"), { tasks = [], today = "" } = tasksData;
+  const open = tasks.filter((t) => t.status === "open"), sug = tasks.filter((t) => t.status === "suggested"), done = tasks.filter((t) => t.status === "done");
+  const todos = open.filter((t) => t.kind === "todo"), waiting = open.filter((t) => t.kind === "waiting");
+  const groups = [
+    ["Overdue", todos.filter((t) => t.dueDate && t.dueDate < today)],
+    ["Today", todos.filter((t) => t.dueDate === today)],
+    ["Coming up", todos.filter((t) => t.dueDate && t.dueDate > today)],
+    ["Anytime", todos.filter((t) => !t.dueDate)],
+    ["Waiting on others", waiting],
+  ];
+  const attn = sug.length + todos.filter((t) => t.dueDate && t.dueDate <= today).length;
+  $("#tkBadge").hidden = !attn; $("#tkBadge").textContent = attn;
+  const form = `<form class="tk-add" id="tkAddForm">
+      <input id="tkAddTitle" placeholder="Add a task…" aria-label="New task" maxlength="300" autocomplete="off">
+      <input id="tkAddDate" type="date" aria-label="Due date (optional)" title="Due date (optional)">
+      <button class="btn sm" type="submit">Add</button>
+    </form>`;
+  const sugBlock = sug.length ? `<section class="tk-sugs"><h3>${icon("i-spark", 11)} From your meetings: add to your list?</h3><ul class="tk-list">${sug.map((t) => taskRow(t, today)).join("")}</ul></section>` : "";
+  const lists = groups.filter(([, l]) => l.length).map(([label, l]) => `<h3>${label} <span class="count">${l.length}</span></h3><ul class="tk-list">${l.map((t) => taskRow(t, today)).join("")}</ul>`).join("");
+  const empty = !open.length && !sug.length ? `<div class="none">Nothing on your list.<br>Type above, or ask Thinq:
+      <button class="btn ghost sm" data-tkexample="Remind me to send the invoice to Marcus on Friday">“Remind me to send the invoice to Marcus on Friday”</button>
+      <button class="btn ghost sm" data-tkexample="What do I need to follow up on from this week's emails? Add them to my tasks.">“What do I need to follow up on this week?”</button></div>` : "";
+  const doneBlock = done.length ? `<details class="tk-done"><summary>Done <span class="count">${done.length}</span></summary><ul class="tk-list">${done.map((t) => taskRow(t, today)).join("")}</ul></details>` : "";
+  body.innerHTML = form + sugBlock + lists + empty + doneBlock + `<p class="bots-foot">Ask Thinq to add, move or finish tasks. When Thinq drafts an email that asks for something, it can watch for the reply and close the task when it arrives.</p>`;
+}
+$("#tab-tasks").addEventListener("submit", async (e) => {
+  if (e.target.id !== "tkAddForm") return;
+  e.preventDefault();
+  const title = $("#tkAddTitle").value.trim(); if (!title) return;
+  try {
+    await api("/api/tasks", { method: "POST", body: JSON.stringify({ title, dueDate: $("#tkAddDate").value || null }) });
+    await loadTasks(); $("#tkAddTitle").focus();
+  } catch (err) { notice(err.message); }
+});
+$("#tab-tasks").addEventListener("click", async (e) => {
+  const ex = e.target.closest("[data-tkexample]");
+  if (ex) { const i = $("#input"); i.value = ex.dataset.tkexample; autosize(); i.focus(); closeDrawers(); return; }
+  const row = e.target.closest("[data-task]"); if (!row) return;
+  const t = tasksData.tasks.find((x) => x.id === row.dataset.task); if (!t) return;
+  const patch = (body) => api(`/api/tasks/${t.id}`, { method: "PATCH", body: JSON.stringify(body) });
+  try {
+    if (e.target.closest("[data-tkcheck]")) { row.classList.toggle("done"); await patch({ status: t.status === "done" ? "open" : "done" }); }
+    else if (e.target.closest("[data-tkadd]")) await patch({ status: "open" });
+    else if (e.target.closest("[data-tkdismiss]")) await patch({ status: "dismissed" });
+    else if (e.target.closest("[data-tkdel]")) { if (!confirm(`Delete “${t.title}”?`)) return; await api(`/api/tasks/${t.id}`, { method: "DELETE" }); }
+    else if (e.target.closest("[data-tknudge]")) {
+      closeDrawers();
+      await openConversation(null);
+      send(`Draft a short, friendly follow-up nudge${t.person ? ` to ${t.person}` : ""} about: "${t.title}".${t.emailThreadId ? ` Read the latest email in that thread first and reply in the same thread (thread_id ${t.emailThreadId}).` : ""} Keep watching for a reply.`);
+      return;
+    } else return;
+    loadTasks();
+  } catch (err) { notice(err.message); loadTasks(); }
+});
+
 // ---------------- group bots (Telegram) ----------------
 let botsData = null;
 const BOT_EXAMPLE = "Build a bot for my running club's Telegram group. It should answer questions about our runs (we meet Saturdays 7am at the park gates, 5k and 10k groups, bring water) and remind everyone every Friday at 6pm about Saturday's run.";
@@ -1103,8 +1246,9 @@ $("#tab-bots").addEventListener("click", async (e) => {
 
 function showTab(tab) {
   document.querySelectorAll("[data-tab]").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === tab));
-  $("#tab-approvals").hidden = tab !== "approvals"; $("#tab-agenda").hidden = tab !== "agenda"; $("#tab-bots").hidden = tab !== "bots"; $("#tab-routines").hidden = tab !== "routines";
+  $("#tab-approvals").hidden = tab !== "approvals"; $("#tab-tasks").hidden = tab !== "tasks"; $("#tab-agenda").hidden = tab !== "agenda"; $("#tab-bots").hidden = tab !== "bots"; $("#tab-routines").hidden = tab !== "routines";
   if (tab === "agenda") loadAgenda();
+  if (tab === "tasks") loadTasks();
   if (tab === "bots") loadBots();
   if (tab === "routines") loadRoutines();
 }
@@ -1119,15 +1263,39 @@ function renderPending() {
   box.innerHTML = pending.map((a) => `<span class="att${a.status === "error" ? " err" : ""}">${a.status === "uploading" ? `<span class="spin"></span>` : icon("i-doc", 13)}<span class="nm" title="${esc(a.name)}">${esc(a.name)}</span><span class="meta">${a.status === "uploading" ? "Reading…" : a.status === "error" ? esc(a.error) : fileMeta(a)}</span><button type="button" data-remove="${a.key}" aria-label="Remove ${esc(a.name)}">${icon("i-x", 11)}</button></span>`).join("");
 }
 
+// Photos: shrink in the browser before uploading (phone photos are often 3-8 MB; the AI reads up to ~4 MB and
+// text stays sharp at 2000px). Also turns iPhone HEIC photos into JPEG where the browser can open them.
+async function shrinkPhoto(file) {
+  if (!/^image\//.test(file.type) && !/\.(jpe?g|png|webp|heic|heif)$/i.test(file.name)) return file;
+  if (/gif/i.test(file.type)) return file;
+  try {
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
+    if (scale === 1 && file.size < 2.5 * 1024 * 1024 && /jpe?g|png|webp/i.test(file.type)) return file;
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * scale); c.height = Math.round(bmp.height * scale);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.85));
+    if (!blob) return file;
+    const name = (file.name || "photo").replace(/\.[a-z0-9]+$/i, "") + ".jpg";
+    return new File([blob], name === ".jpg" ? "photo.jpg" : name, { type: "image/jpeg" });
+  } catch { return file; } // the browser can't open it: let the server explain
+}
+
 async function addFiles(fileList) {
-  for (const file of fileList) {
-    if (pending.length >= 5) { notice("You can attach up to 5 documents to one message."); break; }
+  for (let file of fileList) {
+    if (pending.length >= 5) { notice("You can attach up to 5 documents or photos to one message."); break; }
     const item = { key: crypto.randomUUID(), name: file.name, status: "uploading" };
     pending.push(item);
     renderPending();
+    try {
+      file = await shrinkPhoto(file);
+      if (!file.name || file.name === "image.png") file = new File([file], `screenshot-${new Date().toISOString().slice(0, 16).replace(/[T:]/g, "-")}.${(file.type.split("/")[1] || "png").replace("jpeg", "jpg")}`, { type: file.type });
+      item.name = file.name;
+    } catch {}
     if (file.size > MAX_DOC_BYTES) { Object.assign(item, { status: "error", error: "Over 10 MB" }); renderPending(); continue; }
     try {
-      const res = await fetch("/api/documents", { method: "POST", headers: { "Content-Type": "application/octet-stream", "X-Filename": encodeURIComponent(file.name) }, body: file });
+      const res = await fetch("/api/documents", { method: "POST", headers: { "Content-Type": file.type || "application/octet-stream", "X-Filename": encodeURIComponent(file.name) }, body: file });
       if (res.status === 401) { location.href = "/login.html"; return; }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Couldn't read that file");
@@ -1387,9 +1555,17 @@ await refresh();
 $("#fileInput").accept = state.documentTypes || "";
 $("#micBtn").hidden = !(state.voiceAvailable && canRecord());
 if (state.images?.available) $("#input").placeholder = "Ask Thinq anything, attach a document, or ask for an image…";
-await openConversation(location.hash.slice(1) || null);
+if (/image/.test(state.documentTypes || "")) { $("#attachBtn").title = "Attach a document or photo (PDF, Word, text, JPEG, PNG)"; $("#attachBtn").setAttribute("aria-label", "Attach a document or photo"); }
+const PANEL_HASHES = ["tasks", "approvals", "routines"];
+const startHash = location.hash.slice(1);
+if (PANEL_HASHES.includes(startHash)) { await openConversation(null); showTab(startHash); openPanel(true); }
+else await openConversation(startHash || null);
 loadAgenda();
 await initPush();
 tour.maybeStart();
 // Tapping a notification while Thinq is open switches to that chat.
-addEventListener("hashchange", () => { const id = location.hash.slice(1); if (id && id !== conversationId) openConversation(id); });
+addEventListener("hashchange", () => {
+  const id = location.hash.slice(1);
+  if (PANEL_HASHES.includes(id)) { showTab(id); openPanel(true); history.replaceState(null, "", conversationId ? `#${conversationId}` : location.pathname); return; }
+  if (id && id !== conversationId) openConversation(id);
+});

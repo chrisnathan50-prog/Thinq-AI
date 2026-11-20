@@ -9,13 +9,14 @@ export const voiceAvailable = () => Boolean(process.env.GROQ_API_KEY);
 
 const extFor = (type) => (/mp4|m4a|aac/.test(type) ? "m4a" : /ogg/.test(type) ? "ogg" : /wav/.test(type) ? "wav" : /mpeg|mp3/.test(type) ? "mp3" : "webm");
 
-export async function transcribe(buffer, contentType = "audio/webm", { language } = {}) {
+// With timestamps: true it returns { text, segments: [{ start, end, text }] } (seconds from the start of this audio).
+export async function transcribe(buffer, contentType = "audio/webm", { language, timestamps = false } = {}) {
   if (!voiceAvailable()) throw new GroqError(0, "Voice notes need GROQ_API_KEY on the server.", "voice_not_configured");
   const type = String(contentType).split(";")[0] || "audio/webm";
   const form = new FormData();
   form.append("file", new Blob([buffer], { type }), `voice-note.${extFor(type)}`);
   form.append("model", TRANSCRIBE_MODEL);
-  form.append("response_format", "json");
+  form.append("response_format", timestamps ? "verbose_json" : "json");
   form.append("temperature", "0");
   if (language) form.append("language", language);
 
@@ -36,5 +37,8 @@ export async function transcribe(buffer, contentType = "audio/webm", { language 
     throw new GroqError(res.status, message, code, Number(res.headers.get("retry-after")) || null);
   }
   const data = await res.json();
+  if (timestamps) {
+    return { text: String(data.text || "").trim(), segments: (data.segments || []).map((s) => ({ start: Number(s.start) || 0, end: Number(s.end) || 0, text: String(s.text || "").trim() })).filter((s) => s.text) };
+  }
   return String(data.text || "").trim();
 }

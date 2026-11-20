@@ -15,7 +15,7 @@ import * as store from "./store.js";
 import { nextRun, normalizeReminder, describeSchedule, validTimeZone } from "./bots.js";
 import { providerFor } from "./providers/index.js";
 import { chatTurn, busy, TurnError } from "./turns.js";
-import { notify } from "./notify.js";
+import { notify, notifyApproval } from "./notify.js";
 import { resolveChat, sendToChat } from "./whatsapp-sync.js";
 import { groqComplete } from "./llm/groq.js";
 import { AI_PROVIDER, MODEL } from "./agent.js";
@@ -201,6 +201,8 @@ export async function runRoutine(r, { manual = false } = {}) {
     const preview = reply.text.replace(/[*#_`>|]/g, "").replace(/\s+/g, " ").trim();
     if (!manual) await markUnread(convId); // shows as a new result (dot on the chat, count on the app icon)
     await notify(user.id, { title: r.title, body: preview, url: `/app#${convId}`, tag: `routine-${r.id}` }, "reminder").catch(() => 0);
+    // Drafts the routine prepared (e.g. "draft replies to anything urgent"): one notification each, with Send / Discard.
+    for (const a of reply.approvals || []) if (a.status === "pending") await notifyApproval(user.id, a, `Ready to send (${r.title})`).catch(() => 0);
     if (r.email_me) {
       const p = await providerFor(user);
       if (p.mode === "google") await p.sendEmail({ to: [user.email], cc: [], subject: `${r.title} - ${when}`, body: `${reply.text}\n\n- Thinq (routine: ${r.title}. Change or stop it in the Routines tab: ${publicUrl()}/app)`, replyToId: null }).catch((e) => console.warn("[routines] email to self failed:", e.message));
@@ -222,7 +224,7 @@ export async function runRoutine(r, { manual = false } = {}) {
     const kind = r.channel === "whatsapp" ? "whatsapp" : "email";
     const payload = kind === "whatsapp" ? { jid: r.recipient, chat: r.recipient_name, text } : { to: [r.recipient], cc: [], subject: r.title, body: text, replyToId: null };
     const a = await store.addApproval(user.id, kind, payload, `${r.title} → ${r.recipient_name}`, null);
-    await notify(user.id, { title: `Ready to send: ${r.title}`, body: `To ${r.recipient_name}: ${text}`, url: "/app", tag: `routine-${r.id}` }, "reminder").catch(() => 0);
+    await notifyApproval(user.id, a, `Ready to send: ${r.title}`).catch(() => 0);
     return `Drafted for your OK (${a.id})`;
   }
   await sendMessage(user, r, text);

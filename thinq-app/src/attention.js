@@ -3,15 +3,18 @@
 // and on the side-panel tabs, and sent with every push notification so the icon updates while Thinq is closed.
 import { query, one } from "./db.js";
 import { countNeedingOk } from "./routines.js";
+import { countNeedingAttention } from "./tasks.js";
 
-export async function attention(userId) {
-  const [approvals, unread, routines] = await Promise.all([
+export async function attention(userId, timeZone) {
+  const [approvals, unread, routines, tasks] = await Promise.all([
     one(`select count(*)::int as n from approvals where user_id = $1 and status = 'pending'`, [userId]),
     query(`select id from conversations where user_id = $1 and unread`, [userId]),
     countNeedingOk(userId).catch(() => 0),
+    countNeedingAttention(userId, timeZone).catch(() => 0),
   ]);
   const unreadChats = unread.map((r) => r.id);
-  return { approvals: approvals.n, routines, unreadChats, total: approvals.n + routines + unreadChats.length };
+  // tasks (due today / overdue / meeting suggestions) show on the Tasks tab only, not in the app-icon total.
+  return { approvals: approvals.n, routines, tasks, unreadChats, total: approvals.n + routines + unreadChats.length };
 }
 
 // A routine posted a result while the person wasn't looking.

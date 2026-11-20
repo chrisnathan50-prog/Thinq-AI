@@ -15,7 +15,9 @@ async function note(entry) {
 self.addEventListener("push", (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch { data = { title: "Thinq", body: event.data?.text() || "" }; }
-  const opts = { body: data.body || "", icon: "/app/icon-192.png", badge: "/app/badge-96.png", data: { url: data.url || "/app" } };
+  const opts = { body: data.body || "", icon: "/app/icon-192.png", badge: "/app/badge-96.png", data: { url: data.url || "/app", approvalId: data.approvalId || null } };
+  // Drafts waiting for approval: Send / Discard buttons, and the notification stays until it's dealt with.
+  if (data.approvalId && Array.isArray(data.actions)) { opts.actions = data.actions; opts.requireInteraction = true; }
   if (data.tag) { opts.tag = data.tag; opts.renotify = true; }
   event.waitUntil((async () => {
     try {
@@ -34,8 +36,32 @@ self.addEventListener("push", (event) => {
   })());
 });
 
+// Send or Discard tapped on a draft's notification: do it right here, without opening Thinq.
+const DONE = { email: "Sent", whatsapp: "Sent on WhatsApp", event: "Added to your calendar", notetaker: "The notetaker is on its way" };
+async function actOnApproval(approvalId, action, title) {
+  const show = (t, body, extra = {}) => self.registration.showNotification(t, { body, icon: "/app/icon-192.png", badge: "/app/badge-96.png", tag: `approval-${approvalId}`, data: { url: "/app#approvals" }, ...extra });
+  try {
+    const res = await fetch(`/api/approvals/${encodeURIComponent(approvalId)}/${action === "send" ? "approve" : "decline"}`, {
+      method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ via: "notification" }),
+    });
+    const out = await res.json().catch(() => ({}));
+    if (res.status === 401) return show("Sign in to Thinq", "You've been signed out on this device. Tap to open Thinq and send it from Approvals.");
+    if (!res.ok) return show(action === "send" ? "Couldn't send it" : "Couldn't discard it", `${out.error || "Something went wrong."} Tap to open Approvals.`);
+    const demo = out.mode === "demo" ? " (demo mode - nothing really went out)" : "";
+    await show(action === "send" ? `${DONE[out.kind] || "Done"}${demo}` : "Discarded", title || "");
+  } catch {
+    await show("You're offline", "Tap to open Thinq and send it from Approvals when you're back online.");
+  }
+  for (const c of await self.clients.matchAll({ type: "window" })) c.postMessage({ type: "push" }); // refresh an open Thinq tab
+}
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+  const approvalId = event.notification.data?.approvalId;
+  if (approvalId && (event.action === "send" || event.action === "discard")) {
+    event.waitUntil(actOnApproval(approvalId, event.action, event.notification.title.replace(/^Ready to send:?\s*/i, "")));
+    return;
+  }
   const target = new URL(event.notification.data?.url || "/app", self.location.origin);
   event.waitUntil((async () => {
     if (target.origin !== self.location.origin) return self.clients.openWindow(target.href); // e.g. a meeting link

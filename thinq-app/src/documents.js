@@ -3,6 +3,7 @@
 import mammoth from "mammoth";
 import { extractText, getDocumentProxy } from "unpdf";
 import JSZip from "jszip";
+import { readImage, readScannedPdf, imageMime, visionAvailable, VisionError, IMAGE_EXTS } from "./llm/vision.js";
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB per file
 export const MAX_TEXT_CHARS = 400_000; // ~100k words kept per document
@@ -10,6 +11,8 @@ export const PART_CHARS = 6_000; // one "part" the AI reads at a time (~1,500 to
 
 const TEXT_TYPES = new Set(["txt", "md", "markdown", "csv", "tsv", "json", "html", "htm", "log"]);
 export const ACCEPTED = ".pdf,.docx,.txt,.md,.csv,.tsv,.json,.html,.log,.zip";
+// Photos and screenshots are accepted too when the server can read pictures (see src/llm/vision.js).
+export const acceptedTypes = () => (visionAvailable() ? `${ACCEPTED},${IMAGE_EXTS.map((e) => `.${e}`).join(",")},image/*` : ACCEPTED);
 
 export class DocumentError extends Error {}
 
@@ -19,7 +22,14 @@ export async function extractDocument(name, buffer) {
   if (!buffer?.length) throw new DocumentError("That file is empty.");
   if (buffer.length > MAX_UPLOAD_BYTES) throw new DocumentError("That file is over 10 MB. Try a smaller one.");
   const kind = ext(name);
-  let text = "", pages = null;
+  let text = "", pages = null, ocr = false;
+  const vision = async (fn) => {
+    try { return await fn(); } catch (err) {
+      if (err instanceof VisionError) throw new DocumentError(err.message);
+      console.warn("[documents] reading a picture failed:", err.message);
+      throw new DocumentError("Couldn't read the text in that file. Try again in a moment.");
+    }
+  };
 
   if (kind === "pdf" || buffer.subarray(0, 5).toString() === "%PDF-") {
     try {
@@ -31,8 +41,20 @@ export async function extractDocument(name, buffer) {
       throw new DocumentError("Couldn't read that PDF. It may be password-protected or damaged.");
     }
     if (text.replace(/\[Page \d+\]/g, "").trim().length < 20) {
-      throw new DocumentError("That PDF has no readable text — it's probably a scan or photos. Try a PDF with selectable text.");
+      // No text layer: it's a scan or photos. Read the pages as pictures.
+      if (!visionAvailable()) throw new DocumentError("That PDF has no readable text — it's probably a scan or photos. Try a PDF with selectable text.");
+      const out = await vision(() => readScannedPdf(buffer));
+      text = `(Scanned PDF - text read from the page images, so expect small mistakes.)\n\n${out.text}`;
+      ocr = true;
     }
+  } else if (IMAGE_EXTS.includes(kind) || imageMime("", buffer)) {
+    if (!visionAvailable()) throw new DocumentError("Thinq can't read photos on this server yet. Try a PDF with selectable text.");
+    const mime = imageMime(name, buffer);
+    if (!mime) throw new DocumentError("Thinq can read JPEG, PNG, WebP and GIF pictures.");
+    text = `(Photo - text read from the picture, so expect small mistakes.)\n\n${await vision(() => readImage(buffer, mime))}`;
+    ocr = true;
+  } else if (kind === "heic" || kind === "heif") {
+    throw new DocumentError("HEIC photos can't be read yet. On iPhone, share it as JPEG (or take a screenshot) and try again.");
   } else if (kind === "docx") {
     try {
       text = (await mammoth.extractRawText({ buffer })).value;
@@ -54,7 +76,7 @@ export async function extractDocument(name, buffer) {
     text = buffer.toString("utf8");
     if (kind === "html" || kind === "htm") text = text.replace(/<(script|style)[\s\S]*?<\/\1>/gi, "").replace(/<[^>]+>/g, " ").replace(/[ \t]{2,}/g, " ");
   } else {
-    throw new DocumentError("Thinq can read PDF, Word (.docx) and text files (.txt, .md, .csv).");
+    throw new DocumentError(`Thinq can read PDF, Word (.docx), text files (.txt, .md, .csv)${visionAvailable() ? " and photos (JPEG, PNG)" : ""}.`);
   }
 
   text = text.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
@@ -66,7 +88,7 @@ export async function extractDocument(name, buffer) {
   }
   const truncated = text.length > MAX_TEXT_CHARS;
   if (truncated) text = text.slice(0, MAX_TEXT_CHARS);
-  return { text, pages, truncated, chars: text.length, parts: partCount(text.length), whatsapp: whatsapp && { messages: whatsapp.count, people: whatsapp.people } };
+  return { text, pages, truncated, ocr, chars: text.length, parts: partCount(text.length), whatsapp: whatsapp && { messages: whatsapp.count, people: whatsapp.people } };
 }
 
 export const partCount = (chars) => Math.max(1, Math.ceil(chars / PART_CHARS));

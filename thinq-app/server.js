@@ -5,6 +5,8 @@
 //   /auth/...    Google sign-in, connecting Gmail & Calendar, log out
 import * as bots from "./src/bots.js";
 import * as routines from "./src/routines.js";
+import * as tasks from "./src/tasks.js";
+import { searchEverything } from "./src/search.js";
 import { attention, markRead } from "./src/attention.js";
 import { mountTelegram, startTelegram, telegramConfigured, botUsername } from "./src/telegram.js";
 import express from "express";
@@ -17,7 +19,7 @@ import { hasApiKey, apiKeyName, MODEL, AI_PROVIDER } from "./src/agent.js";
 import { providerFor } from "./src/providers/index.js";
 import { googleConfigured, publicUrl, redirectUri } from "./src/providers/google.js";
 import { attachUser, requireUser, mountAuth } from "./src/auth.js";
-import { extractDocument, DocumentError, ACCEPTED, MAX_UPLOAD_BYTES, partCount } from "./src/documents.js";
+import { extractDocument, DocumentError, acceptedTypes, MAX_UPLOAD_BYTES, partCount } from "./src/documents.js";
 import { transcribe, voiceAvailable, MAX_AUDIO_BYTES } from "./src/llm/transcribe.js";
 import { imagesAvailable, IMAGE_DAILY_LIMIT } from "./src/llm/images.js";
 import { speechAvailable, synthesize, trimForSpeech } from "./src/llm/speech.js";
@@ -98,7 +100,7 @@ api.get("/state", async (req, res) => {
     model: MODEL,
     usage: { today: await store.usageToday(req.user.id), limit: DAILY_LIMIT },
     voiceAvailable: voiceAvailable(),
-    attention: await attention(req.user.id).catch(() => null),
+    attention: await attention(req.user.id, validTz(req.get("x-time-zone"))).catch(() => null),
     telegram: telegramConfigured() ? { username: botUsername() } : null,
     admin: isAdmin(req.user.email) ? { pendingTesters: (await store.listTesters()).filter((t) => t.status === "pending").length } : null,
     speechAvailable: speechAvailable(),
@@ -107,7 +109,7 @@ api.get("/state", async (req, res) => {
     meetings: await meetingsState(req.user.id),
     notifications: await notifyState(req.user.id).catch(() => null),
     images: { available: imagesAvailable(), today: await store.imagesToday(req.user.id), limit: IMAGE_DAILY_LIMIT },
-    documentTypes: ACCEPTED,
+    documentTypes: acceptedTypes(),
     conversations: await store.listConversations(req.user.id),
     approvals: await store.listApprovals(req.user.id),
     notes: await store.listNotes(req.user.id),
@@ -176,9 +178,13 @@ const rawBody = (limit) => express.raw({ type: () => true, limit });
 api.post("/documents", rawBody(MAX_UPLOAD_BYTES + 1024), async (req, res) => {
   const name = decodeURIComponent(String(req.get("x-filename") || "document")).replace(/[\\/\u0000-\u001f]/g, " ").trim() || "document";
   try {
+    // Reading a photo or scanned PDF uses the AI, so it counts as one request toward the daily limit.
+    const looksLikePicture = /\.(jpe?g|png|webp|gif)$/i.test(name) || /^image\//.test(req.get("content-type") || "") ;
+    if (looksLikePicture && DAILY_LIMIT && (await store.usageToday(req.user.id)) >= DAILY_LIMIT) return res.status(429).json({ error: `You've used today's ${DAILY_LIMIT} requests. Your limit resets tomorrow.` });
     const out = await extractDocument(name, req.body);
+    if (out.ocr) await store.useRequest(req.user.id, 0);
     const doc = await store.addDocument(req.user.id, { name, sizeBytes: req.body.length, pages: out.pages, text: out.text });
-    await store.logAction(req.user.id, "document_added", { id: doc.id, name, chars: out.chars });
+    await store.logAction(req.user.id, "document_added", { id: doc.id, name, chars: out.chars, ocr: out.ocr || undefined });
     res.json({ ...doc, parts: partCount(out.chars), truncated: out.truncated });
   } catch (err) {
     if (err instanceof DocumentError) return res.status(400).json({ error: err.message });
@@ -274,13 +280,13 @@ async function meetingsState(userId) {
   return { available: true, bot, record, ...(bot ? await meetings.getPrefs(userId) : { autoJoin: false }), meetings: await meetings.listMeetings(userId, 12) };
 }
 api.post("/recordings", async (req, res) => {
-  try { res.json(await recordings.startRecording(req.user.id, { title: req.body?.title, withTab: req.body?.withTab === true })); }
+  try { res.json(await recordings.startRecording(req.user.id, { title: req.body?.title, withTab: req.body?.withTab === true, separate: req.body?.separate === true })); }
   catch (err) { meetingErr(res, err); }
 });
 api.post("/recordings/:id/segments", rawBody(recordings.MAX_SEGMENT_BYTES + 1024), async (req, res) => {
   try {
     res.json(await recordings.addSegment(req.user.id, req.params.id, {
-      n: Number(req.query.n), offsetMs: Number(req.query.offset) || 0, mime: req.get("content-type"), audio: req.body,
+      n: Number(req.query.n), offsetMs: Number(req.query.offset) || 0, mime: req.get("content-type"), audio: req.body, track: String(req.query.track || "mixed"),
     }));
   } catch (err) { meetingErr(res, err); }
 });
@@ -326,7 +332,7 @@ api.put("/meetings/settings", async (req, res) => {
 const routineErr = (res, err) => (err instanceof routines.RoutineError || err.userFacing || err instanceof TurnError ? res.status(400).json({ error: err.message }) : (console.error(err), res.status(500).json({ error: friendlyError(err) })));
 api.get("/routines", async (req, res) => res.json({ routines: await routines.listRoutines(req.user.id) }));
 // Just the counts, for keeping the app icon and tab title up to date without reloading everything.
-api.get("/attention", async (req, res) => res.json(await attention(req.user.id)));
+api.get("/attention", async (req, res) => res.json(await attention(req.user.id, validTz(req.get("x-time-zone")))));
 // Turning a routine on is only ever done here, by the user's own click - the AI has no tool for it.
 api.post("/routines/:id/on", async (req, res) => {
   try { res.json(await routines.turnOn(req.user.id, req.params.id, { autoSend: req.body?.autoSend === true })); } catch (err) { routineErr(res, err); }
@@ -338,6 +344,32 @@ api.post("/routines/:id/run", async (req, res) => {
   try { res.json({ result: await routines.runNow(req.user.id, req.params.id) }); } catch (err) { routineErr(res, err); }
 });
 api.delete("/routines/:id", async (req, res) => { await routines.deleteRoutine(req.user.id, req.params.id); res.json({ ok: true }); });
+
+// ---------- search (sidebar): past chats, meeting notes, documents ----------
+api.get("/search", async (req, res) => {
+  const q = String(req.query.q || "").slice(0, 200);
+  res.json({ results: await searchEverything(req.user.id, q, { limit: 30 }) });
+});
+
+// ---------- tasks and follow-ups ----------
+const taskErr = (res, err) => (err instanceof tasks.TaskError ? res.status(400).json({ error: err.message }) : (console.error(err), res.status(500).json({ error: friendlyError(err) })));
+api.get("/tasks", async (req, res) => {
+  const tz = validTz(req.get("x-time-zone"));
+  res.json({ tasks: await tasks.listTasks(req.user.id), today: tasks.localDate(tz) });
+});
+api.post("/tasks", async (req, res) => {
+  const b = req.body || {};
+  try {
+    res.json(await tasks.addTask(req.user.id, { title: b.title, notes: b.notes, kind: b.kind === "waiting" ? "waiting" : "todo", person: b.person,
+      dueDate: b.dueDate || null, dueTime: b.dueTime || null, timeZone: validTz(req.get("x-time-zone")), source: "you" }));
+  } catch (err) { taskErr(res, err); }
+});
+api.patch("/tasks/:id", async (req, res) => {
+  const b = req.body || {}, patch = {};
+  for (const k of ["title", "notes", "status", "dueDate", "dueTime", "person"]) if (k in b) patch[k] = b[k];
+  try { res.json(await tasks.updateTask(req.user.id, req.params.id, patch)); } catch (err) { taskErr(res, err); }
+});
+api.delete("/tasks/:id", async (req, res) => { await tasks.deleteTask(req.user.id, req.params.id); res.json({ ok: true }); });
 
 // ---------- group bots (built by chatting with Thinq; live in Telegram groups) ----------
 const botErr = (res, err) => (err instanceof bots.BotError ? res.status(400).json({ error: err.message }) : (console.error(err), res.status(500).json({ error: "Something went wrong." })));
@@ -418,12 +450,12 @@ api.patch("/approvals/:id", async (req, res) => {
 });
 
 api.post("/approvals/:id/approve", async (req, res) => {
-  const out = await approveItem(req.user, req.params.id);
+  const out = await approveItem(req.user, req.params.id, req.body?.via === "notification" ? "notification" : "app");
   out.ok ? res.json(out.approval) : res.status(out.status).json({ error: out.error });
 });
 
 api.post("/approvals/:id/decline", async (req, res) => {
-  const out = await declineItem(req.user, req.params.id);
+  const out = await declineItem(req.user, req.params.id, req.body?.via === "notification" ? "notification" : "app");
   out.ok ? res.json(out.approval) : res.status(404).json({ error: out.error });
 });
 
@@ -462,6 +494,7 @@ meetings.startMeetingWorkers();
 recordings.startRecordingWorker();
 notifier.startNotifyWorker();
 routines.startRoutineWorker(); // scheduled tasks: morning summaries, daily messages...
+tasks.startTaskWorker(); // due-date reminders, and closing "waiting on" tasks when the reply arrives
 await startTelegram(); // learns the bot's name, registers the webhook, starts group-bot reminders
 
 // Keep-awake: Render's free plan puts the server to sleep after ~15 minutes without visitors, and a sleeping

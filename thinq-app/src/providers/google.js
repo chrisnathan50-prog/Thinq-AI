@@ -139,6 +139,16 @@ export function createGoogleProvider(userId, user) {
     };
   },
 
+  // Messages in a thread that arrived after a time and weren't sent by the user: "did they reply?"
+  async threadReplies({ threadId, after }) {
+    const gmail = google.gmail({ version: "v1", auth: await authed(userId) });
+    const { data } = await gmail.users.threads.get({ userId: "me", id: threadId, format: "metadata", metadataHeaders: ["From", "Subject"] });
+    const since = new Date(after).getTime();
+    return (data.messages || [])
+      .filter((m) => Number(m.internalDate) > since && !(m.labelIds || []).includes("SENT"))
+      .map((m) => ({ id: m.id, from: header(m.payload.headers, "From"), subject: header(m.payload.headers, "Subject"), date: new Date(Number(m.internalDate)).toISOString(), snippet: m.snippet }));
+  },
+
   async listEvents({ timeMin, timeMax }) {
     const calendar = google.calendar({ version: "v3", auth: await authed(userId) });
     const { data } = await calendar.events.list({

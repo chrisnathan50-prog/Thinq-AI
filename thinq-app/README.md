@@ -24,7 +24,8 @@ One server runs everything:
 
 ### Documents and voice notes
 
-- **Documents**: up to 5 per message, 10 MB each (PDF with selectable text, .docx, .txt, .md, .csv, .json, .html). Thinq keeps only the text, not the file. Long documents are split into parts the AI reads one at a time with the `read_document` tool. Scanned PDFs (photos of pages) aren't supported yet.
+- **Documents**: up to 5 per message, 10 MB each (PDF with selectable text, .docx, .txt, .md, .csv, .json, .html). Thinq keeps only the text, not the file. Long documents are split into parts the AI reads one at a time with the `read_document` tool.
+- **Photos and scanned PDFs**: attach or paste a photo (receipt, whiteboard, letter, screenshot) or a PDF without a text layer, and Thinq reads the text from the picture. With Claude, the picture goes to Claude. With Groq, a Groq model that accepts images reads it. Groq retires models, so a list is tried in order (`GROQ_VISION_MODELS`, default `qwen/qwen3.8-27b`, then two Llama 4 models), and a model that no longer exists is skipped. Scanned PDFs on Groq are read one page at a time, up to `MAX_SCAN_PAGES` (default 15). The app shrinks photos to about 2000px before uploading. Each photo or scan counts as one request toward the daily limit. `VISION=off` turns this off. HEIC photos the browser can't open are refused with a hint to send a JPEG.
 - **Voice notes** use Groq's free Whisper speech-to-text (`whisper-large-v3-turbo`, change with `GROQ_TRANSCRIBE_MODEL`), so they need `GROQ_API_KEY` even if you use Claude for chat. The recording is sent once to be transcribed and isn't stored. Each voice note counts as one request toward the daily limit.
 - **Read aloud** tries three voices in order:
   1. **ElevenLabs** (most natural) when `ELEVENLABS_API_KEY` is set. Get the key at elevenlabs.io → Developers → API Keys; it starts with `sk_`. Change the voice with `ELEVENLABS_VOICE_ID`. ElevenLabs bills per character.
@@ -52,6 +53,23 @@ The website has a **Help Us Test** page (`/testers.html`, linked from the home p
 - While your Google sign-in is in *Testing*, also add each approved tester's Gmail under Google Cloud → Google Auth Platform → **Audience → Test users** (up to 100). The admin page links there and has a copy button.
 - Optional `CONTACT_EMAIL` shows a "Prefer email?" link on the page. It's public, so use an address you're happy to share.
 - The form has spam protection (hidden field + 5 requests per hour per visitor).
+
+### Tasks and follow-ups
+
+The **Tasks** tab is the person's to-do list, and Thinq keeps it with them:
+
+- **To-dos**: "I need to send the lease back by Monday", typed in the Tasks tab or said in chat. A task with a due date gets one notification when it's due (09:00 that day if no time was given). Overdue tasks and tasks due today show as a number on the Tasks tab.
+- **Waiting on others**: when Thinq drafts an email that asks someone for something, it sets *follow up if no reply in N days*. Once you send it, a "waiting on" task tracks the Gmail thread (checked about every 20 minutes). It closes by itself when they reply ("Priya replied" notification); if they don't, you're nudged on the day, and **Draft a nudge** writes the follow-up in the same thread.
+- **From meetings**: action items in meeting notes that are yours (or have no clear owner) appear at the top of the Tasks tab as suggestions with **Add** / dismiss. Nothing is added unless you tap Add.
+- "Plan my day" sees what's overdue, due today and what you're waiting on.
+
+### Search
+
+The search box in the sidebar (and Thinq itself, with `search_history`) searches past chats, meeting notes and transcripts, and the text of attached documents and photos. Every word must appear. Results show the newest first; meeting results open their notes.
+
+### Send and Discard right from a notification
+
+When a routine prepares a draft (an email or WhatsApp message waiting in Approvals), its notification has **Send** and **Discard** buttons on Chrome, Edge and Firefox (computer and Android). It's sent without opening Thinq, and a second notification confirms it. iPhone and Mac Safari don't show notification buttons, so tapping the notification opens Approvals instead.
 
 ### Routines: tasks on a schedule
 
@@ -122,7 +140,8 @@ In the app, **Link WhatsApp chats** shows a warning, then a QR code to scan in W
 - **What's recorded:** the microphone, and on desktop Chrome or Edge, optionally a meeting tab's sound too (Google Meet, Zoom or Teams open in the browser). Chrome asks which tab to share; pick the meeting and keep *Share tab audio* on. That way the other people in the call are heard even with headphones. Phones and Safari record the microphone only.
 - **How it works:** the browser sends the audio in 5-minute pieces, and each piece is transcribed as soon as it arrives. The audio is deleted once it's turned into text; only the transcript and notes are kept. Long meetings (up to 4 hours) work, and if the tab closes mid-meeting, whatever was already sent still becomes notes after about 12 minutes.
 - **Afterwards:** the meeting appears in Meeting notes (View notes, full transcript, delete), and people can ask Thinq about it ("what did we decide about the launch date?", "draft the follow-up email").
-- **Limits:** recorded transcripts have no speaker names, so the notes only name an action's owner when the words make it clear. Groq's free tier transcribes about 2 hours of audio per hour; pieces that hit the limit are retried automatically. Each person can record up to `RECORDINGS_PER_DAY` meetings a day (default 10).
+- **Who said what:** with *Also record a meeting tab's sound* on, your microphone and the meeting tab are recorded as two separate tracks. The transcript labels your lines with your first name and everyone else's as *Others in the call*, merged in time order with Whisper timestamps. If you're on speakers rather than headphones, the call's sound picked up by your microphone is dropped. Whisper can't tell different voices apart within one track, so the people on the call share one label, and microphone-only recordings (one room) have no speaker names.
+- **Limits:** the notes only name an action's owner when it's clear (you, or a name mentioned in the words). Groq's free tier transcribes about 2 hours of audio per hour; pieces that hit the limit are retried automatically. Each person can record up to `RECORDINGS_PER_DAY` meetings a day (default 10).
 - **Consent:** the app reminds people to tell everyone in the meeting they're being recorded.
 
 #### Optional: a notetaker bot that joins calls
