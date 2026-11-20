@@ -1,6 +1,6 @@
 /* =========================================================
    Thinq app — liquid glass skin (loaded after app.css)
-   A frost-white room with a soft colour field behind it; the app's panes float on top as thick, milky glass.
+   A frost-white room with a soft grey field behind it (kept still so the glass doesn't redraw constantly); the app's panes float on top as thick, milky glass.
    Round controls are clear glass bubbles that bend the colours behind them (Chrome/Edge: real refraction via
    an SVG filter; Safari/Firefox: frosted). Everything falls back to solid surfaces with "Reduce transparency".
    Remove the <link> to glass.css to go back to the flat design.
@@ -45,18 +45,12 @@ body{position:relative}
     radial-gradient(24% 36% at 92% 62%,var(--field-steel),transparent 70%),
     radial-gradient(20% 26% at 88% 98%,var(--field-graphite),transparent 70%),
     radial-gradient(34% 22% at 48% 102%,var(--field-silver),transparent 72%);
-  filter:blur(36px);
-  animation:field-drift 48s ease-in-out infinite alternate;
+  filter:blur(36px); /* still on purpose: a moving field would make every glass blur redraw nonstop */
 }
 .shell::after{ /* dot grain, like a fine screen */
   content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
   background:radial-gradient(rgba(20,16,40,.07) .7px,transparent 1px) 0 0/5px 5px;
   -webkit-mask:linear-gradient(180deg,#000,rgba(0,0,0,.35) 60%,#000);mask:linear-gradient(180deg,#000,rgba(0,0,0,.35) 60%,#000);
-}
-@keyframes field-drift{
-  0%{transform:translate3d(0,0,0) scale(1)}
-  50%{transform:translate3d(-2%,1.5%,0) scale(1.04)}
-  100%{transform:translate3d(1.5%,-1%,0) scale(1.02)}
 }
 
 /* ---------- panes: sidebar, side panel, dialogs, menus ---------- */
@@ -254,7 +248,6 @@ html.refract .tool,html.refract .icon-btn{
   .sidebar,.panel,.composer,.apv,.bot,.event,.tk-add{background:#fff}
   .segmented button{color:var(--ink-2)}
 }
-@media (prefers-reduced-motion:reduce){.shell::before{animation:none}}
 
 /* =========================================================
    Dark mode: smoked glass in a graphite room.
