@@ -857,7 +857,7 @@ export async function* runTurn({ user, conversationId, userText, timeZone, attac
     const system = `${INSTRUCTIONS}\n\n${context}`;
     const groqSpecs = pickToolsFor(specs, [userText, ...history.slice(-4).map((m) => m.content)]);
     const groqHistory = fitHistory(history, approxTokens(system) + toolTokens(groqSpecs) + approxTokens(userText) + 50);
-    for await (const ev of runGroqTurn({ system, history: groqHistory, userText, specs: groqSpecs })) {
+    for await (const ev of runGroqTurn({ system, history: groqHistory, userText, specs: groqSpecs, allSpecs: specs })) {
       if (ev.type === "tool") { onTool(ev.name); yield { type: "status", text: STATUS[ev.name] || "Working" }; }
       if (ev.type === "final") text = ev.text;
     }

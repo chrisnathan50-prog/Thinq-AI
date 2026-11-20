@@ -53,16 +53,35 @@ export function providers() {
   return list;
 }
 
+// Tool definitions as sent to the AI service. Groq checks every tool call against these and rejects the whole
+// answer if the model gets a field name wrong ("tool_use_failed"). So we send them lenient - no "required", extra
+// fields allowed - and check strictly ourselves in runOne(), which tells the model what to fix in the same turn.
+// What's required is still written in the description.
+function lenient(schema) {
+  if (!schema || typeof schema !== "object") return schema;
+  if (Array.isArray(schema)) return schema.map(lenient);
+  const out = {};
+  for (const [k, v] of Object.entries(schema)) {
+    if (k === "required" || k === "additionalProperties" || k === "$schema") continue;
+    out[k] = v && typeof v === "object" ? lenient(v) : v;
+  }
+  return out;
+}
 function toFunctions(specs) {
   return specs.map((s) => {
-    const { $schema, ...parameters } = z.toJSONSchema(s.inputSchema);
-    return { type: "function", function: { name: s.name, description: s.description, parameters } };
+    const json = z.toJSONSchema(s.inputSchema);
+    const required = json.required?.length ? ` Required: ${json.required.join(", ")}.` : "";
+    return { type: "function", function: { name: s.name, description: s.description + required, parameters: lenient(json) } };
   });
 }
 
 // Groq-style request body -> what a given provider accepts.
+// Some free models only allow ~1,000 output tokens a minute; asking for more makes Groq refuse the request outright.
+const OUTPUT_CAP = { "qwen/qwen3.8-27b": 950 };
 function bodyFor(p, body) {
   const b = { ...body, model: p.model };
+  const cap = OUTPUT_CAP[p.model];
+  if (cap && b.max_completion_tokens > cap) b.max_completion_tokens = cap;
   if (p.kind !== "groq") {
     if (b.max_completion_tokens) { b.max_tokens = Math.min(b.max_completion_tokens, 4096); delete b.max_completion_tokens; }
     b.messages = b.messages.map(({ reasoning, ...m }) => m);
@@ -82,22 +101,24 @@ async function callOne(p, body) {
   } catch (err) {
     throw new GroqError(0, `Couldn't reach ${p.label}: ${err.message}`, "connection_error");
   }
-  const retryAfter = Number(res.headers.get("retry-after")) || null;
+  let retryAfter = Number(res.headers.get("retry-after")) || null;
   if (res.ok) {
     const data = await res.json();
     if (data?.choices?.length) return data;
     throw new GroqError(502, `${p.label} sent an empty answer`, "empty");
   }
-  let message, code;
-  try { const raw = await res.json(); const e = raw.error || raw.errors?.[0] || {}; message = e.message || raw.message; code = e.code; } catch {}
-  throw Object.assign(new GroqError(res.status, message, code, retryAfter), { daily: /per day|\(TPD\)|\(RPD\)|daily|neurons/i.test(message || "") });
+  let message, code, failedGeneration;
+  try { const raw = await res.json(); const e = raw.error || raw.errors?.[0] || {}; message = e.message || raw.message; code = e.code; failedGeneration = e.failed_generation; } catch {}
+  // Groq often says exactly when to try again in the message ("Please try again in 231.4ms" / "in 2.6s").
+  if (!retryAfter) { const m = String(message || "").match(/try again in ([\d.]+)(ms|s)\b/i); if (m) retryAfter = Number(m[1]) / (m[2].toLowerCase() === "ms" ? 1000 : 1); }
+  throw Object.assign(new GroqError(res.status, message, code, retryAfter), { daily: /per day|\(TPD\)|\(RPD\)|daily|neurons/i.test(message || ""), failedGeneration });
 }
 
 // One chat request, trying each provider in turn. Busy providers are skipped until their wait is over.
 async function chat(body, { only } = {}) {
   const list = providers().filter((p) => !only || p.id === only);
   if (!list.length) throw new GroqError(401, "No AI service is set up (GROQ_API_KEY missing).", "not_configured");
-  let lastErr, toolRetried = false;
+  let lastErr;
   for (let round = 0; round < 2; round++) {
     for (const p of list) {
       if ((cooldown.get(p.id) || 0) > Date.now() && !only) continue;
@@ -107,8 +128,15 @@ async function chat(body, { only } = {}) {
         return data;
       } catch (err) {
         lastErr = err;
-        // Open models sometimes write a malformed tool call; the provider rejects it. Ask the same one again once.
-        if (err.status === 400 && err.code === "tool_use_failed" && !toolRetried) { toolRetried = true; try { const d = await callOne(p, body); d.provider = p.id; return d; } catch (e) { lastErr = e; } }
+        // A malformed tool call: runGroqTurn tells the model what was wrong and asks again (repeating the same
+        // request unchanged mostly fails the same way).
+        if (err.status === 400 && err.code === "tool_use_failed") throw err;
+        // Busy for just a moment (Groq says how long): wait it out on the same model instead of failing over.
+        if (err.status === 429 && !err.daily && err.retryAfter != null && err.retryAfter <= 4) {
+          await sleep(err.retryAfter * 1000 + 150);
+          try { const d = await callOne(p, body); d.provider = p.id; return d; } catch (e) { lastErr = err = e; }
+          if (err.status === 400 && err.code === "tool_use_failed") throw err;
+        }
         const tooBig = err.status === 413 || /request too large|context length|maximum context/i.test(err.message || "");
         const busy = err.status === 429;
         const down = err.status === 0 || err.status >= 500;
@@ -178,20 +206,35 @@ export async function groqComplete({ system, prompt, maxTokens = 4000 }) {
 /**
  * Yields { type: "tool", name } as tools run, then { type: "final", text }.
  */
-export async function* runGroqTurn({ system, history, userText, specs }) {
-  const byName = Object.fromEntries(specs.map((s) => [s.name, s]));
-  const tools = toFunctions(specs);
+// allSpecs: every tool Thinq has. Only `specs` are sent (to keep requests small); if the model reaches for one of
+// the others, it's added and the request repeated.
+export async function* runGroqTurn({ system, history, userText, specs, allSpecs = specs }) {
+  specs = [...specs];
+  let byName = Object.fromEntries(specs.map((s) => [s.name, s]));
+  let tools = toFunctions(specs);
   const messages = [{ role: "system", content: system }, ...history, { role: "user", content: userText }];
+  let repairs = 0;
 
   for (let step = 0; step < MAX_STEPS; step++) {
-    const data = await chat({
-      model: GROQ_MODEL,
-      messages,
-      tools,
-      tool_choice: "auto",
-      temperature: 0.3,
-      max_completion_tokens: 8192,
-    });
+    let data;
+    try {
+      data = await chat({ model: GROQ_MODEL, messages, tools, tool_choice: "auto", temperature: 0.3, max_completion_tokens: 8192 });
+    } catch (err) {
+      // The service rejected the model's tool call. Fix what we can and ask again (twice at most per turn).
+      if (!(err.status === 400 && err.code === "tool_use_failed") || repairs >= 2) throw err;
+      repairs++;
+      const reason = String(err.message || "").replace(/^tool call validation failed:\s*/i, "").slice(0, 400);
+      const missing = reason.match(/(?:attempted to call tool|tool)\s+'?"?([\w-]+)'?"?\s+which (?:was|is) not in request/i)?.[1];
+      const spec = missing && allSpecs.find((s) => s.name === missing);
+      if (spec && !byName[missing]) {
+        specs.push(spec); byName[missing] = spec; tools = toFunctions(specs);
+        console.warn(`[ai] model asked for ${missing}, which wasn't sent - adding it and asking again`);
+      } else {
+        console.warn(`[ai] tool call rejected (${reason.slice(0, 160)}) - asking the model to correct it`);
+        messages.push({ role: "user", content: `(Note from the app, not the user: your last tool call was rejected - ${reason}. Call the tool again using exactly the parameter names in its definition, or answer without it.)` });
+      }
+      step--; continue;
+    }
     const choice = data.choices?.[0] ?? {};
     const msg = choice.message ?? {};
     const calls = msg.tool_calls ?? [];
