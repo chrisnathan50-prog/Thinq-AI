@@ -58,6 +58,7 @@ async function api(path, opts = {}) {
 async function refresh() {
   state = await api("/api/state");
   $("#botsTabBtn").hidden = !state.telegram;
+  placeLenses();
   applyAttention(state.attention);
   api("/api/routines").then((r) => { routinesData = r.routines; const w = routinesData.filter((x) => x.status === "needs_ok").length; $("#rtBadge").hidden = !w; $("#rtBadge").textContent = w; if (!$("#tab-routines").hidden) renderRoutines(); }).catch(() => {});
   renderAccount(); renderConn(); renderWhatsApp(); renderWaSync(); renderMeetings(); renderNotify(); renderNotes(); renderConvos(); renderApprovals(); renderGreeting();
@@ -67,7 +68,7 @@ function renderGreeting() {
   const h = new Date().getHours();
   const part = h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
   const first = (state.user?.name || state.profile?.name)?.split(" ")[0];
-  $("#greeting").textContent = first ? `${part}, ${first}.` : `${part}.`;
+  $("#greeting").innerHTML = first ? `<span class="soft">${esc(part)},</span> ${esc(first)}.` : `${esc(part)}.`;
 }
 
 function renderAccount() {
@@ -1244,8 +1245,49 @@ $("#tab-bots").addEventListener("click", async (e) => {
   } catch (err) { notice(err.message); }
 });
 
+// ---------------- appearance: auto (follow the device), light or dark ----------------
+// The choice is remembered on this device. The <head> script applies it before the page is drawn.
+const THEMES = { auto: ["automatic", "Appearance: automatic (follows your device)"], light: ["light", "Appearance: light"], dark: ["dark", "Appearance: dark"] };
+const darkQuery = matchMedia("(prefers-color-scheme: dark)");
+const themePref = () => { try { return localStorage.getItem("thinq-theme") || "auto"; } catch { return "auto"; } };
+function applyTheme(pref = themePref()) {
+  const dark = pref === "dark" || (pref === "auto" && darkQuery.matches);
+  const root = document.documentElement;
+  root.dataset.theme = dark ? "dark" : "light"; root.dataset.themePref = pref;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#0c0c0e" : "#eef0f3");
+  const b = $("#themeBtn");
+  if (b) { b.innerHTML = icon(`i-theme-${pref}`, 16); b.title = THEMES[pref][1]; b.setAttribute("aria-label", `${THEMES[pref][1]}. Change appearance`); }
+}
+$("#themeBtn")?.addEventListener("click", () => {
+  const order = ["auto", "light", "dark"], next = order[(order.indexOf(themePref()) + 1) % 3];
+  try { localStorage.setItem("thinq-theme", next); } catch {}
+  document.documentElement.classList.add("theme-switching");
+  applyTheme(next);
+  setTimeout(() => document.documentElement.classList.remove("theme-switching"), 400);
+  notice(next === "auto" ? "Appearance follows your device's light or dark setting." : `Appearance: ${THEMES[next][0]}.`, "ok");
+});
+darkQuery.addEventListener?.("change", () => { if (themePref() === "auto") applyTheme("auto"); });
+applyTheme();
+
+// Liquid glass: a lens that slides to the selected tab (styled in glass.css).
+function placeLens(seg) {
+  if (!seg) return;
+  const on = seg.querySelector('[aria-selected="true"]');
+  let lens = seg.querySelector(".seg-lens");
+  if (!lens) { lens = document.createElement("span"); lens.className = "seg-lens"; lens.setAttribute("aria-hidden", "true"); seg.prepend(lens); }
+  if (!on || !on.offsetWidth) { lens.style.width = "0"; return; }
+  lens.style.left = `${on.offsetLeft}px`; lens.style.width = `${on.offsetWidth}px`;
+  seg.classList.add("has-lens");
+}
+const placeLenses = () => document.querySelectorAll(".segmented").forEach(placeLens);
+addEventListener("resize", placeLenses);
+document.fonts?.ready.then(placeLenses);
+// Real refraction needs SVG filters inside backdrop-filter, which only Chromium browsers draw.
+if (navigator.userAgentData?.brands?.some((b) => /Chromium/.test(b.brand))) document.documentElement.classList.add("refract");
+
 function showTab(tab) {
   document.querySelectorAll("[data-tab]").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === tab));
+  placeLenses();
   $("#tab-approvals").hidden = tab !== "approvals"; $("#tab-tasks").hidden = tab !== "tasks"; $("#tab-agenda").hidden = tab !== "agenda"; $("#tab-bots").hidden = tab !== "bots"; $("#tab-routines").hidden = tab !== "routines";
   if (tab === "agenda") loadAgenda();
   if (tab === "tasks") loadTasks();
@@ -1555,6 +1597,7 @@ await refresh();
 $("#fileInput").accept = state.documentTypes || "";
 $("#micBtn").hidden = !(state.voiceAvailable && canRecord());
 if (state.images?.available) $("#input").placeholder = "Ask Thinq anything, attach a document, or ask for an image…";
+if (matchMedia("(max-width:560px)").matches) $("#input").placeholder = "Ask Thinq anything…"; // the long hint wraps on phones
 if (/image/.test(state.documentTypes || "")) { $("#attachBtn").title = "Attach a document or photo (PDF, Word, text, JPEG, PNG)"; $("#attachBtn").setAttribute("aria-label", "Attach a document or photo"); }
 const PANEL_HASHES = ["tasks", "approvals", "routines"];
 const startHash = location.hash.slice(1);
