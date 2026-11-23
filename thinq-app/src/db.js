@@ -319,6 +319,9 @@ async function migrate() {
     alter table messages add column if not exists attachments jsonb;
     alter table meeting_segments add column if not exists track text not null default 'mixed';
     alter table meeting_segments add column if not exists lines jsonb;
+    alter table meeting_segments add column if not exists chunks integer not null default 0;
+    alter table meeting_segments add column if not exists overlap_ms integer not null default 0;
+    alter table meeting_segments add column if not exists next_try_at timestamptz;
     alter table conversations add column if not exists unread boolean not null default false;
     alter table users add column if not exists tour_done_at timestamptz;
     create index if not exists documents_conv on documents(conversation_id);

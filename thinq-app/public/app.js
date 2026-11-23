@@ -329,14 +329,150 @@ function renderWaSync() {
 // meetings work and nothing already sent is lost if the tab closes. Audio is mixed from the microphone and,
 // on desktop Chrome/Edge, the shared tab's sound (so the other people in a Meet/Zoom/Teams tab are heard too).
 const SEG_MS = 5 * 60 * 1000;
-let mrec = null; // { id, title, started, ctx, dest, sources, recorder, n, queue, uploading, stopping, timer, wake }
+const FLUSH_MS = 15_000; // how often recorded audio is sent to the server
+const PIECE_OVERLAP_MS = 2000;
+const MIC_AUDIO = { audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } };
+let mrec = null; // the running recording: audio graph, open pieces, upload queue, timers
 const fmtDur = (ms) => { const s = Math.floor(ms / 1000), h = Math.floor(s / 3600); return `${h ? `${h}:` : ""}${String(Math.floor((s % 3600) / 60)).padStart(h ? 2 : 1, "0")}:${String(s % 60).padStart(2, "0")}`; };
 const recMime = () => ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"].find((t) => window.MediaRecorder?.isTypeSupported?.(t)) || "";
 
-async function startMeetingRecording({ title, withTab }) {
+// ---------------- meeting video: saved on this device, never uploaded ----------------
+// Video is recorded next to the audio pieces (which still go to the server for the transcript and notes). It's written
+// in small files to the browser's private storage, so a crash or reload loses seconds and the video can be recovered.
+// Browsers without that storage keep it in memory, up to a limit. The person then saves it with Save video.
+const VIDEO_DIR = "thinq-videos";
+const VIDEO_MEMORY_MAX = 350 * 1024 * 1024;
+const CAMERA_VIDEO = { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" };
+const videoMime = () => ["video/mp4;codecs=avc1.42E01F,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"].find((t) => window.MediaRecorder?.isTypeSupported?.(t)) || "";
+const videoExt = (type) => (/mp4/.test(type) ? "mp4" : "webm");
+let readyVideos = [];
+
+function diskVideo(all, dir, id, meta, seq = 0, size = 0) {
+  return {
+    id, name: meta.name, type: meta.type, size,
+    async put(blob) {
+      const h = await dir.getFileHandle(String(seq++).padStart(7, "0"), { create: true });
+      const out = await h.createWritable(); await out.write(blob); await out.close();
+      this.size += blob.size;
+    },
+    async file() {
+      const parts = [];
+      for await (const [name, h] of dir.entries()) if (/^\d+$/.test(name)) parts.push([name, await h.getFile()]);
+      parts.sort((a, b) => a[0].localeCompare(b[0]));
+      return new File(parts.map((p) => p[1]), this.name, { type: this.type.split(";")[0] });
+    },
+    discard: () => all.removeEntry(id, { recursive: true }).catch(() => {}),
+  };
+}
+async function openVideoStore(id, title, type) {
+  const clean = String(title || "Meeting").replace(/[\\/:*?"<>|]+/g, " ").trim().slice(0, 80);
+  const meta = { name: `Thinq - ${clean} - ${new Date().toISOString().slice(0, 10)}.${videoExt(type)}`, type };
+  try {
+    const all = await (await navigator.storage.getDirectory()).getDirectoryHandle(VIDEO_DIR, { create: true });
+    const dir = await all.getDirectoryHandle(id, { create: true });
+    const out = await (await dir.getFileHandle("meta.json", { create: true })).createWritable();
+    await out.write(JSON.stringify(meta)); await out.close();
+    return diskVideo(all, dir, id, meta);
+  } catch {
+    const parts = [];
+    return { id, ...meta, size: 0, inMemory: true, async put(blob) { parts.push(blob); this.size += blob.size; }, async file() { return new File(parts, this.name, { type: this.type.split(";")[0] }); }, async discard() { parts.length = 0; } };
+  }
+}
+async function startVideo(cur, track, isCamera) {
+  const type = videoMime();
+  try {
+    const store = await openVideoStore(cur.id, cur.title, type);
+    const recorder = new MediaRecorder(new MediaStream([track, ...cur.videoMix.stream.getAudioTracks()]), { mimeType: type, videoBitsPerSecond: 1_200_000, audioBitsPerSecond: 96_000 });
+    const v = cur.video = { recorder, store, track, isCamera, chain: Promise.resolve(), parts: 0 };
+    recorder.ondataavailable = (e) => {
+      if (!e.data.size) return;
+      v.chain = v.chain.then(() => store.put(e.data)).then(() => checkVideoRoom(cur, v))
+        .catch(() => endVideoEarly(cur, "This device ran out of room for video. Audio is still recording."));
+    };
+    recorder.onerror = () => endVideoEarly(cur, "The video stopped here. Audio is still recording.");
+    recorder.start(5000);
+  } catch { cur.video = null; notice("Video couldn't start. Still recording audio for your notes."); }
+}
+async function checkVideoRoom(cur, v) {
+  if (v.store.inMemory) { if (v.store.size > VIDEO_MEMORY_MAX) endVideoEarly(cur, "This browser's video limit was reached. Audio is still recording."); return; }
+  if (++v.parts % 12) return;
+  const room = await navigator.storage.estimate?.().catch(() => null);
+  if (room?.quota && room.quota - room.usage < 200 * 1024 * 1024) endVideoEarly(cur, "This device is almost out of room, so the video ends here. Audio is still recording.");
+}
+function finishVideo(cur) {
+  const v = cur.video;
+  if (!v) return Promise.resolve();
+  return v.finished ||= (async () => {
+    if (v.recorder.state !== "inactive") await new Promise((r) => { v.recorder.addEventListener("stop", r, { once: true }); v.recorder.stop(); });
+    await v.chain;
+    if (v.isCamera) v.track.stop();
+    if (cur.cancelled || !v.store.size) await v.store.discard();
+    else readyVideos.push(v.store);
+    await showVideoReady();
+  })();
+}
+function endVideoEarly(cur, message) {
+  if (!cur.video || cur.video.finished) return;
+  notice(message);
+  finishVideo(cur).then(() => { if (mrec === cur) renderRecBar(); });
+}
+const fileSize = (n) => (n >= 1024 ** 3 ? `${(n / 1024 ** 3).toFixed(1)} GB` : `${Math.max(1, Math.round(n / 1024 ** 2))} MB`);
+async function showVideoReady() {
+  const bar = $("#mvideoBar"), v = readyVideos[0];
+  if (!v) { bar.hidden = true; bar.innerHTML = ""; return; }
+  v.fileObj ||= await v.file(); // built ahead, because phones only allow saving straight after the tap
+  bar.hidden = false;
+  bar.innerHTML = `${icon("i-video", 16)}<span class="mrec-txt"><b>${v.saved ? "Video saved" : "Video ready"}: ${esc(v.name)}</b><small>${fileSize(v.fileObj.size)} · ${v.saved ? "Done removes Thinq's copy" : "only on this device until you save it"}</small></span>
+    <button class="btn ${v.saved ? "ghost " : ""}sm" id="mvideoSave">${v.saved ? "Save again" : "Save video"}</button><button class="btn ghost sm" id="mvideoDone">Done</button>`;
+  $("#mvideoSave").addEventListener("click", () => saveVideo(v));
+  $("#mvideoDone").addEventListener("click", async () => {
+    if (!v.saved && !confirm("Delete this video? It hasn't been saved.")) return;
+    await v.discard();
+    readyVideos = readyVideos.filter((x) => x !== v);
+    showVideoReady();
+  });
+}
+async function saveVideo(v) {
+  const file = v.fileObj;
+  try {
+    if (matchMedia("(pointer:coarse)").matches && navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: file.name });
+    else if (window.showSaveFilePicker) {
+      const h = await showSaveFilePicker({ suggestedName: file.name, types: [{ description: "Video", accept: { [file.type]: [`.${videoExt(file.type)}`] } }] });
+      const out = await h.createWritable(); await out.write(file); await out.close();
+    } else {
+      const a = document.createElement("a"), url = URL.createObjectURL(file);
+      a.href = url; a.download = file.name; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 120_000);
+    }
+    v.saved = true;
+    notice("Video saved.", "ok");
+    showVideoReady();
+  } catch (err) { if (err.name !== "AbortError") notice("Couldn't save the video. Try Save video again."); }
+}
+// After a crash or reload: offer any video that was being recorded.
+async function restoreVideos() {
+  try {
+    const all = await (await navigator.storage.getDirectory()).getDirectoryHandle(VIDEO_DIR);
+    for await (const [id, dir] of all.entries()) {
+      if (dir.kind !== "directory" || readyVideos.some((v) => v.id === id) || mrec?.id === id) continue;
+      let size = 0, newest = 0, seq = 0, meta = null;
+      for await (const [name, h] of dir.entries()) {
+        const f = await h.getFile();
+        if (name === "meta.json") meta = JSON.parse(await f.text());
+        else if (/^\d+$/.test(name)) { size += f.size; seq++; newest = Math.max(newest, f.lastModified); }
+      }
+      if (Date.now() - newest < 30_000 && seq) continue; // probably still recording in another tab
+      if (!meta || !size) { await all.removeEntry(id, { recursive: true }).catch(() => {}); continue; }
+      readyVideos.push(diskVideo(all, dir, id, meta, seq, size));
+    }
+    await showVideoReady();
+  } catch { /* nothing stored, or this browser has no private storage */ }
+}
+
+async function startMeetingRecording({ title, withTab, withVideo = false }) {
   if (mrec) return notice("A recording is already running.");
   if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return notice("This browser can't record audio. Try Chrome, Edge or Safari.");
-  let tab = null, mic = null;
+  let tab = null, mic = null, camera = null;
   if (withTab) {
     try {
       tab = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, selfBrowserSurface: "exclude", systemAudio: "include", preferCurrentTab: false });
@@ -346,96 +482,195 @@ async function startMeetingRecording({ title, withTab }) {
       return notice("That share had no sound. Choose the meeting's browser tab and keep “Share tab audio” switched on.");
     }
   }
-  try { mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
-  catch { if (!tab) return notice("Thinq couldn't use your microphone. Allow microphone access for this site and try again."); }
+  const wantsCamera = withVideo && !tab; // with a shared tab, the video is the tab's picture
+  try {
+    const s = await navigator.mediaDevices.getUserMedia(wantsCamera ? { ...MIC_AUDIO, video: CAMERA_VIDEO } : MIC_AUDIO);
+    mic = new MediaStream(s.getAudioTracks());
+    if (wantsCamera) camera = new MediaStream(s.getVideoTracks());
+  } catch {
+    if (wantsCamera) return notice("Thinq couldn't use your camera and microphone. Allow them for this site, or untick the video option.");
+    if (!tab) return notice("Thinq couldn't use your microphone. Allow microphone access for this site and try again.");
+  }
 
   const ctx = new AudioContext();
-  const dest = ctx.createMediaStreamDestination();
-  const sources = [mic, tab].filter(Boolean);
-  for (const s of sources) if (s.getAudioTracks().length) ctx.createMediaStreamSource(new MediaStream(s.getAudioTracks())).connect(dest);
-  // Microphone and meeting tab both on: record them as two tracks, so the notes can tell what you said from what
-  // the others on the call said. Otherwise one mixed track.
+  await ctx.resume().catch(() => {});
+  // Microphone and meeting tab both on: two tracks, so the notes can tell what you said from what the others said.
+  // Recorders listen to these outputs rather than the devices, so a microphone can be swapped mid-recording.
   const separate = Boolean(mic && tab);
-  const tracks = separate
-    ? [{ track: "me", stream: new MediaStream(mic.getAudioTracks()) }, { track: "others", stream: new MediaStream(tab.getAudioTracks()) }]
-    : [{ track: "mixed", stream: dest.stream }];
+  const outputs = separate ? { mic: ctx.createMediaStreamDestination(), tab: ctx.createMediaStreamDestination() } : (() => { const d = ctx.createMediaStreamDestination(); return { mic: d, tab: d }; })();
+  const tracks = separate ? [{ track: "me", stream: outputs.mic.stream }, { track: "others", stream: outputs.tab.stream }] : [{ track: "mixed", stream: outputs.mic.stream }];
 
   let r;
   try { r = await api("/api/recordings", { method: "POST", body: JSON.stringify({ title, withTab: Boolean(tab), separate }) }); }
-  catch (err) { sources.forEach((s) => s.getTracks().forEach((t) => t.stop())); ctx.close(); return notice(err.message); }
+  catch (err) { [mic, tab, camera].forEach((s) => s?.getTracks().forEach((t) => t.stop())); ctx.close(); return notice(err.message); }
 
-  mrec = { id: r.id, title: r.title, started: Date.now(), ctx, dest, sources, tracks, recorders: [], n: 0, queue: [], uploading: false, stopping: false, tab: Boolean(tab), mic: Boolean(mic) };
+  const cur = mrec = { id: r.id, title: r.title, started: Date.now(), ctx, outputs, inputs: {}, tracks, active: new Map(), open: new Set(), n: 0, queue: [], uploading: false, stopping: false, separate, tab: Boolean(tab), mic: Boolean(mic), quietMs: 0, warn: "", videoMix: withVideo ? ctx.createMediaStreamDestination() : null };
+  if (mic) connectInput(cur, "mic", mic);
+  if (tab) connectInput(cur, "tab", tab);
   // If they stop sharing the tab from Chrome's own bar, keep recording the microphone.
-  tab?.getVideoTracks()[0]?.addEventListener("ended", () => { if (mrec && !mrec.stopping) { mrec.tab = false; notice(mic ? "Tab sharing stopped - still recording your microphone." : "Tab sharing stopped."); if (!mic) stopMeetingRecording(); } });
-  try { mrec.wake = await navigator.wakeLock?.request("screen"); } catch { /* not supported */ }
-  nextPiece();
-  mrec.timer = setInterval(renderRecBar, 1000);
+  tab?.getVideoTracks()[0]?.addEventListener("ended", () => {
+    if (mrec !== cur || cur.stopping) return;
+    cur.tab = false;
+    if (!mic) { notice("Tab sharing stopped."); return stopMeetingRecording(); }
+    notice("Tab sharing stopped - still recording your microphone.");
+    cur.inputs.tab?.node.disconnect(); delete cur.inputs.tab;
+    if (cur.separate) { // no point sending a silent track to be transcribed
+      cur.tracks = cur.tracks.filter((t) => t.track !== "others");
+      const p = cur.active.get("others"); cur.active.delete("others"); if (p?.recorder.state !== "inactive") p?.recorder.stop();
+    }
+  });
+  await keepAwake(cur);
+  rotatePieces(cur);
+  if (withVideo) await startVideo(cur, (camera || tab).getVideoTracks()[0], Boolean(camera));
+  cur.timer = setInterval(renderRecBar, 1000);
+  cur.flusher = setInterval(() => cur.open.forEach((p) => flushPiece(cur, p)), FLUSH_MS);
+  cur.monitor = setInterval(() => watchRecording(cur), 250);
   renderRecBar();
   $("#connDialog").close();
   state.meetings = await api("/api/meetings").catch(() => state.meetings);
   renderMeetings();
 }
 
-function nextPiece() {
-  const type = recMime(), cur = mrec;
-  const n = cur.n++, offset = Date.now() - cur.started;
-  // One recorder per track (a track whose sharing has ended is skipped).
-  cur.recorders = cur.tracks.filter((t) => t.stream.getAudioTracks().some((a) => a.readyState === "live")).map(({ track, stream }) => {
-    const recorder = new MediaRecorder(stream, { ...(type ? { mimeType: type } : {}), audioBitsPerSecond: 32000 });
-    const chunks = [];
-    recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
-    recorder.onstop = () => {
-      const blob = new Blob(chunks, { type: recorder.mimeType || type || "audio/webm" });
-      if (!cur.cancelled && blob.size > 2000) { cur.queue.push({ n, offset, blob, track }); uploadPieces(); }
-    };
-    recorder.start(10_000);
-    return recorder;
-  });
-  cur.rotate = setTimeout(() => { if (mrec === cur && !cur.stopping) { cur.recorders.forEach((r) => r.state !== "inactive" && r.stop()); nextPiece(); } }, SEG_MS);
+function connectInput(cur, kind, stream) {
+  const old = cur.inputs[kind];
+  try { old?.node.disconnect(); } catch {}
+  const node = cur.ctx.createMediaStreamSource(new MediaStream(stream.getAudioTracks()));
+  const analyser = cur.ctx.createAnalyser(); analyser.fftSize = 1024;
+  node.connect(cur.outputs[kind]); node.connect(analyser);
+  if (cur.videoMix) node.connect(cur.videoMix);
+  cur.inputs[kind] = { node, stream, analyser, buf: new Float32Array(analyser.fftSize), mutedSince: 0 };
+}
+async function keepAwake(cur) {
+  if (document.visibilityState !== "visible" || (cur.wake && !cur.wake.released)) return;
+  try { cur.wake = await navigator.wakeLock?.request("screen"); } catch { /* not supported */ }
+}
+// A phone call, AirPods disconnecting or switching apps can take the microphone away: get it back.
+async function reconnectMic(cur) {
+  if (cur.reconnecting || Date.now() - (cur.lastReconnect || 0) < 4000) return;
+  cur.reconnecting = true; cur.lastReconnect = Date.now();
+  try {
+    cur.inputs.mic?.stream.getTracks().forEach((t) => t.stop()); // Safari won't reopen a device that's still held
+    const s = await navigator.mediaDevices.getUserMedia(MIC_AUDIO);
+    if (mrec !== cur || cur.stopping) s.getTracks().forEach((t) => t.stop());
+    else { connectInput(cur, "mic", s); cur.quietMs = 0; }
+  } catch { /* still unavailable: tried again in a few seconds */ }
+  cur.reconnecting = false;
+}
+// Four times a second: the sound meter, and noticing anything that would silently ruin the recording.
+function watchRecording(cur) {
+  if (mrec !== cur || cur.stopping) return;
+  if (cur.ctx.state !== "running") cur.ctx.resume().catch(() => {});
+  if (cur.video && !cur.video.finished && cur.video.track.readyState === "ended") endVideoEarly(cur, `${cur.video.isCamera ? "The camera stopped" : "Tab sharing stopped"}, so the video ends here. Audio is still recording.`);
+  const input = cur.inputs.mic || cur.inputs.tab;
+  let micLost = false;
+  if (cur.inputs.mic) {
+    const m = cur.inputs.mic, t = m.stream.getAudioTracks()[0];
+    m.mutedSince = t?.muted ? m.mutedSince || Date.now() : 0;
+    micLost = !t || t.readyState !== "live" || (m.mutedSince && Date.now() - m.mutedSince > 2500);
+    if (micLost) reconnectMic(cur);
+  }
+  let level = 0;
+  if (input) { input.analyser.getFloatTimeDomainData(input.buf); let sum = 0; for (const x of input.buf) sum += x * x; level = Math.sqrt(sum / input.buf.length); }
+  cur.quietMs = level < 0.0006 ? cur.quietMs + 250 : 0;
+  $("#mrecBar").style.setProperty("--rec-level", Math.min(1, level * 14).toFixed(2));
+  // A recorder the browser stopped by itself: start a new piece for that track.
+  for (const t of cur.tracks) { const p = cur.active.get(t.track); if (!p || p.recorder.state === "inactive") startPiece(cur, t, cur.n++, Date.now() - cur.started); }
+  setRecWarning(cur, micLost ? "Microphone lost. Reconnecting…"
+    : cur.ctx.state !== "running" ? "Recording is paused by your device. Tap here to resume."
+    : cur.quietMs >= 20000 ? "Thinq can't hear anything. Check your microphone."
+    : cur.uploadTrouble ? "Connection problem. Your audio is safe while this tab stays open." : "");
+}
+function setRecWarning(cur, text) {
+  if (cur.warn === text) return;
+  cur.warn = text;
+  const w = $("#mrecWarn"); if (w) { w.textContent = text; w.hidden = !text; }
+}
+document.addEventListener("visibilitychange", () => {
+  if (!mrec || mrec.stopping || document.visibilityState !== "visible") return;
+  mrec.ctx.resume().catch(() => {});
+  keepAwake(mrec); // the browser drops the keep-awake lock whenever the page is hidden
+  watchRecording(mrec);
+});
+
+function startPiece(cur, t, n, offset) {
+  const type = recMime();
+  const recorder = new MediaRecorder(t.stream, { ...(type ? { mimeType: type } : {}), audioBitsPerSecond: 32000 });
+  const p = { recorder, n, offset, track: t.track, seq: 0, buf: [], overlap: 0, type };
+  recorder.ondataavailable = (e) => { if (e.data.size) p.buf.push(e.data); };
+  recorder.onstop = () => { cur.open.delete(p); if (!cur.cancelled) flushPiece(cur, p, true); };
+  recorder.onerror = () => { try { if (recorder.state !== "inactive") recorder.stop(); } catch {} };
+  recorder.start(5000);
+  cur.open.add(p); cur.active.set(t.track, p);
+  return p;
+}
+// Every 5 minutes a new piece starts two seconds before the old one ends, so no word falls in the gap.
+function rotatePieces(cur) {
+  if (mrec !== cur || cur.stopping) return;
+  const old = [...cur.active.values()], n = cur.n++, offset = Date.now() - cur.started;
+  cur.tracks.forEach((t) => startPiece(cur, t, n, offset));
+  old.forEach((p) => { p.overlap = PIECE_OVERLAP_MS; setTimeout(() => { if (p.recorder.state !== "inactive") p.recorder.stop(); }, PIECE_OVERLAP_MS); });
+  cur.rotate = setTimeout(() => rotatePieces(cur), SEG_MS);
+}
+// What's been recorded so far goes to the server every 15 seconds, so a crash loses seconds rather than minutes.
+function flushPiece(cur, p, final = false) {
+  if (!p.buf.length && !final) return;
+  const blob = new Blob(p.buf, { type: p.recorder.mimeType || p.type || "audio/webm" });
+  p.buf = [];
+  if (!blob.size && (!final || p.seq === 0)) return;
+  if (final && p.seq === 0 && blob.size < 2000) return; // a blip, nothing worth sending
+  cur.queue.push({ p, seq: p.seq++, blob, final });
+  uploadPieces(cur);
 }
 
-async function uploadPieces() {
-  const cur = mrec;
+async function uploadPieces(cur = mrec) {
   if (!cur || cur.uploading) return;
   cur.uploading = true;
   while (cur.queue.length && !cur.cancelled) {
-    const p = cur.queue[0];
-    let ok = false;
-    for (let attempt = 0; attempt < 4 && !ok; attempt++) {
+    const q = cur.queue[0], { p } = q;
+    for (let attempt = 1; !cur.cancelled; attempt++) {
+      let done = false;
       try {
-        const res = await fetch(`/api/recordings/${cur.id}/segments?n=${p.n}&offset=${p.offset}&track=${p.track || "mixed"}`, { method: "POST", headers: { "Content-Type": p.blob.type }, body: p.blob });
-        if (res.ok) ok = true;
-        else if (res.status >= 400 && res.status < 500) { notice((await res.json().catch(() => ({}))).error || "Part of the recording couldn't be saved."); break; }
-      } catch { /* offline - retry */ }
-      if (!ok) await new Promise((r) => setTimeout(r, 3000 * (attempt + 1)));
+        const res = await fetch(`/api/recordings/${cur.id}/segments?n=${p.n}&offset=${p.offset}&track=${p.track}&seq=${q.seq}&final=${q.final ? 1 : 0}&overlap=${p.overlap}`, { method: "POST", headers: { "Content-Type": q.blob.type }, body: q.blob });
+        if (res.ok) done = true;
+        else if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) { notice((await res.json().catch(() => ({}))).error || "Part of the recording couldn't be saved."); done = true; }
+      } catch { /* offline, or the server is waking up */ }
+      if (done) { cur.uploadTrouble = false; break; }
+      cur.uploadTrouble = attempt >= 2;
+      // While recording, keep trying for as long as it takes. After Stop, give it three minutes.
+      if (cur.stopping && Date.now() - cur.stoppedAt > 180_000) { cur.queue.length = 1; notice("Part of the recording couldn't be uploaded. The notes may have a gap."); break; }
+      await new Promise((r) => setTimeout(r, Math.min(15_000, 2000 * attempt)));
     }
-    if (!ok) notice("Part of the recording couldn't be uploaded. The notes may have a gap.");
     cur.queue.shift();
   }
   cur.uploading = false;
-  cur.drained?.();
+  if (!cur.queue.length) cur.drained?.();
 }
 
 async function stopMeetingRecording({ cancel = false } = {}) {
   const cur = mrec;
   if (!cur || cur.stopping) return;
-  cur.stopping = true; cur.cancelled = cancel;
-  clearTimeout(cur.rotate); clearInterval(cur.timer);
+  cur.stopping = true; cur.cancelled = cancel; cur.stoppedAt = Date.now();
+  clearTimeout(cur.rotate); clearInterval(cur.timer); clearInterval(cur.flusher); clearInterval(cur.monitor);
   renderRecBar();
-  await Promise.all((cur.recorders || []).map((rec) => new Promise((resolve) => {
-    if (rec.state === "inactive") return resolve();
-    rec.addEventListener("stop", () => setTimeout(resolve, 50), { once: true });
-    rec.stop();
+  await Promise.all([...cur.open].map((p) => new Promise((resolve) => {
+    if (p.recorder.state === "inactive") return resolve();
+    p.recorder.addEventListener("stop", () => setTimeout(resolve, 50), { once: true });
+    p.recorder.stop();
   })));
-  cur.sources.forEach((s) => s.getTracks().forEach((t) => t.stop()));
+  await finishVideo(cur); // before the audio it's mixed from is closed
+  Object.values(cur.inputs).forEach((i) => i.stream.getTracks().forEach((t) => t.stop()));
   cur.ctx.close().catch(() => {});
   cur.wake?.release?.().catch(() => {});
   try {
     if (cancel) {
       await api(`/api/recordings/${cur.id}`, { method: "DELETE" });
     } else {
-      if (cur.uploading || cur.queue.length) await new Promise((r) => { cur.drained = r; if (!cur.uploading) uploadPieces(); });
-      await api(`/api/recordings/${cur.id}/finish`, { method: "POST" });
+      if (cur.uploading || cur.queue.length) await new Promise((r) => { cur.drained = r; if (!cur.uploading) uploadPieces(cur); });
+      // The free server may be waking up: try a few times. If it never answers, it finishes the recording by itself.
+      for (let attempt = 1; ; attempt++) {
+        try { await api(`/api/recordings/${cur.id}/finish`, { method: "POST" }); break; }
+        catch (err) { if (attempt >= 5) throw err; await new Promise((r) => setTimeout(r, 4000 * attempt)); }
+      }
     }
   } catch (err) { notice(err.message); }
   mrec = null;
@@ -450,13 +685,19 @@ async function stopMeetingRecording({ cancel = false } = {}) {
 function renderRecBar() {
   const bar = $("#mrecBar");
   if (!mrec) { bar.hidden = true; bar.innerHTML = ""; bar.dataset.mode = ""; renderLinks(); return; }
-  const mode = mrec.stopping ? (mrec.cancelled ? "discarding" : "saving") : `rec-${mrec.tab}-${mrec.mic}`;
+  const videoOn = Boolean(mrec.video && !mrec.video.finished);
+  const mode = mrec.stopping ? (mrec.cancelled ? "discarding" : "saving") : `rec-${mrec.tab}-${mrec.mic}-${videoOn}`;
   if (bar.dataset.mode !== mode) {
     bar.dataset.mode = mode; bar.hidden = false;
     bar.innerHTML = mrec.stopping
       ? `<span class="spin"></span><span class="mrec-txt"><b>${mrec.cancelled ? "Discarding…" : "Saving the recording…"}</b></span>`
-      : `<span class="dot"></span><span class="mrec-txt"><b>Recording “${esc(mrec.title)}”</b><small><span id="mrecTime">0:00</span> · ${mrec.tab && mrec.mic ? "meeting tab + microphone" : mrec.tab ? "meeting tab" : "microphone"} · keep this tab open</small></span>
+      : `<span class="dot"></span><span class="mrec-txt"><b>Recording “${esc(mrec.title)}”</b><small><span id="mrecTime">0:00</span> · ${mrec.tab && mrec.mic ? "meeting tab + microphone" : mrec.tab ? "meeting tab" : "microphone"}${videoOn ? " + video" : ""} · keep this tab open</small><small class="mrec-warn" id="mrecWarn" role="alert" hidden></small></span>
+         ${videoOn && mrec.video.isCamera ? `<video class="mrec-preview" id="mrecPreview" muted playsinline autoplay aria-label="Your camera"></video>` : ""}
+         <span class="mrec-meter" aria-hidden="true"><i></i></span>
          <button class="btn sm" id="mrecStop">Stop & get notes</button><button class="btn ghost sm" id="mrecDiscard">Discard</button>`;
+    mrec.warn = "";
+    if ($("#mrecPreview")) $("#mrecPreview").srcObject = new MediaStream([mrec.video.track]);
+    $("#mrecWarn")?.addEventListener("click", () => mrec?.ctx.resume().catch(() => {}));
     $("#mrecStop")?.addEventListener("click", () => stopMeetingRecording());
     $("#mrecDiscard")?.addEventListener("click", () => { if (confirm("Discard this recording? Nothing will be saved.")) stopMeetingRecording({ cancel: true }); });
     renderLinks();
@@ -522,6 +763,7 @@ function renderMeetings() {
     : `<form class="meet-rec" id="recForm">
         <input class="input" id="recTitle" type="text" maxlength="200" placeholder="Meeting name (optional)" aria-label="Meeting name">
         ${canTab ? `<label class="meet-check"><input type="checkbox" id="recTab" checked><span>Also record a meeting tab's sound <small>(Google Meet, Zoom or Teams in your browser). Chrome asks which tab: pick the meeting and keep “Share tab audio” on. Your voice and the call are kept apart, so the notes show who said what.</small></span></label>` : ""}
+        ${videoMime() ? `<label class="meet-check"><input type="checkbox" id="recVideo"><span>Also save a video to this device <small>${canTab ? "Uses the meeting tab's picture, or your camera if no tab is shared." : "Uses your camera."} The video stays on this device and is never uploaded.</small></span></label>` : ""}
         <button class="btn sm" type="submit">${icon("i-mic", 13)}Record meeting</button>
       </form>`;
   const botBlock = !s.bot ? "" : `
@@ -539,7 +781,7 @@ function renderMeetings() {
     <p class="meta">Only you can see your notes. Let people in the meeting know you're recording.</p>`;
   $("#recForm")?.addEventListener("submit", (e) => {
     e.preventDefault();
-    startMeetingRecording({ title: $("#recTitle").value.trim(), withTab: Boolean($("#recTab")?.checked) });
+    startMeetingRecording({ title: $("#recTitle").value.trim(), withTab: Boolean($("#recTab")?.checked), withVideo: Boolean($("#recVideo")?.checked) });
   });
 
   $("#meetForm")?.addEventListener("submit", async (e) => {
@@ -1620,6 +1862,7 @@ if (PANEL_HASHES.includes(startHash)) { await openConversation(null); showTab(st
 else await openConversation(startHash || null);
 loadAgenda();
 await initPush();
+restoreVideos();
 tour.maybeStart();
 // Tapping a notification while Thinq is open switches to that chat.
 addEventListener("hashchange", () => {

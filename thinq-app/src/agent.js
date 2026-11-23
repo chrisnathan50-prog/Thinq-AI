@@ -31,12 +31,13 @@ let client;
 const anthropic = () => (client ??= new Anthropic());
 
 // A single request and answer without tools, on whichever AI service is configured.
-export async function completeText({ system, prompt, maxTokens = 4000 }) {
-  if (AI_PROVIDER === "groq") return groqComplete({ system, prompt, maxTokens });
+export async function completeText({ system, prompt, maxTokens = 4000, requireComplete = false }) {
+  if (AI_PROVIDER === "groq") return groqComplete({ system, prompt, maxTokens, requireComplete });
   const msg = await anthropic().messages.create({
     model: MODEL, max_tokens: maxTokens, output_config: { effort: "low" },
     system, messages: [{ role: "user", content: prompt }],
   });
+  if (requireComplete && msg.stop_reason === "max_tokens") throw new Error("The AI ran out of room before finishing.");
   return msg.content.filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
 }
 // How much transcript text fits in one summary request (Groq's free tier has small per-minute token limits).

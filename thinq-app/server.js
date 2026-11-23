@@ -289,6 +289,7 @@ api.post("/recordings/:id/segments", rawBody(recordings.MAX_SEGMENT_BYTES + 1024
   try {
     res.json(await recordings.addSegment(req.user.id, req.params.id, {
       n: Number(req.query.n), offsetMs: Number(req.query.offset) || 0, mime: req.get("content-type"), audio: req.body, track: String(req.query.track || "mixed"),
+      seq: req.query.seq === undefined ? null : Number(req.query.seq), final: req.query.final !== "0", overlapMs: Number(req.query.overlap) || 0,
     }));
   } catch (err) { meetingErr(res, err); }
 });

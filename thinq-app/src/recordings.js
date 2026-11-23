@@ -1,7 +1,9 @@
 // Recorded meetings: the person presses "Record meeting" in the Thinq app, and the browser records their
 // microphone (and, on desktop Chrome/Edge, the audio of a meeting tab such as Google Meet). The browser sends
-// the audio in pieces of a few minutes; each piece is turned into text with Groq's Whisper (free tier) as soon as
-// it arrives, and the audio is deleted once it has been transcribed. When the recording stops, Thinq joins the
+// the audio in pieces of a few minutes, saving each piece to the server every 15 seconds while it records. Each
+// finished piece is turned into text with Groq's Whisper (free tier), and its audio is deleted only once that worked:
+// when Groq is busy the audio waits, for as long as Groq asks, up to a day. Pieces overlap by two seconds so no word
+// is lost at a join. When the recording stops, Thinq joins the
 // pieces into one transcript and writes the same notes as for the notetaker (summary, decisions, action items).
 //
 // Recordings are rows in the meetings table (source = 'recording') with their pieces in meeting_segments.
@@ -20,7 +22,10 @@ import { summarize } from "./meetings.js";
 
 export const recordingAvailable = () => voiceAvailable();
 export const MAX_SEGMENT_BYTES = MAX_AUDIO_BYTES;
-const MAX_SEGMENTS = 48; // 4 hours at 5-minute pieces
+const MAX_SEGMENTS = 200; // piece numbers per recording (a dropped recorder restarts with a new piece)
+const MAX_RECORDING_MS = 4 * 3600e3;
+const GIVE_UP_MS = 24 * 3600e3; // audio Groq still hasn't taken after a day is dropped
+let groqPausedUntil = 0; // Groq said to wait: nothing is sent until then
 const MAX_RECORDINGS_PER_DAY = Number(process.env.RECORDINGS_PER_DAY ?? 10);
 
 class RecordingError extends Error { userFacing = true; }
@@ -47,19 +52,36 @@ export async function startRecording(userId, { title, withTab, separate = false 
 
 const owned = (userId, meetingId) => one(`select * from meetings where id = $1 and user_id = $2 and source = 'recording'`, [meetingId, userId]);
 
-export async function addSegment(userId, meetingId, { n, offsetMs, mime, audio, track = "mixed" }) {
+// A piece arrives in numbered parts (seq 0, 1, 2...) and `final` marks the last one. Parts are appended in order and
+// a repeated part (a retry after a lost response) is ignored. Without seq, the body is one whole piece.
+export async function addSegment(userId, meetingId, { n, offsetMs, mime, audio, track = "mixed", seq = null, final = true, overlapMs = 0 }) {
   if (!TRACKS.includes(track)) throw new RecordingError("Unknown audio track.");
   const m = await owned(userId, meetingId);
   if (!m) throw new RecordingError("That recording wasn't found.");
   if (!["recording", "transcribing"].includes(m.status)) throw new RecordingError("That recording has already finished.");
-  if (!Number.isInteger(n) || n < 0 || n >= MAX_SEGMENTS) throw new RecordingError("That recording is too long (4 hours at most).");
-  if (!audio?.length || audio.length > MAX_SEGMENT_BYTES) throw new RecordingError("That piece of audio is empty or too big.");
-  await query(
-    `insert into meeting_segments (meeting_id, n, offset_ms, mime, audio, track) values ($1, $2, $3, $4, $5, $6)
-     on conflict (meeting_id, n) do nothing`,
-    [meetingId, trackN(track, n), Math.max(0, offsetMs | 0), String(mime || "audio/webm").slice(0, 80), audio, track]);
+  if (!Number.isInteger(n) || n < 0 || n >= MAX_SEGMENTS || offsetMs > MAX_RECORDING_MS) throw new RecordingError("That recording is too long (4 hours at most).");
+  const bytes = Buffer.isBuffer(audio) ? audio : Buffer.alloc(0);
+  if (bytes.length > MAX_SEGMENT_BYTES) throw new RecordingError("That piece of audio is too big.");
+  const dbN = trackN(track, n), overlap = Math.min(5000, Math.max(0, overlapMs | 0));
+  if (seq == null || seq === 0) {
+    if (!bytes.length) throw new RecordingError("That piece of audio is empty.");
+    await query(
+      `insert into meeting_segments (meeting_id, n, offset_ms, mime, audio, track, status, chunks, overlap_ms) values ($1, $2, $3, $4, $5, $6, $7, 1, $8)
+       on conflict (meeting_id, n) do nothing`,
+      [meetingId, dbN, Math.max(0, offsetMs | 0), String(mime || "audio/webm").slice(0, 80), bytes, track, final ? "pending" : "receiving", overlap]);
+  } else {
+    const added = await one(
+      `update meeting_segments set audio = audio || $3::bytea, chunks = chunks + 1, overlap_ms = greatest(overlap_ms, $6::int),
+         status = case when $4::boolean then 'pending' else 'receiving' end
+       where meeting_id = $1 and n = $2 and chunks = $5::int and status = 'receiving' and octet_length(audio) + $7::int <= $8::int returning n`,
+      [meetingId, dbN, bytes, Boolean(final), seq, overlap, bytes.length, MAX_SEGMENT_BYTES]);
+    if (!added) {
+      const row = await one(`select chunks from meeting_segments where meeting_id = $1 and n = $2`, [meetingId, dbN]);
+      if (!row || row.chunks < seq) throw new RecordingError("Part of the recording arrived out of order.");
+    }
+  }
   await query(`update meetings set updated_at = now() where id = $1`, [meetingId]);
-  transcribeSegment(meetingId, trackN(track, n)).catch(() => {}); // in the background; the browser doesn't wait
+  if (final) transcribeSegment(meetingId, dbN).catch(() => {}); // in the background; the browser doesn't wait
   return { ok: true };
 }
 
@@ -67,28 +89,28 @@ export async function addSegment(userId, meetingId, { n, offsetMs, mime, audio, 
 const working = new Set();
 async function transcribeSegment(meetingId, n) {
   const key = `${meetingId}:${n}`;
-  if (working.has(key)) return;
+  if (working.has(key) || Date.now() < groqPausedUntil) return;
   working.add(key);
   try {
     const s = await one(`select * from meeting_segments where meeting_id = $1 and n = $2 and status = 'pending'`, [meetingId, n]);
     if (!s?.audio) return;
     try {
-      let text, lines = null;
-      if (s.track === "me" || s.track === "others") {
-        // Separate tracks: keep each sentence's time so the two tracks can be merged in order.
-        const out = await transcribe(Buffer.from(s.audio), s.mime || "audio/webm", { timestamps: true });
-        text = out.text;
-        lines = out.segments.map((g) => ({ at: s.offset_ms + Math.round(g.start * 1000), end: s.offset_ms + Math.round(g.end * 1000), text: g.text }));
-      } else {
-        text = await transcribe(Buffer.from(s.audio), s.mime || "audio/webm");
-      }
-      await query(`update meeting_segments set text = $3, lines = $4, status = 'done', audio = null where meeting_id = $1 and n = $2`, [meetingId, n, text, lines ? JSON.stringify(lines) : null]);
+      // Timed sentences, so overlapping pieces and separate tracks can be joined in order.
+      const out = await transcribe(Buffer.from(s.audio), s.mime || "audio/webm", { timestamps: true });
+      const lines = cleanLines(out.segments.length ? out.segments : [{ start: 0, end: 0, text: out.text }], s.offset_ms);
+      await query(`update meeting_segments set text = $3, lines = $4, status = 'done', audio = null, next_try_at = null where meeting_id = $1 and n = $2`,
+        [meetingId, n, lines.map((l) => l.text).join(" "), JSON.stringify(lines)]);
     } catch (err) {
       const tries = s.tries + 1;
-      const giveUp = tries >= 6 || (err.status && err.status >= 400 && err.status < 500 && err.status !== 429);
-      await query(`update meeting_segments set tries = $3, status = $4, audio = case when $4 = 'failed' then null else audio end where meeting_id = $1 and n = $2`,
-        [meetingId, n, tries, giveUp ? "failed" : "pending"]);
-      console.warn(`[recordings] piece ${n} of ${meetingId} ${giveUp ? "failed" : "will retry"}: ${err.message}`);
+      // Only audio the service can never read is dropped. Busy, down or a wrong key: keep it and try again later.
+      const unreadable = [400, 413, 415, 422].includes(err.status);
+      const giveUp = unreadable || Date.now() - new Date(s.created_at).getTime() > GIVE_UP_MS;
+      const waitSec = Math.max(5, err.retryAfter ?? Math.min(900, 60 * tries));
+      if (err.status === 429) groqPausedUntil = Date.now() + waitSec * 1000;
+      await query(`update meeting_segments set tries = $3, status = $4, next_try_at = now() + make_interval(secs => $5),
+          audio = case when $4 = 'failed' then null else audio end where meeting_id = $1 and n = $2`,
+        [meetingId, n, tries, giveUp ? "failed" : "pending", waitSec]);
+      console.warn(`[recordings] piece ${n} of ${meetingId} ${giveUp ? "failed" : `will retry in ${Math.round(waitSec)}s`}: ${err.message}`);
     }
     await maybeComplete(meetingId);
   } finally {
@@ -102,18 +124,56 @@ const clock = (ms) => {
   return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 };
 
+// Whisper's sentences -> what we keep. It "hears" punctuation or stock phrases in silence, so those are dropped.
+const PHANTOM = /^(thank(s| you)( (so much|very much))?( for watching| for listening)?|you|bye|okay|subtitles by .*)[.!]?$/i;
+export function cleanLines(segments, offsetMs = 0) {
+  return (segments || []).filter((g) => {
+    const text = String(g.text || "").trim(), noSpeech = g.noSpeech || 0, logprob = g.logprob || 0;
+    if (!/[\p{L}\p{N}]/u.test(text)) return false;
+    if (noSpeech >= 0.8 || (noSpeech > 0.6 && logprob < -0.7)) return false;
+    if (g.wordCount && g.wordCount <= 5 && g.wordSeconds > 1) return false; // words stretched over seconds: invented in silence
+    return !(PHANTOM.test(text) && noSpeech > 0.25);
+  }).map((g) => ({ at: offsetMs + Math.round(g.start * 1000), end: offsetMs + Math.round(g.end * 1000), text: String(g.text).trim() }));
+}
+
+// Each track's pieces in order, cutting the overlap at its midpoint so a sentence appears once.
+export function stitchLines(parts) {
+  const out = [];
+  for (const track of new Set(parts.map((p) => p.track || "mixed"))) {
+    const list = parts.filter((p) => (p.track || "mixed") === track).sort((a, b) => a.offset_ms - b.offset_ms);
+    list.forEach((s, i) => {
+      const before = list[i - 1], after = list[i + 1];
+      const from = before ? s.offset_ms + (before.overlap_ms || 0) / 2 : -Infinity;
+      const to = after ? after.offset_ms + (s.overlap_ms || 0) / 2 : Infinity;
+      const lines = (typeof s.lines === "string" ? JSON.parse(s.lines) : s.lines) || [{ at: s.offset_ms, end: s.offset_ms, text: s.text }];
+      for (const l of lines) if (l.text?.trim() && l.at >= from && l.at < to) out.push({ at: l.at, end: l.end ?? l.at, track, text: l.text.trim() });
+    });
+  }
+  return out.sort((a, b) => a.at - b.at);
+}
+// One voice: readable paragraphs, each with its time.
+function plainTranscript(lines) {
+  const paras = [];
+  for (const l of lines) {
+    const last = paras.at(-1);
+    if (last && l.at - last.end < 8000 && last.text.length < 600) { last.text += ` ${l.text}`; last.end = l.end; }
+    else paras.push({ ...l });
+  }
+  return paras.map((p) => `[${clock(p.at)}] ${p.text}`).join("\n\n");
+}
+
 // Once the recording has stopped and every piece is transcribed, build the transcript and write the notes.
 async function maybeComplete(meetingId) {
   const m = await one(`select * from meetings where id = $1`, [meetingId]);
   if (m?.status !== "transcribing") return;
-  const segs = await query(`select n, offset_ms, text, lines, track, status from meeting_segments where meeting_id = $1 order by offset_ms, n`, [meetingId]);
+  const segs = await query(`select n, offset_ms, overlap_ms, text, lines, track, status from meeting_segments where meeting_id = $1 order by offset_ms, n`, [meetingId]);
   if (segs.some((s) => s.status === "pending")) return;
   const parts = segs.filter((s) => s.status === "done" && s.text?.trim());
   const failed = segs.filter((s) => s.status === "failed").length;
   const separate = parts.some((s) => s.track === "me" || s.track === "others");
   const transcript = separate
     ? speakerTranscript(parts, (await one(`select name from users where id = $1`, [m.user_id]))?.name)
-    : parts.map((s) => `[${clock(s.offset_ms)}] ${s.text.trim()}`).join("\n\n");
+    : plainTranscript(stitchLines(parts));
   const claimed = await one(`update meetings set status = 'summarizing', transcript = $2, updated_at = now() where id = $1 and status = 'transcribing' returning id`, [meetingId, transcript || null]);
   if (!claimed) return;
   if (!transcript) {
@@ -129,25 +189,22 @@ async function maybeComplete(meetingId) {
 // Two tracks -> one transcript in time order, each line labelled with who spoke:
 //   [02:14] Alex: Can we move the launch to March?
 //   [02:19] Others in the call: March works if design is done by the 20th.
-const normal = (t) => t.toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
+const wordsOf = (t) => String(t).toLowerCase().match(/[\p{L}\p{N}']+/gu) || [];
+// The same run of words: most of this line's word pairs also appear, in order, in the other track's line.
+function repeats(line, other) {
+  const a = wordsOf(line), b = wordsOf(other);
+  if (a.length < 3 || b.length < 2) return false;
+  const pairs = new Set(b.slice(1).map((w, i) => `${b[i]} ${w}`));
+  const shared = a.slice(1).filter((w, i) => pairs.has(`${a[i]} ${w}`)).length;
+  return shared / (a.length - 1) >= 0.7;
+}
 export function speakerTranscript(parts, userName) {
   const me = String(userName || "").split(/\s+/)[0] || "You";
-  const lines = [];
-  for (const s of parts) {
-    const who = s.track === "me" ? me : s.track === "others" ? OTHERS_LABEL : "Someone";
-    const list = (typeof s.lines === "string" ? JSON.parse(s.lines) : s.lines) || [{ at: s.offset_ms, end: s.offset_ms, text: s.text }];
-    for (const l of list) if (l.text?.trim()) lines.push({ at: l.at, end: l.end ?? l.at, who, text: l.text.trim() });
-  }
-  lines.sort((a, b) => a.at - b.at);
+  const lines = stitchLines(parts).map((l) => ({ ...l, who: l.track === "me" ? me : l.track === "others" ? OTHERS_LABEL : "Someone" }));
   // On speakers (no headphones) the microphone also picks up the call. Drop "me" lines that just repeat what the
   // tab said at the same moment.
   const others = lines.filter((l) => l.who === OTHERS_LABEL);
-  const echo = (l) => {
-    if (l.who !== me) return false;
-    const t = normal(l.text);
-    if (t.length < 6) return false;
-    return others.some((o) => Math.abs(o.at - l.at) < 4000 && (normal(o.text).includes(t) || t.includes(normal(o.text))));
-  };
+  const echo = (l) => l.track === "me" && others.some((o) => o.at - 2000 <= l.end && l.at <= o.end + 2000 && repeats(l.text, o.text));
   const kept = lines.filter((l) => !echo(l));
   // Join consecutive lines from the same speaker so it reads like a conversation.
   const turns = [];
@@ -165,6 +222,9 @@ export async function finishRecording(userId, meetingId) {
   if (m.status === "recording") {
     await query(`update meetings set status = 'transcribing', ended_at = now(), updated_at = now() where id = $1`, [meetingId]);
   }
+  // Pieces the browser never finished sending (tab closed, phone died): use what arrived.
+  await query(`update meeting_segments set status = 'pending' where meeting_id = $1 and status = 'receiving' and octet_length(audio) >= 2000`, [meetingId]);
+  await query(`delete from meeting_segments where meeting_id = $1 and status = 'receiving'`, [meetingId]);
   const pending = await query(`select n from meeting_segments where meeting_id = $1 and status = 'pending'`, [meetingId]);
   for (const s of pending) transcribeSegment(meetingId, s.n).catch(() => {});
   await maybeComplete(meetingId);
@@ -181,8 +241,9 @@ export async function cancelRecording(userId, meetingId) {
 
 // ---------- background: retries, and recordings whose tab was closed ----------
 async function tick() {
-  // Retry pieces that failed for a temporary reason (e.g. Groq's per-minute limit), oldest first.
-  const retry = await query(`select meeting_id, n from meeting_segments where status = 'pending' and created_at < now() - interval '1 minute' order by created_at limit 5`);
+  // Retry pieces that failed for a temporary reason (e.g. Groq's limits), oldest first, once their wait is over.
+  const retry = Date.now() < groqPausedUntil ? [] : await query(`select meeting_id, n from meeting_segments
+    where status = 'pending' and coalesce(next_try_at, created_at + interval '1 minute') <= now() order by created_at limit 5`);
   for (const s of retry) await transcribeSegment(s.meeting_id, s.n).catch(() => {});
   // A recording that hasn't sent anything for 12 minutes was probably closed: finish it with what arrived.
   const stale = await query(`select id, user_id from meetings where source = 'recording' and status = 'recording' and updated_at < now() - interval '12 minutes'`);
@@ -203,3 +264,4 @@ export function startRecordingWorker() {
   setTimeout(() => tick().catch(() => {}), 10_000).unref();
 }
 export const _tick = tick;
+export const _resetGroqPause = () => { groqPausedUntil = 0; };

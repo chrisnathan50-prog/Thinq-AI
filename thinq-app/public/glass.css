@@ -471,3 +471,7 @@ body.voice-on{overflow:hidden}
     border-color:rgba(255,255,255,.4);box-shadow:inset 0 1px 1px rgba(255,255,255,.35),0 6px 14px -6px rgba(12,12,16,.5)}
   [data-theme="dark"] .composer .tool.talk:not([hidden]){color:#0b0b0c;background:radial-gradient(60% 45% at 35% 22%,#fff,rgba(255,255,255,0) 70%),linear-gradient(170deg,#fff,#c6c7cd 75%)}
 }
+[data-theme="dark"] .mrec-warn{color:#ffb4ae!important}
+[data-theme="dark"] .mrec-meter{background:rgba(255,255,255,.14)}
+[data-theme="dark"] .mrec-bar.video-ready{background:rgba(255,255,255,.07);border-color:var(--rim)}
+[data-theme="dark"] .video-ready .mrec-txt small{color:var(--muted)}

@@ -115,8 +115,10 @@ async function callOne(p, body) {
 }
 
 // One chat request, trying each provider in turn. Busy providers are skipped until their wait is over.
-async function chat(body, { only } = {}) {
-  const list = providers().filter((p) => !only || p.id === only);
+async function chat(body, { only, fullOutput = false } = {}) {
+  let list = providers().filter((p) => !only || p.id === only);
+  // When a whole answer matters, skip models whose output limit is smaller than what's needed.
+  if (fullOutput) { const big = list.filter((p) => !(OUTPUT_CAP[p.model] < body.max_completion_tokens)); if (big.length) list = big; }
   if (!list.length) throw new GroqError(401, "No AI service is set up (GROQ_API_KEY missing).", "not_configured");
   let lastErr;
   for (let round = 0; round < 2; round++) {
@@ -194,13 +196,20 @@ async function runOne(call, byName) {
 }
 
 // One plain request and answer, no tools (used for meeting summaries).
-export async function groqComplete({ system, prompt, maxTokens = 4000 }) {
-  const data = await chat({
-    model: GROQ_MODEL,
-    messages: [{ role: "system", content: system }, { role: "user", content: prompt }],
-    max_completion_tokens: maxTokens,
-  });
-  return String(data.choices?.[0]?.message?.content || "").trim();
+// requireComplete: an answer the model ran out of room for is retried with more room, and never returned cut off.
+export async function groqComplete({ system, prompt, maxTokens = 4000, requireComplete = false }) {
+  let room = maxTokens;
+  for (let attempt = 0; attempt < (requireComplete ? 3 : 1); attempt++) {
+    const data = await chat({
+      model: GROQ_MODEL,
+      messages: [{ role: "system", content: system }, { role: "user", content: prompt }],
+      max_completion_tokens: room,
+    }, { fullOutput: requireComplete });
+    const text = String(data.choices?.[0]?.message?.content || "").trim();
+    if (!requireComplete || (text && data.choices?.[0]?.finish_reason !== "length")) return text;
+    room = Math.min(8000, room * 2);
+  }
+  throw new GroqError(502, "The AI ran out of room before finishing.", "truncated");
 }
 
 /**

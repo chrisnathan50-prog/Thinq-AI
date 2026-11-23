@@ -296,14 +296,16 @@ export async function summarize(meetingId) {
     }
     let summary;
     if (chunks.length === 1) {
-      summary = await completeText({ system: SUMMARY_SYSTEM, prompt: `${header}\n\n<transcript>\n${chunks[0]}\n</transcript>`, maxTokens: 2000 });
+      summary = await completeText({ system: SUMMARY_SYSTEM, prompt: `${header}\n\n<transcript>\n${chunks[0]}\n</transcript>`, maxTokens: 2000, requireComplete: true });
     } else {
       const parts = [];
       for (const [i, c] of chunks.entries()) {
-        parts.push(await completeText({ system: SUMMARY_SYSTEM, prompt: `${header}\nThis is part ${i + 1} of ${chunks.length} of the transcript. Write notes for this part only.\n\n<transcript>\n${c}\n</transcript>`, maxTokens: 1500 }));
+        parts.push(await completeText({ system: SUMMARY_SYSTEM, prompt: `${header}\nThis is part ${i + 1} of ${chunks.length} of the transcript. Write notes for this part only.\n\n<transcript>\n${c}\n</transcript>`, maxTokens: 1500, requireComplete: true }));
       }
-      summary = await completeText({ system: SUMMARY_SYSTEM, prompt: `${header}\nBelow are notes on each part of one long meeting, in order. Combine them into one set of notes for the whole meeting.\n\n${parts.map((p, i) => `<part n="${i + 1}">\n${p}\n</part>`).join("\n\n")}`, maxTokens: 2000 });
+      summary = await completeText({ system: SUMMARY_SYSTEM, prompt: `${header}\nBelow are notes on each part of one long meeting, in order. Combine them into one set of notes for the whole meeting.\n\n${parts.map((p, i) => `<part n="${i + 1}">\n${p}\n</part>`).join("\n\n")}`, maxTokens: 2000, requireComplete: true });
     }
+    // Models sometimes write "## Action items" instead of the bold headings asked for; the app and Tasks read the bold form.
+    summary = String(summary || "").replace(/^[ \t]*#{1,6}[ \t]*(.+?)[ \t]*$/gm, (_, h) => `**${h.replace(/\*\*/g, "")}**`);
     await setMeeting(m.id, { summary: summary || "(No summary could be written.)", status: "done", error: null });
     // The user's action items become suggestions in the Tasks tab (Add / Dismiss).
     if (summary) await suggestFromMeeting({ id: m.id, title: m.title, summary }, await store.getUser(m.user_id)).catch((e) => console.warn("[tasks] meeting suggestions failed:", e.message));
