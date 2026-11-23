@@ -164,6 +164,28 @@
   </div>
 </div>
 
+<!-- A meeting's video next to its transcript (the video is read from this device) -->
+<dialog class="conn-dialog meet-player" id="meetPlayer" aria-labelledby="mpTitle">
+  <div class="conn-dialog-head">
+    <h2 id="mpTitle">Meeting video</h2>
+    <div class="mp-actions">
+      <button class="btn ghost sm" id="mpCaptions" type="button" hidden>Download captions</button>
+      <button class="icon-btn" id="mpClose" type="button" aria-label="Close"><svg width="14" height="14"><use href="#i-x"/></svg></button>
+    </div>
+  </div>
+  <div class="mp-body">
+    <div class="mp-stage">
+      <video id="mpVideo" controls playsinline></video>
+      <div class="mp-empty" id="mpEmpty" hidden>
+        <p>This video isn't in this browser. Choose the file you saved to watch it with the transcript.</p>
+        <button class="btn sm" id="mpChoose" type="button">Choose saved video</button>
+        <input id="mpFile" type="file" accept="video/*" hidden>
+      </div>
+    </div>
+    <div class="mp-list" id="mpList" aria-label="Transcript"></div>
+  </div>
+</dialog>
+
 <!-- Details for one connection (opened from the sidebar's Connections list) -->
 <dialog class="conn-dialog" id="connDialog" aria-labelledby="connDialogTitle">
   <div class="conn-dialog-head">

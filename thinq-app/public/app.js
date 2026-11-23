@@ -342,6 +342,7 @@ const recMime = () => ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "aud
 // Browsers without that storage keep it in memory, up to a limit. The person then saves it with Save video.
 const VIDEO_DIR = "thinq-videos";
 const VIDEO_MEMORY_MAX = 350 * 1024 * 1024;
+const SCREEN_VIDEO = { displaySurface: "browser", width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 15, max: 30 } };
 const CAMERA_VIDEO = { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" };
 const videoMime = () => ["video/mp4;codecs=avc1.42E01F,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"].find((t) => window.MediaRecorder?.isTypeSupported?.(t)) || "";
 const videoExt = (type) => (/mp4/.test(type) ? "mp4" : "webm");
@@ -382,7 +383,7 @@ async function startVideo(cur, track, isCamera) {
   const type = videoMime();
   try {
     const store = await openVideoStore(cur.id, cur.title, type);
-    const recorder = new MediaRecorder(new MediaStream([track, ...cur.videoMix.stream.getAudioTracks()]), { mimeType: type, videoBitsPerSecond: 1_200_000, audioBitsPerSecond: 96_000 });
+    const recorder = new MediaRecorder(new MediaStream([track, ...cur.videoMix.stream.getAudioTracks()]), { mimeType: type, videoBitsPerSecond: isCamera ? 1_200_000 : 2_500_000, audioBitsPerSecond: 96_000 });
     const v = cur.video = { recorder, store, track, isCamera, chain: Promise.resolve(), parts: 0 };
     recorder.ondataavailable = (e) => {
       if (!e.data.size) return;
@@ -390,6 +391,9 @@ async function startVideo(cur, track, isCamera) {
         .catch(() => endVideoEarly(cur, "This device ran out of room for video. Audio is still recording."));
     };
     recorder.onerror = () => endVideoEarly(cur, "The video stopped here. Audio is still recording.");
+    // Transcript times are counted from this moment, so "[02:14]" is 2:14 in the video. (Chrome's "start" event
+    // can arrive over a second after the video has begun, so it can't be used as the zero point.)
+    cur.started = Date.now();
     recorder.start(5000);
   } catch { cur.video = null; notice("Video couldn't start. Still recording audio for your notes."); }
 }
@@ -423,7 +427,8 @@ async function showVideoReady() {
   v.fileObj ||= await v.file(); // built ahead, because phones only allow saving straight after the tap
   bar.hidden = false;
   bar.innerHTML = `${icon("i-video", 16)}<span class="mrec-txt"><b>${v.saved ? "Video saved" : "Video ready"}: ${esc(v.name)}</b><small>${fileSize(v.fileObj.size)} · ${v.saved ? "Done removes Thinq's copy" : "only on this device until you save it"}</small></span>
-    <button class="btn ${v.saved ? "ghost " : ""}sm" id="mvideoSave">${v.saved ? "Save again" : "Save video"}</button><button class="btn ghost sm" id="mvideoDone">Done</button>`;
+    <button class="btn ${v.saved ? "ghost " : ""}sm" id="mvideoSave">${v.saved ? "Save again" : "Save video"}</button><button class="btn ghost sm" id="mvideoWatch">Watch with transcript</button><button class="btn ghost sm" id="mvideoDone">Done</button>`;
+  $("#mvideoWatch").addEventListener("click", () => openMeetPlayer(v.id));
   $("#mvideoSave").addEventListener("click", () => saveVideo(v));
   $("#mvideoDone").addEventListener("click", async () => {
     if (!v.saved && !confirm("Delete this video? It hasn't been saved.")) return;
@@ -469,18 +474,113 @@ async function restoreVideos() {
   } catch { /* nothing stored, or this browser has no private storage */ }
 }
 
+// ---------------- meeting player: the call's video next to its transcript ----------------
+// Recording starts the video first and counts transcript time from that moment, so "[02:14]" is 2:14 in the video.
+function parseTranscript(text, hasSpeakers) {
+  const lines = [];
+  for (const raw of String(text || "").split("\n")) {
+    const m = raw.match(/^\[(?:(\d+):)?(\d{2}):(\d{2})\]\s*(.*)$/);
+    if (!m) continue;
+    let body = m[4], who = "";
+    if (hasSpeakers) { const s = body.match(/^([^:]{1,40}):\s+(.*)$/); if (s) { who = s[1]; body = s[2]; } }
+    lines.push({ t: Number(m[1] || 0) * 3600 + Number(m[2]) * 60 + Number(m[3]), label: raw.slice(1, raw.indexOf("]")), who, text: body });
+  }
+  return lines;
+}
+function captionsFrom(lines) {
+  const stamp = (s) => `${String(Math.floor(s / 3600)).padStart(2, "0")}:${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}.000`;
+  return "WEBVTT\n\n" + lines.map((l, i) => {
+    const end = Math.min(lines[i + 1]?.t ?? Infinity, l.t + Math.max(3, Math.ceil(l.text.split(/\s+/).length / 2.5)));
+    return `${i + 1}\n${stamp(l.t)} --> ${stamp(Math.max(end, l.t + 1))}\n${l.who ? `<v ${l.who.replace(/[<>]/g, "")}>` : ""}${l.text.replace(/&/g, "&amp;").replace(/</g, "&lt;")}\n`;
+  }).join("\n");
+}
+let mp = null;
+function setPlayerVideo(p, file) {
+  if (p.url) URL.revokeObjectURL(p.url);
+  p.url = URL.createObjectURL(file);
+  $("#mpVideo").src = p.url; $("#mpVideo").hidden = false; $("#mpEmpty").hidden = true;
+}
+async function loadPlayerTranscript(p) {
+  let m;
+  try { m = await api(`/api/meetings/${p.id}`); } catch (err) { if (mp === p) $("#mpList").innerHTML = `<p class="meta">${esc(err.message)}</p>`; return; }
+  if (mp !== p) return;
+  $("#mpTitle").textContent = m.title || "Meeting video";
+  p.name = m.title || "Meeting";
+  p.lines = parseTranscript(m.transcript, /you \+ meeting tab/.test(m.platform || ""));
+  if (!p.lines.length) {
+    const working = ACTIVE_MEET.includes(m.status);
+    $("#mpList").innerHTML = `<p class="meta">${working ? "Thinq is still writing the transcript. It will appear here." : "This meeting has no timed transcript."}</p>`;
+    if (working) p.poll = setTimeout(() => loadPlayerTranscript(p), 5000);
+    return;
+  }
+  $("#mpList").innerHTML = p.lines.map((l, i) => `<button type="button" class="mp-line" data-line="${i}"><time>${esc(l.label)}</time><span>${l.who ? `<b>${esc(l.who)}</b> ` : ""}${esc(l.text)}</span></button>`).join("");
+  $("#mpCaptions").hidden = false;
+  const video = $("#mpVideo");
+  video.querySelector("track")?.remove();
+  p.vtt = URL.createObjectURL(new Blob([captionsFrom(p.lines)], { type: "text/vtt" }));
+  const track = document.createElement("track");
+  Object.assign(track, { kind: "subtitles", label: "Transcript", srclang: "en", src: p.vtt });
+  video.append(track);
+}
+async function openMeetPlayer(id) {
+  closePlayer();
+  const p = mp = { id, lines: [], current: -1 };
+  if ($("#connDialog").open) $("#connDialog").close();
+  $("#mpTitle").textContent = "Meeting video"; $("#mpList").innerHTML = `<p class="meta">Loading the transcript…</p>`; $("#mpCaptions").hidden = true;
+  $("#meetPlayer").showModal();
+  const local = readyVideos.find((v) => v.id === id);
+  if (local) { local.fileObj ||= await local.file(); if (mp === p) setPlayerVideo(p, local.fileObj); }
+  else { $("#mpVideo").hidden = true; $("#mpEmpty").hidden = false; }
+  loadPlayerTranscript(p);
+}
+function closePlayer() {
+  const p = mp; if (!p) return;
+  mp = null; clearTimeout(p.poll);
+  const video = $("#mpVideo"); video.pause(); video.querySelector("track")?.remove(); video.removeAttribute("src"); video.load();
+  if (p.url) URL.revokeObjectURL(p.url);
+  if (p.vtt) URL.revokeObjectURL(p.vtt);
+}
+$("#mpClose").addEventListener("click", () => $("#meetPlayer").close());
+$("#meetPlayer").addEventListener("close", closePlayer);
+$("#mpChoose").addEventListener("click", () => $("#mpFile").click());
+$("#mpFile").addEventListener("change", (e) => { const f = e.target.files[0]; if (f && mp) setPlayerVideo(mp, f); e.target.value = ""; });
+$("#mpList").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-line]"); if (!b || !mp) return;
+  const video = $("#mpVideo");
+  if (video.hidden) return;
+  video.currentTime = mp.lines[Number(b.dataset.line)].t;
+  video.play().catch(() => {});
+});
+$("#mpVideo").addEventListener("timeupdate", (e) => {
+  const p = mp; if (!p?.lines.length) return;
+  let i = -1; for (let k = 0; k < p.lines.length && p.lines[k].t <= e.target.currentTime + 0.05; k++) i = k;
+  if (i === p.current) return;
+  $("#mpList").querySelector('[aria-current="true"]')?.removeAttribute("aria-current");
+  p.current = i;
+  const row = i >= 0 ? $("#mpList").querySelector(`[data-line="${i}"]`) : null;
+  if (!row) return;
+  row.setAttribute("aria-current", "true");
+  const list = $("#mpList");
+  if (row.offsetTop < list.scrollTop || row.offsetTop + row.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTo({ top: row.offsetTop - 60, behavior: matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth" });
+});
+$("#mpCaptions").addEventListener("click", () => {
+  if (!mp?.vtt) return;
+  const a = document.createElement("a"); a.href = mp.vtt; a.download = `Thinq - ${String(mp.name).replace(/[\\/:*?"<>|]+/g, " ").trim()}.vtt`; a.click();
+});
+
 async function startMeetingRecording({ title, withTab, withVideo = false }) {
   if (mrec) return notice("A recording is already running.");
   if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return notice("This browser can't record audio. Try Chrome, Edge or Safari.");
   let tab = null, mic = null, camera = null;
   if (withTab) {
     try {
-      tab = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, selfBrowserSurface: "exclude", systemAudio: "include", preferCurrentTab: false });
+      tab = await navigator.mediaDevices.getDisplayMedia({ video: withVideo ? SCREEN_VIDEO : true, audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, selfBrowserSurface: "exclude", systemAudio: "include", preferCurrentTab: false });
     } catch { return notice("Recording didn't start: no tab was shared. Untick “Also record a meeting tab” to record just your microphone."); }
     if (!tab.getAudioTracks().length) {
       tab.getTracks().forEach((t) => t.stop());
       return notice("That share had no sound. Choose the meeting's browser tab and keep “Share tab audio” switched on.");
     }
+    if (withVideo) { const v = tab.getVideoTracks()[0]; if (v && "contentHint" in v) v.contentHint = "detail"; } // keep shared slides and text sharp
   }
   const wantsCamera = withVideo && !tab; // with a shared tab, the video is the tab's picture
   try {
@@ -520,8 +620,9 @@ async function startMeetingRecording({ title, withTab, withVideo = false }) {
     }
   });
   await keepAwake(cur);
-  rotatePieces(cur);
   if (withVideo) await startVideo(cur, (camera || tab).getVideoTracks()[0], Boolean(camera));
+  if (!cur.video) cur.started = Date.now();
+  rotatePieces(cur);
   cur.timer = setInterval(renderRecBar, 1000);
   cur.flusher = setInterval(() => cur.open.forEach((p) => flushPiece(cur, p)), FLUSH_MS);
   cur.monitor = setInterval(() => watchRecording(cur), 250);
@@ -748,6 +849,7 @@ function renderMeetings() {
       ${m.error ? `<p class="meet-err">${esc(m.error)}</p>` : ""}
       <div class="meet-actions">
         ${m.hasNotes || m.hasTranscript ? `<button class="btn ghost sm" data-meet="open">${meetOpen === m.id ? "Hide notes" : "View notes"}</button>` : ""}
+        ${m.source === "recording" && m.hasTranscript ? `<button class="btn ghost sm" data-meet="watch">Watch with transcript</button>` : ""}
         ${m.hasTranscript && !m.hasNotes && m.status === "done" ? `<button class="btn ghost sm" data-meet="summarize">Write notes again</button>` : ""}
         ${canStop ? `<button class="btn ghost sm" data-meet="stop">${m.status === "scheduled" ? "Cancel" : "Remove from call"}</button>` : ""}
         ${canFinish ? `<button class="btn ghost sm" data-meet="finish">Finish and get notes</button>` : ""}
@@ -763,7 +865,7 @@ function renderMeetings() {
     : `<form class="meet-rec" id="recForm">
         <input class="input" id="recTitle" type="text" maxlength="200" placeholder="Meeting name (optional)" aria-label="Meeting name">
         ${canTab ? `<label class="meet-check"><input type="checkbox" id="recTab" checked><span>Also record a meeting tab's sound <small>(Google Meet, Zoom or Teams in your browser). Chrome asks which tab: pick the meeting and keep “Share tab audio” on. Your voice and the call are kept apart, so the notes show who said what.</small></span></label>` : ""}
-        ${videoMime() ? `<label class="meet-check"><input type="checkbox" id="recVideo"><span>Also save a video to this device <small>${canTab ? "Uses the meeting tab's picture, or your camera if no tab is shared." : "Uses your camera."} The video stays on this device and is never uploaded.</small></span></label>` : ""}
+        ${videoMime() ? `<label class="meet-check"><input type="checkbox" id="recVideo"><span>${canTab ? "Also save the call's video" : "Also save a camera video"} <small>${canTab ? "Records the meeting tab, including anything people share on screen, and links each transcript line to that moment." : "Phones can't capture a call, so this uses your camera."} It stays on this device and is never uploaded.</small></span></label>` : ""}
         <button class="btn sm" type="submit">${icon("i-mic", 13)}Record meeting</button>
       </form>`;
   const botBlock = !s.bot ? "" : `
@@ -779,6 +881,9 @@ function renderMeetings() {
     ${botBlock}
     ${list.length ? `<h3 class="meet-sub">Your meetings</h3><ul class="meet-list">${list.map(item).join("")}</ul>` : `<p class="meta">No meetings yet.</p>`}
     <p class="meta">Only you can see your notes. Let people in the meeting know you're recording.</p>`;
+  // On a computer, the call's video comes from the shared meeting tab, so the two options go together.
+  $("#recVideo")?.addEventListener("change", (e) => { if (e.target.checked && $("#recTab")) $("#recTab").checked = true; });
+  $("#recTab")?.addEventListener("change", (e) => { if (!e.target.checked && $("#recVideo")) $("#recVideo").checked = false; });
   $("#recForm")?.addEventListener("submit", (e) => {
     e.preventDefault();
     startMeetingRecording({ title: $("#recTitle").value.trim(), withTab: Boolean($("#recTab")?.checked), withVideo: Boolean($("#recVideo")?.checked) });
@@ -813,6 +918,7 @@ $("#meet").addEventListener("click", async (e) => {
   const id = b.closest(".meet-item").dataset.id, act = b.dataset.meet;
   try {
     if (act === "open") { meetOpen = meetOpen === id ? null : id; return renderMeetings(); }
+    if (act === "watch") return openMeetPlayer(id);
     if (act === "stop" && !confirm(b.textContent === "Cancel" ? "Cancel the notetaker for this meeting?" : "Remove the notetaker from the call? Notes for what was said so far will still be written.")) return;
     if (act === "delete" && !confirm("Delete this meeting's notes and transcript from Thinq?")) return;
     b.disabled = true;

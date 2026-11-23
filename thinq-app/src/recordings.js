@@ -119,7 +119,7 @@ async function transcribeSegment(meetingId, n) {
 }
 
 const clock = (ms) => {
-  const s = Math.max(0, Math.round(ms / 1000));
+  const s = Math.max(0, Math.floor(ms / 1000)); // rounded down, so jumping to a line never skips its first word
   const h = Math.floor(s / 3600), mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0"), ss = String(s % 60).padStart(2, "0");
   return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 };
