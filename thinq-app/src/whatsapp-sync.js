@@ -16,7 +16,7 @@
 // Settings: WHATSAPP_SYNC=off turns the feature off. WA_SYNC_KEEP_DAYS (default 90).
 import QRCode from "qrcode";
 import makeWASocket, {
-  Browsers, BufferJSON, DisconnectReason, initAuthCreds, makeCacheableSignalKeyStore, proto, fetchLatestBaileysVersion,
+  Browsers, BufferJSON, DisconnectReason, initAuthCreds, makeCacheableSignalKeyStore, proto, fetchLatestBaileysVersion, fetchLatestWaWebVersion,
   normalizeMessageContent, getContentType, jidNormalizedUser, isJidGroup, isJidBroadcast, isJidNewsletter, isLidUser,
 } from "@whiskeysockets/baileys";
 import { query, one } from "./db.js";
@@ -25,7 +25,8 @@ import * as store from "./store.js";
 
 export const syncAvailable = () => String(process.env.WHATSAPP_SYNC || "on").toLowerCase() !== "off";
 const KEEP_DAYS = Math.max(7, Number(process.env.WA_SYNC_KEEP_DAYS) || 90);
-const QR_WAIT_MS = 3 * 60_000; // stop showing new QR codes after this long without a scan
+const QR_WAIT_MS = 5 * 60_000; // stop showing new QR codes after this long without a scan
+const CODE_LIFE_MS = 160_000; // WhatsApp hangs up on an unused link after ~164 seconds; a phone code dies with it
 
 // Baileys logs a lot; keep only real errors.
 const logger = {
@@ -51,6 +52,7 @@ async function dbAuthState(userId) {
   const remove = (key) => query(`delete from wa_sync_auth where user_id = $1 and key = $2`, [userId, key]);
 
   const creds = (await read("creds")) || initAuthCreds();
+  let saving = Promise.resolve();
   return {
     state: {
       creds,
@@ -74,7 +76,9 @@ async function dbAuthState(userId) {
         },
       },
     },
-    saveCreds: () => write("creds", creds),
+    // One save at a time, in order: an older copy of the keys must never overwrite a newer one.
+    saveCreds: () => (saving = saving.catch(() => {}).then(() => write("creds", creds))),
+    settled: () => saving.catch(() => {}),
   };
 }
 
@@ -172,20 +176,47 @@ async function setSession(userId, fields) {
     [userId, ...cols.map((c) => fields[c])]);
 }
 
+// Linked = the phone accepted this device. (Baileys' creds.registered is only ever set by phone codes, never by QR.)
+const isLinked = (creds) => Boolean(creds?.me?.id && (creds.account || creds.signalIdentities?.length || creds.platform));
+
 let waVersion;
-async function connect(userId, { pairPhone } = {}) {
+const linkVersion = { v: undefined, at: 0 };
+// WhatsApp can refuse NEW devices that announce an old WhatsApp Web version, so linking asks for today's.
+async function versionFor(linked) {
+  waVersion ??= await fetchLatestBaileysVersion().then((r) => r.version).catch(() => undefined);
+  if (linked) return waVersion;
+  if (Date.now() - linkVersion.at > 6 * 3600e3) {
+    linkVersion.v = await fetchLatestWaWebVersion({ signal: AbortSignal.timeout(8000) }).then((r) => (r.error ? undefined : r.version)).catch(() => undefined);
+    linkVersion.at = Date.now();
+  }
+  return linkVersion.v || waVersion;
+}
+
+async function connect(userId, { pairPhone, link = false } = {}) {
   const prev = live.get(userId);
-  const entry = prev && !prev.stopped ? prev : { status: "starting", retries: 0, names: new Map(), startedAt: Date.now() };
+  const entry = prev && !prev.stopped ? prev : { status: "starting", retries: 0, linkErrors: 0, names: new Map(), startedAt: Date.now() };
   if (pairPhone) entry.pairPhone = pairPhone;
+  if (link) entry.linking = true;
   live.set(userId, entry);
 
-  const { state, saveCreds } = await dbAuthState(userId);
-  waVersion ??= await fetchLatestBaileysVersion().then((r) => r.version).catch(() => undefined);
+  // Keep the same keys in memory across reconnects: re-reading them from the database right after a scan could
+  // miss the ones WhatsApp just gave us, and the scan would be forgotten.
+  entry.auth ??= await dbAuthState(userId);
+  await entry.auth.settled();
+  const { state, saveCreds } = entry.auth;
+  const linked = isLinked(state.creds);
+  if (!linked && !entry.linking) { // nothing to reconnect with: say so instead of quietly making QR codes
+    stop(userId, "logged_out");
+    await setSession(userId, { status: "logged_out" });
+    return;
+  }
+  const version = await versionFor(linked);
+  if (live.get(userId) !== entry || entry.stopped) return; // cancelled meanwhile
   const sock = makeWASocket({
-    ...(waVersion ? { version: waVersion } : {}),
+    ...(version ? { version } : {}),
     auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, logger) },
     logger,
-    browser: Browsers.macOS("Thinq"),
+    browser: Browsers.macOS("Chrome"), // phone codes are refused ("Couldn't link device") unless this is a real browser
     markOnlineOnConnect: false, // so the person still gets notifications on their phone
     syncFullHistory: false, // recent history only; new messages arrive live
     emitOwnEvents: false,
@@ -199,16 +230,25 @@ async function connect(userId, { pairPhone } = {}) {
 
   sock.ev.on("connection.update", async (u) => {
     if (live.get(userId) !== entry || entry.sock !== sock) return;
-    if (u.qr) {
+    if (u.isNewLogin) { entry.finishing = true; entry.qr = null; entry.pairingCode = null; entry.status = "starting"; } // accepted on the phone
+    if (u.qr && !entry.finishing) {
       if (Date.now() - entry.startedAt > QR_WAIT_MS) { stop(userId, "expired"); return; }
-      entry.status = "waiting";
-      entry.qr = await QRCode.toDataURL(u.qr, { margin: 1, width: 280 }).catch(() => null);
-      if (entry.pairPhone && !entry.pairingCode && !state.creds.registered) {
-        entry.pairingCode = await sock.requestPairingCode(entry.pairPhone).catch((e) => { console.warn("[wa-sync] pairing code failed:", e.message); return null; });
+      if (entry.pairPhone) {
+        if (!entry.codeAsked) {
+          entry.codeAsked = true;
+          const code = await sock.requestPairingCode(entry.pairPhone).catch((e) => { console.warn("[wa-sync] pairing code failed:", e.message); return null; });
+          if (entry.stopped || live.get(userId) !== entry) return;
+          if (!code) { fail(userId, "WhatsApp didn't give a code for that number. Check the number and try again, or use the QR code."); return; }
+          entry.pairingCode = code; entry.codeUntil = Date.now() + CODE_LIFE_MS;
+        }
+      } else {
+        // Large, with the full white border scanners need (the app shows it smaller).
+        entry.qr = await QRCode.toDataURL(u.qr, { margin: 4, scale: 10, errorCorrectionLevel: "L" }).catch(() => null);
       }
+      entry.status = "waiting";
     }
     if (u.connection === "open") {
-      entry.status = "connected"; entry.qr = null; entry.pairingCode = null; entry.pairPhone = null; entry.retries = 0;
+      entry.status = "connected"; entry.qr = null; entry.pairingCode = null; entry.pairPhone = null; entry.retries = 0; entry.linking = false; entry.finishing = false; failures.delete(userId);
       const phone = jidNormalizedUser(sock.user?.id || "").split("@")[0] || null;
       entry.phone = phone;
       await setSession(userId, { status: "connected", phone, name: sock.user?.name || null, linked_at: new Date().toISOString() });
@@ -221,14 +261,33 @@ async function connect(userId, { pairPhone } = {}) {
     if (u.connection === "close") {
       const code = u.lastDisconnect?.error?.output?.statusCode;
       if (entry.stopped) return;
+      if (!isLinked(state.creds)) { // still waiting for the phone
+        console.warn(`[wa-sync] link attempt closed (code ${code ?? "?"}, ${entry.pairPhone ? "phone code" : "QR"}, after ${Math.round((Date.now() - entry.startedAt) / 1000)}s)`);
+        if (entry.pairPhone && entry.codeAsked) {
+          // A phone code can't survive its connection. Say what happened instead of logging in with half-made keys.
+          fail(userId, code === DisconnectReason.loggedOut || code === DisconnectReason.forbidden
+            ? "WhatsApp didn't accept the code. Check that the number is the one WhatsApp uses on your phone, then get a new code or use the QR code."
+            : "That code expired before it was used. Get a new one and enter it within 2 minutes.");
+          await query(`delete from wa_sync_auth where user_id = $1`, [userId]);
+          return;
+        }
+        if (code === 405) { linkVersion.v = undefined; } // WhatsApp refused that version: use the library's own
+        if (Date.now() - entry.startedAt > QR_WAIT_MS) { stop(userId, "expired"); return; }
+        if (code !== DisconnectReason.timedOut && ++entry.linkErrors > 6) { fail(userId, "Couldn't reach WhatsApp to make a code. Wait a minute and try again."); return; }
+        entry.auth = null; entry.qr = null; entry.status = "starting";
+        await query(`delete from wa_sync_auth where user_id = $1`, [userId]);
+        entry.timer = setTimeout(() => { entry.timer = null; if (live.get(userId) === entry && !entry.stopped) connect(userId).catch((e) => console.warn("[wa-sync] link retry failed:", e.message)); }, code === DisconnectReason.timedOut ? 200 : 2000);
+        return;
+      }
       if (code === DisconnectReason.loggedOut || code === DisconnectReason.forbidden) {
         // Unlinked from the phone (or blocked): forget the keys, keep nothing half-working.
+        await entry.auth?.settled();
         await wipe(userId, { keepMessages: true });
         await setSession(userId, { status: code === DisconnectReason.forbidden ? "blocked" : "logged_out" });
+        if (entry.finishing) failures.set(userId, "WhatsApp unlinked Thinq straight after linking. Try again.");
         entry.stopped = true; entry.status = "logged_out"; live.delete(userId);
         return;
       }
-      if (!state.creds.registered && Date.now() - entry.startedAt > QR_WAIT_MS) { stop(userId, "expired"); return; }
       // Restart required right after pairing, or a dropped connection: reconnect quickly (1s, 2s, 4s, 8s, then every 15s).
       // 440 = another copy of Thinq took over this WhatsApp link (happens for a few seconds during a deploy): give it
       // room instead of fighting it - the copy that's shutting down stops for good (see stopAllSyncs).
@@ -236,7 +295,7 @@ async function connect(userId, { pairPhone } = {}) {
         : code === DisconnectReason.connectionReplaced ? 20_000
         : Math.min(15_000, 1000 * 2 ** entry.retries++);
       console.warn(`[wa-sync] connection closed (code ${code ?? "?"}); reconnecting in ${Math.round(delay / 1000)}s`);
-      entry.status = state.creds.registered ? "reconnecting" : entry.status;
+      entry.status = entry.finishing ? "starting" : "reconnecting";
       clearTimeout(entry.timer);
       entry.nextAt = Date.now() + delay;
       entry.timer = setTimeout(() => { entry.timer = null; if (live.get(userId) === entry && !entry.stopped) connect(userId).catch((e) => console.warn("[wa-sync] reconnect failed:", e.message)); }, delay);
@@ -267,10 +326,14 @@ async function nameUnnamedChats(userId, names) {
   await saveChatNames(userId, rows.map((r) => ({ jid: r.jid, name: names.get(r.jid) })).filter((r) => r.name));
 }
 
+const failures = new Map(); // userId -> why the last link attempt failed, in plain words
+function fail(userId, why) { failures.set(userId, why); stop(userId, "failed"); }
+
 function stop(userId, status) {
   const entry = live.get(userId);
   if (!entry) return;
-  entry.stopped = true; entry.status = status || "idle";
+  entry.stopped = true; entry.status = status || "idle"; clearTimeout(entry.timer);
+  if (status === "expired") failures.set(userId, "The QR code wasn't scanned in time.");
   try { entry.sock?.end(undefined); } catch { /* already closed */ }
   live.delete(userId);
 }
@@ -285,25 +348,36 @@ async function wipe(userId, { keepMessages = false } = {}) {
 }
 
 // ---------- what the server calls ----------
-const cleanPhone = (s) => String(s || "").replace(/\D/g, "");
+// "+44 (0)7700 900123", "0044 7700...", "+234 0803..." -> digits WhatsApp understands: country code, no extra zeros.
+const TRUNK_ZERO = ["20", "27", "30", "31", "32", "33", "40", "41", "43", "44", "46", "49", "60", "61", "62", "63", "64", "66", "81", "82", "84", "90", "91", "92", "94", "212", "213", "233", "234", "250", "251", "254", "255", "256", "260", "263", "351", "353", "358", "380", "880", "966", "971", "972"];
+export function cleanPhone(raw) {
+  let d = String(raw || "").replace(/\(0\)/g, "").replace(/\D/g, "");
+  if (d.startsWith("00")) d = d.slice(2);
+  const cc = TRUNK_ZERO.find((c) => d.startsWith(`${c}0`));
+  return cc ? cc + d.slice(cc.length + 1) : d;
+}
 
 export async function startSync(userId, { phone } = {}) {
   if (!syncAvailable()) throw new Error("WhatsApp chat sync is turned off on this server.");
   const p = cleanPhone(phone);
-  if (phone && (p.length < 8 || p.length > 15)) throw new Error("Enter your full WhatsApp number with the country code, like +44 7700 900123.");
+  if (phone && p.startsWith("0")) throw new Error("Start with your country code instead of 0, like +44 7700 900123 or +234 803 123 4567.");
+  if (phone && (p.length < 9 || p.length > 15)) throw new Error("Enter your full WhatsApp number with the country code, like +44 7700 900123.");
   const cur = live.get(userId);
   if (cur?.status === "connected") return syncState(userId);
   if (cur) stop(userId);
   // A fresh link always starts from fresh keys.
-  const session = await one(`select status from wa_sync_sessions where user_id = $1`, [userId]);
-  if (session?.status !== "connected") await query(`delete from wa_sync_auth where user_id = $1`, [userId]);
-  await connect(userId, { pairPhone: p || null });
+  await query(`delete from wa_sync_auth where user_id = $1`, [userId]);
+  await query(`update wa_sync_sessions set status = 'off' where user_id = $1`, [userId]);
+  failures.delete(userId);
+  await connect(userId, { pairPhone: p || null, link: true });
+  if (p && live.get(userId)) live.get(userId).phoneShown = `+${p}`;
   return syncState(userId);
 }
 
 export async function cancelSync(userId) {
   const cur = live.get(userId);
-  if (cur && cur.status !== "connected") { stop(userId); await query(`delete from wa_sync_auth where user_id = $1`, [userId]); }
+  failures.delete(userId);
+  if (cur && cur.status !== "connected" && !isLinked(cur.auth?.state.creds)) { stop(userId); await query(`delete from wa_sync_auth where user_id = $1`, [userId]); }
 }
 
 export async function disconnectSync(userId) {
@@ -349,6 +423,10 @@ export async function syncState(userId) {
     status, // off | starting | waiting | connected | reconnecting | logged_out | blocked | expired
     qr: status === "waiting" ? entry?.qr || null : null,
     pairingCode: status === "waiting" ? entry?.pairingCode || null : null,
+    pairingFor: status === "waiting" ? entry?.phoneShown || null : null,
+    codeSeconds: status === "waiting" && entry?.codeUntil ? Math.max(0, Math.round((entry.codeUntil - Date.now()) / 1000)) : null,
+    finishing: Boolean(entry?.finishing),
+    problem: entry ? null : failures.get(userId) || null,
     phone: masked(entry?.phone || session?.phone),
     since: session?.linked_at || null,
     chats: counts.chats, messages: counts.messages, lastMessageAt: counts.last,

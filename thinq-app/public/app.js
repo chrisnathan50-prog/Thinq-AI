@@ -243,11 +243,12 @@ function waSyncWatch() {
     const s = await api("/api/whatsapp-sync").catch(() => null);
     if (!s) return;
     const wasConnected = state.whatsappSync?.status === "connected";
+    const changed = JSON.stringify(s) !== JSON.stringify(state.whatsappSync);
     state.whatsappSync = s;
     if (!["starting", "waiting", "reconnecting"].includes(s.status) && !(s.status === "connected" && s.messages === 0)) clearInterval(waSyncPoll);
     if (s.status === "connected" && !wasConnected) notice("WhatsApp linked. Your recent chats are syncing - this can take a few minutes.", "ok");
-    renderWaSync();
-  }, 3000);
+    if (changed) renderWaSync();
+  }, 2000);
 }
 function renderWaSync() {
   const box = $("#wasync"), s = state.whatsappSync || {};
@@ -270,15 +271,21 @@ function renderWaSync() {
   }
 
   if (s.status === "starting" || s.status === "waiting") {
-    box.innerHTML = `${head("demo", "Waiting for your phone")}
+    const where = `WhatsApp → <b>Settings</b> (iPhone) or <b>⋮</b> (Android) → <b>Linked devices</b> → <b>Link a device</b>`;
+    box.innerHTML = s.finishing
+      ? `${head("demo", "Almost there…")}<p>Your phone accepted the link. Finishing up, this takes a few seconds. Keep WhatsApp open on your phone.</p>`
+      : `${head("demo", "Waiting for your phone")}
       ${s.pairingCode
-        ? `<p>On your phone: WhatsApp → <b>Settings → Linked devices → Link a device → Link with phone number instead</b>, then enter:</p><div class="wa-code" aria-label="Pairing code">${esc(s.pairingCode.replace(/^(.{4})(.{4})$/, "$1-$2"))}</div>`
+        ? `<ol class="wa-steps"><li>On the phone with <b>${esc(s.pairingFor || "your number")}</b>, tap WhatsApp's notification <i>“Enter code to link new device”</i>, or open ${where} → <b>Link with phone number instead</b>.</li><li>Enter this code:</li></ol>
+           <div class="wa-code" aria-label="Pairing code">${esc(s.pairingCode.replace(/^(.{4})(.{4})$/, "$1-$2"))}</div>
+           <p class="meta">${s.codeSeconds ? `Works for about ${s.codeSeconds > 60 ? `${Math.ceil(s.codeSeconds / 60)} more minutes` : `${s.codeSeconds} more seconds`}.` : "About to expire."} Wrong number? Cancel and start again.</p>`
         : s.qr
-          ? `<p>On your phone: WhatsApp → <b>Settings → Linked devices → Link a device</b>, then scan:</p><img class="wa-qr" src="${esc(s.qr)}" alt="WhatsApp link QR code" width="200" height="200">`
+          ? `<p>On your phone: ${where}, then scan this:</p><img class="wa-qr" src="${esc(s.qr)}" alt="WhatsApp link QR code" width="280" height="280">
+             <p class="meta">The code refreshes by itself. Scan it with WhatsApp, not the phone's camera app. Won't scan? Cancel and choose “Use a code instead”.</p>`
           : `<p>Getting a code from WhatsApp…</p>`}
       <div class="wa-actions"><button class="btn ghost sm" id="waSyncCancel">Cancel</button></div>
-      <p class="meta">${s.pairingCode ? "" : "The code refreshes by itself. "}This box updates once it's linked.</p>`;
-    $("#waSyncCancel").addEventListener("click", async () => {
+      <p class="meta">It shows on your phone as “Google Chrome (Mac OS)”. That's Thinq. This box updates once it's linked.</p>`;
+    $("#waSyncCancel")?.addEventListener("click", async () => {
       clearInterval(waSyncPoll);
       state.whatsappSync = await api("/api/whatsapp-sync/cancel", { method: "POST" }).catch(() => s);
       waSyncStep = null; renderWaSync();
@@ -295,7 +302,7 @@ function renderWaSync() {
       <div class="wa-actions">
         ${waSyncStep === "phone"
           ? `<button class="btn sm" id="waSyncGo" data-mode="phone">Get pairing code</button><button class="btn ghost sm" id="waSyncQr">Use a QR code</button>`
-          : `<button class="btn sm" id="waSyncGo" data-mode="qr">I understand, show QR code</button><button class="btn ghost sm" id="waSyncPhoneBtn">I'm on my phone</button>`}
+          : `<button class="btn sm" id="waSyncGo" data-mode="qr">I understand, show QR code</button><button class="btn ghost sm" id="waSyncPhoneBtn">Use a code instead</button>`}
         <button class="btn ghost sm" id="waSyncBack">Not now</button>
       </div>`;
     $("#waSyncBack").addEventListener("click", () => { waSyncStep = null; renderWaSync(); });
@@ -313,7 +320,7 @@ function renderWaSync() {
     return;
   }
 
-  const why = { logged_out: "WhatsApp chats were unlinked from your phone.", blocked: "WhatsApp blocked the link. Your number may be restricted.", expired: "The code expired before it was scanned." }[s.status];
+  const why = s.problem || { logged_out: "WhatsApp chats were unlinked from your phone.", blocked: "WhatsApp blocked the link. Your number may be restricted.", expired: "The code expired before it was scanned." }[s.status];
   box.innerHTML = `${head(why ? "off" : "none", why ? "Not linked" : "Not linked yet")}
     <p>${why ? `${esc(why)} ` : ""}Let Thinq read your own WhatsApp chats, so you can ask “what did I miss?” or “what did Sam say about Friday?”</p>
     <div class="wa-actions"><button class="btn sm" id="waSyncStart">${why ? "Link again" : "Link WhatsApp chats"}</button>${s.messages ? `<button class="btn ghost sm" id="waSyncDel">Delete synced messages</button>` : ""}</div>`;
