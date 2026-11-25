@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Knoxdev</title>
+<meta name="description" content="Knoxdev: product designer, AI builder, studio founder.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..600&family=Instrument+Serif:ital@1&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#ffffff; --ink:#6c6c73; --ink-strong:#16161a; --muted:#a6a6ad; --dot:rgba(20,20,40,.11);
+  --pill:rgba(255,255,255,.78); --pill-line:rgba(20,20,40,.07); --chip:#f4f4f6;
+  --c1:#3d8bff; --c2:#1463ff; --c3:#0e47d1;
+}
+:root[data-theme="dark"]{
+  --bg:#0c0d10; --ink:#8d8d96; --ink-strong:#f2f2f5; --muted:#5f5f68; --dot:rgba(255,255,255,.09);
+  --pill:rgba(28,29,34,.72); --pill-line:rgba(255,255,255,.08); --chip:#1c1d22;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0c0d10; --ink:#8d8d96; --ink-strong:#f2f2f5; --muted:#5f5f68; --dot:rgba(255,255,255,.09);
+  --pill:rgba(28,29,34,.72); --pill-line:rgba(255,255,255,.08); --chip:#1c1d22;}}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--ink);transition:background .5s cubic-bezier(.2,.7,.2,1),color .5s}
+body{font-family:"Inter",-apple-system,system-ui,sans-serif;font-optical-sizing:auto;-webkit-font-smoothing:antialiased;min-height:100vh;overflow-x:clip}
+a{color:inherit;text-decoration:none}
+button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--c2);outline-offset:3px;border-radius:10px}
+
+/* dotted field, fading at the edges */
+.field{position:fixed;inset:0;pointer-events:none;
+  background-image:radial-gradient(circle,var(--dot) 1.1px,transparent 1.4px);background-size:22px 22px;
+  -webkit-mask:radial-gradient(60% 55% at 50% 45%,#000 30%,transparent 80%);mask:radial-gradient(60% 55% at 50% 45%,#000 30%,transparent 80%)}
+
+/* nav pill */
+nav{position:fixed;top:22px;left:50%;transform:translateX(-50%);z-index:10;display:flex;align-items:center;gap:6px;padding:7px 8px 7px 7px;border-radius:22px;
+  background:var(--pill);-webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%);
+  box-shadow:inset 0 0 0 1px var(--pill-line),0 1px 2px rgba(0,0,0,.04),0 12px 30px -16px rgba(20,20,60,.25)}
+.mark{width:46px;height:46px;border-radius:15px;display:grid;place-items:center;color:#fff;font-weight:600;font-size:20px;letter-spacing:-.04em;
+  background:linear-gradient(160deg,#5c9dff 0%,#1463ff 55%,#0e47d1 100%);
+  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.45),inset 0 -2px 0 rgba(0,20,90,.35),0 6px 14px -6px rgba(20,99,255,.7)}
+nav a.l{font-size:14.5px;font-weight:500;color:var(--ink-strong);opacity:.78;padding:10px 12px;border-radius:12px;transition:opacity .2s,background .2s}
+nav a.l:hover{opacity:1;background:var(--chip)}
+.moon{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;margin-left:4px;color:var(--ink-strong);box-shadow:inset 0 0 0 1px var(--pill-line);background:var(--chip)}
+
+/* hero */
+main{min-height:100vh;display:grid;place-items:center;padding:140px 16px 90px;position:relative}
+h1{font-weight:400;font-size:clamp(44px,8.4vw,112px);line-height:1.08;letter-spacing:-.045em;text-align:center;color:var(--ink)}
+h1 .ln{display:block;white-space:nowrap}
+.obj{display:inline-block;vertical-align:middle;position:relative;top:-.06em;margin:0 .06em}
+
+/* object 1: glass switch (the real theme toggle) */
+.sw{width:1.5em;height:.82em;border-radius:.41em;position:relative;
+  background:linear-gradient(180deg,#e7e8ec,#d4d6dc);box-shadow:inset 0 2px 4px rgba(0,0,0,.12),inset 0 -1px 0 rgba(255,255,255,.8),0 0 0 1px rgba(0,0,0,.04)}
+.sw .lens{position:absolute;right:.15em;top:50%;width:.2em;height:.2em;border-radius:50%;transform:translateY(-50%);
+  background:radial-gradient(circle at 35% 35%,#5b6380,#0c0e16 70%);box-shadow:0 0 0 .035em #c7c9cf}
+.sw .knob{position:absolute;left:.05em;top:.05em;width:.72em;height:.72em;border-radius:.24em;display:grid;place-items:center;
+  background:linear-gradient(160deg,#ffffff,#eef0f4);box-shadow:inset 0 1px 0 #fff,0 .04em .1em rgba(0,0,0,.18),0 .1em .22em rgba(20,20,50,.18);
+  transition:left .5s cubic-bezier(.3,1.4,.5,1)}
+.sw .knob svg{width:.26em;height:.26em;color:#9a9ca6}
+:root[data-theme="dark"] .sw{background:linear-gradient(180deg,#1f3d86,#1463ff);box-shadow:inset 0 2px 5px rgba(0,0,30,.5),0 0 0 1px rgba(255,255,255,.06),0 0 30px -6px rgba(20,99,255,.7)}
+:root[data-theme="dark"] .sw .knob{left:calc(100% - .77em)}
+:root[data-theme="dark"] .sw .lens{right:auto;left:.15em}
+
+/* object 2: glossy cobalt spark */
+.spark{width:.92em;height:.92em;filter:drop-shadow(0 .08em .12em rgba(20,99,255,.45))}
+.spark .m{transform-origin:50% 50%;animation:spin 14s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* object 3: work thumbnail */
+.thumb{width:1.36em;height:.82em;border-radius:.26em;overflow:hidden;position:relative;
+  box-shadow:0 0 0 .055em rgba(20,99,255,.18),0 0 0 .1em rgba(255,255,255,.9),0 .14em .3em -.06em rgba(20,40,120,.45)}
+:root[data-theme="dark"] .thumb{box-shadow:0 0 0 .055em rgba(20,99,255,.4),0 0 0 .1em rgba(255,255,255,.08),0 .14em .3em -.06em rgba(0,0,0,.6)}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block;transition:opacity .6s}
+.thumb img+img{position:absolute;inset:0;opacity:0}
+
+.tag{display:block;margin-top:.9em;font-family:"Instrument Serif",Georgia,serif;font-style:italic;font-size:clamp(20px,2.3vw,30px);color:var(--muted);letter-spacing:-.005em;text-align:center}
+.now{display:flex;justify-content:center;margin-top:28px}
+.now a{display:inline-flex;align-items:center;gap:10px;font-size:14.5px;font-weight:500;color:var(--ink-strong);padding:10px 16px 10px 12px;border-radius:99px;background:var(--chip);box-shadow:inset 0 0 0 1px var(--pill-line)}
+.now i{width:8px;height:8px;border-radius:50%;background:#34c759;box-shadow:0 0 0 4px rgba(52,199,89,.18)}
+.now b{font-weight:500;color:var(--c2)}
+
+/* single load moment: lines rise in sequence */
+.ln{opacity:0;transform:translateY(.35em);animation:rise .9s cubic-bezier(.2,.7,.2,1) forwards}
+.ln:nth-child(2){animation-delay:.12s}.ln:nth-child(3){animation-delay:.24s}
+.tag,.now{opacity:0;animation:rise .9s .42s cubic-bezier(.2,.7,.2,1) forwards}
+@keyframes rise{to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.ln,.tag,.now{animation:none;opacity:1;transform:none}.spark .m{animation:none}}
+@media (max-width:560px){nav a.l{padding:10px 8px;font-size:14px}h1{font-size:9vw}}
+</style>
+</head>
+<body>
+<div class="field" aria-hidden="true"></div>
+
+<nav aria-label="Main">
+  <a href="#" class="mark" aria-label="Knoxdev home">K</a>
+  <a class="l" href="#work">Work</a>
+  <a class="l" href="#studio">Studio</a>
+  <a class="l" href="#contact">Contact</a>
+  <button class="moon" id="moon" aria-label="Switch to dark mode"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.6A8.2 8.2 0 0 1 9.4 4a8.2 8.2 0 1 0 10.6 10.6z"/></svg></button>
+</nav>
+
+<main>
+  <div>
+    <h1>
+      <span class="ln">Product <button class="obj sw" id="sw" aria-label="Toggle dark mode"><span class="lens"></span><span class="knob"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg></span></button> designer,</span>
+      <span class="ln">AI <svg class="obj spark" viewBox="0 0 100 100" aria-hidden="true">
+          <defs>
+            <radialGradient id="sg" cx="35%" cy="28%" r="80%"><stop offset="0" stop-color="#cfe0ff"/><stop offset=".35" stop-color="#5c9dff"/><stop offset=".7" stop-color="#1463ff"/><stop offset="1" stop-color="#0a3bb8"/></radialGradient>
+            <radialGradient id="hl" cx="38%" cy="30%" r="30%"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+          </defs>
+          <g class="m"><path d="M50 4c4 22 20 38 46 46-26 8-42 24-46 46-4-22-20-38-46-46C30 42 46 26 50 4z" fill="url(#sg)"/>
+          <path d="M50 4c4 22 20 38 46 46-26 8-42 24-46 46-4-22-20-38-46-46C30 42 46 26 50 4z" fill="url(#hl)"/>
+          <g fill="#fff" opacity=".95"><circle cx="50" cy="50" r="6"/><circle cx="50" cy="36" r="3"/><circle cx="50" cy="64" r="3"/><circle cx="36" cy="50" r="3"/><circle cx="64" cy="50" r="3"/></g></g>
+        </svg> builder,</span>
+      <span class="ln">Knoxdev <a class="obj thumb" href="#work" aria-label="See recent work"><img src="../widgets/png/1-morning-brief.png" alt="" style="object-position:50% 52%"><img src="../health/png/9-daily-insights.png" alt="" style="object-position:50% 58%"></a> founder</span>
+    </h1>
+    <span class="tag">and always shipping.</span>
+    <div class="now"><a href="#work"><i></i>Now building <b>Thinq AI</b></a></div>
+  </div>
+</main>
+
+<script>
+const root=document.documentElement, moon=document.getElementById('moon');
+function isDark(){return root.dataset.theme? root.dataset.theme==='dark' : matchMedia('(prefers-color-scheme: dark)').matches}
+function setTheme(d){root.dataset.theme=d?'dark':'light';moon.setAttribute('aria-label',d?'Switch to light mode':'Switch to dark mode');try{localStorage.setItem('kx-theme',root.dataset.theme)}catch(e){}}
+try{const t=localStorage.getItem('kx-theme');if(t)root.dataset.theme=t}catch(e){}
+document.getElementById('sw').onclick=()=>setTheme(!isDark());
+moon.onclick=()=>setTheme(!isDark());
+// the work thumbnail slowly alternates between two pieces
+const im=document.querySelectorAll('.thumb img');let k=0;
+if(!matchMedia('(prefers-reduced-motion: reduce)').matches) setInterval(()=>{k^=1;im[1].style.opacity=k},3200);
+</script>
+</body>
+</html>
