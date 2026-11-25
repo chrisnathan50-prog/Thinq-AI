@@ -283,6 +283,18 @@ svg{display:block}
 .f9 .qa div{width:100px;height:100px;border-radius:50%;display:grid;place-items:center}
 .f9 .home{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);width:270px;height:9px;border-radius:9px;background:rgba(255,255,255,.85)}
 .stack{z-index:1}
+
+.ph{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.scrim{position:absolute;inset:0;pointer-events:none}
+#h1 .brief.lg{background:linear-gradient(180deg,rgba(255,255,255,.5),rgba(255,255,255,.32))}
+#h2 .ap.lg{background:linear-gradient(180deg,rgba(255,255,255,.2),rgba(255,255,255,.08));-webkit-backdrop-filter:blur(30px) saturate(170%);backdrop-filter:blur(30px) saturate(170%);overflow:hidden}
+#h2 .ap>.ap-head,#h2 .ap>.sheets{position:absolute}
+#h5 .note{color:rgba(29,29,31,.72)}
+#h2 .ap-head h2{text-shadow:0 1px 16px rgba(0,0,0,.25)}
+#h3 .w1 .flap.lg{background:linear-gradient(180deg,rgba(255,255,255,.28),rgba(255,255,255,.12));-webkit-backdrop-filter:blur(16px) saturate(150%);backdrop-filter:blur(16px) saturate(150%)}
+#h3 .w2 .bot.lg{background:linear-gradient(180deg,rgba(255,255,255,.22),rgba(255,255,255,.08))}
+#h4 .today.lg{background:linear-gradient(180deg,rgba(255,255,255,.4),rgba(246,247,250,.6))}
+#h5 .card.lg{background:linear-gradient(180deg,rgba(255,255,255,.42),rgba(255,255,255,.26))}
 </style>
 </head>
 <body>
@@ -314,9 +326,7 @@ svg{display:block}
 
 <!-- H1 · Daily insight -->
 <section class="frame f1" id="h1" aria-label="Daily insight">
-  <div class="sun"></div>
-  <div class="hill" style="top:840px;height:520px;background:#c7d6ec;opacity:.8"></div>
-  <div class="hill" style="top:960px;height:520px;left:20%;right:-30%;background:#a9c1e4;opacity:.8"></div>
+  <img class="ph" src="img/walk.jpg" alt="Woman stretching on a sunlit forest road"><div class="scrim" style="background:linear-gradient(180deg,rgba(255,236,200,.15),rgba(0,0,0,.05) 60%,rgba(0,0,0,.2))"></div>
   <div class="stage">
     <div class="fan" aria-hidden="true">
       <div class="n" style="left:0;transform:rotate(-8deg) translateY(26px)">
@@ -347,8 +357,8 @@ svg{display:block}
 
 <!-- H2 · Blood pressure card -->
 <section class="frame f2" id="h2" aria-label="Blood pressure this week">
-  <div class="ap" style="background:linear-gradient(160deg,#ff8f9c 0%,#ff5e72 36%,#ff7a8a 60%,#ffc4c2 82%,#cfe0f7 100%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.35),inset 0 2px 0 rgba(255,255,255,.6),0 40px 80px -46px rgba(180,30,60,.55)">
-    <div class="sheen" style="background:radial-gradient(40% 30% at 82% 22%,rgba(255,255,255,.6),transparent 70%),radial-gradient(30% 50% at 105% 70%,rgba(170,205,255,.9),transparent 70%),radial-gradient(40% 30% at 10% 45%,rgba(255,60,90,.5),transparent 70%)"></div>
+  <img class="ph" src="img/cuff.jpg" alt="Blood pressure cuff and monitor on an arm" style="object-position:40% 50%"><div class="scrim" style="background:rgba(10,10,20,.12)"></div>
+  <div class="ap lg">
     <div class="ap-head">
       <div class="circ"><svg width="48" height="48" style="color:#ff3b30"><use href="#heart"/></svg></div>
       <h2 style="text-shadow:0 1px 12px rgba(160,20,50,.25)">Blood pressure</h2>
@@ -385,14 +395,13 @@ svg{display:block}
       </div>
     </div>
   </div>
-  <svg class="logo" width="48" height="48" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#1463ff"/><g transform="translate(4 4) scale(.667)"><use href="#hp"/></g></svg>
-</section>
+  </section>
 
 <!-- H3 · Widget set -->
 <section class="frame f3" id="h3" aria-label="Health widget set">
   <div class="grid">
     <div class="w w1">
-      <div class="bk"></div>
+      <img class="ph" src="img/gauge.jpg" alt="Stethoscope and blood pressure gauge"><div class="scrim" style="background:rgba(0,0,0,.08)"></div>
       <div class="pk" style="left:46px;top:58px;transform:rotate(-7deg)"><b>Morning</b><small>Today at 08:02</small>
         <div class="tn" style="font-size:27px;font-weight:700;letter-spacing:-.035em;margin-top:18px">118/76</div><small>mmHg</small></div>
       <div class="pk" style="left:160px;top:46px;transform:rotate(6deg)"><b>Evening</b><small>Yesterday 20:10</small>
@@ -401,7 +410,8 @@ svg{display:block}
       <div class="cap2"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 8h8M8 12h8M8 16h5" stroke-linecap="round"/></svg>Your readings</div>
     </div>
 
-    <div class="w w2" style="background:linear-gradient(180deg,#ffd0d4,#ff8e9a)">
+    <div class="w w2">
+      <img class="ph" src="img/check.jpg" alt="Person holding a blood pressure device" style="object-position:30% 50%"><div class="scrim" style="background:rgba(0,0,0,.12)"></div>
       <div class="top">
         <div class="who"><div class="av" style="background:#fff;box-shadow:0 0 0 1px var(--sep);color:#ff3b30"><svg width="24" height="24"><use href="#heart"/></svg></div><div><b>Blood pressure</b><small>Today at 08:02</small></div></div>
         <div class="tn" style="font-size:52px;font-weight:700;letter-spacing:-.045em;margin-top:12px;line-height:1">118/76 <span style="font-size:17px;font-weight:500;letter-spacing:0;color:var(--label-2)">mmHg</span></div>
@@ -413,11 +423,7 @@ svg{display:block}
     </div>
 
     <div class="w w3" style="background:linear-gradient(180deg,#1b2350 0%,#2c3a78 40%,#4a4f8f 46%,#2a3c6e 47%,#1d2c57 75%,#121c3d 100%)">
-      <svg class="scene" viewBox="0 0 356 356" preserveAspectRatio="none" aria-hidden="true">
-        <circle cx="250" cy="100" r="22" fill="#f3eedb" opacity=".95"/>
-        <g fill="#fff" opacity=".8"><circle cx="60" cy="50" r="1.6"/><circle cx="120" cy="90" r="1.2"/><circle cx="300" cy="40" r="1.4"/><circle cx="190" cy="30" r="1.1"/><circle cx="40" cy="120" r="1.2"/></g>
-        <path d="M200 175 h100 M215 195 h70 M232 216 h40" stroke="#f3eedb" stroke-width="3" opacity=".4" stroke-linecap="round"/>
-      </svg>
+      <img class="ph" src="img/night.jpg" alt="Starry night sky"><div class="scrim" style="background:rgba(10,10,40,.2)"></div>
       <div class="lbl"><svg width="15" height="15"><use href="#moon"/></svg>Sleep</div>
       <svg class="ring" width="292" height="292" viewBox="0 0 292 292">
         <defs><linearGradient id="rgs" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b9b7ff"/><stop offset="1" stop-color="#ffffff"/></linearGradient></defs>
@@ -429,7 +435,7 @@ svg{display:block}
     </div>
 
     <div class="w w4">
-      <div class="art" style="background:linear-gradient(135deg,#2b3a8f 0%,#5e5ce6 50%,#9a86e8 100%)"><div class="wave" aria-hidden="true">
+      <div class="art"><img class="ph" src="img/yoga.jpg" alt="Woman in a yoga pose at sunset" style="object-position:50% 30%"><div class="scrim" style="background:rgba(0,0,0,.18)"></div><div class="wave" aria-hidden="true">
         <span style="height:20%"></span><span style="height:34%"></span><span style="height:52%"></span><span style="height:40%"></span><span style="height:62%"></span><span style="height:46%"></span><span style="height:30%"></span><span style="height:44%"></span><span style="height:58%"></span><span style="height:36%"></span><span class="d" style="height:48%"></span><span class="d" style="height:28%"></span><span class="d" style="height:40%"></span><span class="d" style="height:54%"></span><span class="d" style="height:32%"></span><span class="d" style="height:22%"></span><span class="d" style="height:36%"></span><span class="d" style="height:24%"></span>
       </div></div>
       <div class="meta"><b>Wind down</b><small class="tn">Slow breathing, 10 min</small></div>
@@ -445,11 +451,7 @@ svg{display:block}
 
 <!-- H4 · Today card -->
 <section class="frame f4" id="h4" aria-label="Today summary">
-  <div class="cl" style="left:-60px;top:70px;width:520px;height:220px"><span style="left:0;top:90px;width:260px;height:120px"></span><span style="left:120px;top:20px;width:220px;height:180px"></span><span style="left:260px;top:70px;width:240px;height:140px"></span></div>
-  <div class="cl" style="left:600px;top:150px;width:420px;height:200px;opacity:.85"><span style="left:0;top:80px;width:200px;height:100px"></span><span style="left:90px;top:20px;width:180px;height:150px"></span><span style="left:210px;top:60px;width:220px;height:120px"></span></div>
-  <div class="cl" style="left:-120px;top:620px;width:400px;height:200px;opacity:.75"><span style="left:0;top:70px;width:240px;height:110px"></span><span style="left:110px;top:10px;width:180px;height:150px"></span></div>
-  <div class="cl" style="left:700px;top:560px;width:360px;height:180px;opacity:.7"><span style="left:0;top:60px;width:200px;height:100px"></span><span style="left:100px;top:0;width:180px;height:150px"></span></div>
-  <div class="cl" style="left:40px;top:1000px;width:900px;height:300px"><span style="left:0;top:110px;width:360px;height:180px"></span><span style="left:200px;top:30px;width:300px;height:240px"></span><span style="left:430px;top:80px;width:380px;height:200px"></span></div>
+  <img class="ph" src="img/peaks.jpg" alt="Mountain peaks above the clouds at sunrise">
   <div class="today lg">
     <div class="card">
       <div class="island"></div>
@@ -476,18 +478,7 @@ svg{display:block}
 
 <!-- H5 · Reminders -->
 <section class="frame f5" id="h5" aria-label="Reminders">
-  <svg class="wall" viewBox="0 0 900 1200" preserveAspectRatio="none" aria-hidden="true">
-    <defs><linearGradient id="hs5" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b7d6ea"/><stop offset=".55" stop-color="#e4eee6"/><stop offset="1" stop-color="#f1efe2"/></linearGradient>
-      <filter id="hb5"><feGaussianBlur stdDeviation="2"/></filter></defs>
-    <rect width="900" height="1200" fill="url(#hs5)"/>
-    <circle cx="690" cy="300" r="120" fill="#fff6dc" opacity=".8" filter="url(#hb5)"/>
-    <g filter="url(#hb5)">
-      <path d="M0 640 C160 560 330 600 470 560 S760 520 900 570 V1200 H0Z" fill="#b6d1ae"/>
-      <path d="M0 780 C220 700 420 760 610 710 S840 690 900 720 V1200 H0Z" fill="#8fbb8e"/>
-      <path d="M0 920 C260 850 520 920 900 850 V1200 H0Z" fill="#6a9e72"/>
-      <path d="M0 1060 C300 1000 600 1060 900 1010 V1200 H0Z" fill="#4f8360"/>
-    </g>
-  </svg>
+  <img class="ph" src="img/hills.jpg" alt="Green hills under a bright sky">
   <div class="card lg">
     <h3 style="font-size:54px;font-weight:700;letter-spacing:-.04em;line-height:1.02;padding:8px 6px 0">Make time<br>for you.</h3>
     <div class="slots" style="margin-top:30px">
@@ -502,18 +493,7 @@ svg{display:block}
 
 <!-- H6 · Lock screen -->
 <section class="frame f9" id="h6" aria-label="Lock screen reminder">
-  <svg class="wall" viewBox="0 0 900 1200" preserveAspectRatio="none" aria-hidden="true">
-    <defs><linearGradient id="hs9" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8a27a"/><stop offset=".35" stop-color="#f4c79c"/><stop offset=".6" stop-color="#f1d6c2"/></linearGradient>
-      <filter id="hb9"><feGaussianBlur stdDeviation="2"/></filter><filter id="hb9b" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="50"/></filter></defs>
-    <rect width="900" height="1200" fill="url(#hs9)"/>
-    <circle cx="560" cy="560" r="150" fill="#fff2d6" opacity=".85" filter="url(#hb9b)"/>
-    <g filter="url(#hb9)">
-      <path d="M0 640 L120 560 L210 610 L330 500 L450 590 L560 520 L690 600 L800 540 L900 590 V1200 H0Z" fill="#b997a6"/>
-      <path d="M0 760 L140 660 L260 730 L400 640 L520 720 L650 650 L780 730 L900 680 V1200 H0Z" fill="#8f7699"/>
-      <path d="M0 880 L170 790 L320 860 L470 780 L620 860 L760 800 L900 850 V1200 H0Z" fill="#62557e"/>
-      <path d="M0 1010 L200 930 L380 990 L560 920 L740 990 L900 950 V1200 H0Z" fill="#3b3a5c"/>
-    </g>
-  </svg>
+  <img class="ph" src="img/bedroom.jpg" alt="Sunlit bedroom in the morning"><div class="scrim" style="background:linear-gradient(180deg,rgba(0,0,0,.28),rgba(0,0,0,.05) 40%,rgba(0,0,0,.25))"></div>
   <div class="date">Monday, October 26</div>
   <div class="clock tn">8:00</div>
   <div class="stack">
