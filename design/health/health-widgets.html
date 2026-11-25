@@ -322,11 +322,35 @@ svg{display:block}
 .sw.off{background:rgba(120,120,128,.28)}.sw.off::after{right:auto;left:3px}
 .f5 .slot .sq{width:66px;height:66px;border-radius:18px}
 .pill-ok{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:#1f8a3a;background:rgba(52,199,89,.16);padding:4px 10px;border-radius:99px;margin-top:10px}
+
+/* ---- cobalt infusion (from the app's white-to-blue screens) ---- */
+:root{--c1:#3a86ff;--c2:#1463ff;--c3:#0e47d1;--navy:#0a1238}
+.grade{position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(20,99,255,0) 30%,rgba(20,99,255,.38) 68%,rgba(14,71,209,.82) 100%)}
+.grade.top{background:linear-gradient(180deg,rgba(255,255,255,.35) 0%,rgba(255,255,255,0) 22%,rgba(20,99,255,0) 40%,rgba(20,99,255,.4) 72%,rgba(14,71,209,.85) 100%)}
+.btn,.black{background:linear-gradient(180deg,#3d8bff,#1257ee)!important;box-shadow:inset 0 1.5px 0 rgba(255,255,255,.35),inset 0 -2px 0 rgba(10,40,160,.3),0 16px 30px -14px rgba(18,87,238,.75)!important}
+.sw{background:var(--c2)}.sw.off{background:rgba(120,120,128,.28)}
+/* glass panels fade from white into cobalt */
+#h1 .brief.lg{background:linear-gradient(180deg,rgba(255,255,255,.6) 0%,rgba(255,255,255,.4) 45%,rgba(150,190,255,.42) 100%)}
+#h2 .ap.lg{background:linear-gradient(180deg,rgba(255,255,255,.28) 0%,rgba(110,160,255,.22) 40%,rgba(20,99,255,.5) 80%,rgba(14,71,209,.72) 100%)}
+#h4 .today.lg{background:linear-gradient(180deg,rgba(255,255,255,.6) 0%,rgba(170,200,255,.45) 45%,rgba(30,110,255,.7) 82%,rgba(14,71,209,.85) 100%)}
+#h4 .fine{color:rgba(255,255,255,.85)}
+#h4 .big{background:linear-gradient(180deg,var(--navy) 30%,var(--c2));-webkit-background-clip:text;background-clip:text;color:transparent}
+#h5 .card.lg{background:linear-gradient(180deg,rgba(255,255,255,.62) 0%,rgba(255,255,255,.4) 30%,rgba(90,150,255,.4) 65%,rgba(14,71,209,.78) 100%)}
+#h5 .card h3{color:var(--navy)}
+#h5 .note{color:rgba(255,255,255,.88)!important}
+#h6 .nt.lg{background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(200,220,255,.5))}
+#h3 .w1 .flap.lg{background:linear-gradient(180deg,rgba(255,255,255,.3),rgba(20,99,255,.45))}
+#h3 .w2 .bot.lg{background:linear-gradient(180deg,rgba(110,160,255,.3),rgba(14,71,209,.72))}
+#h3 .w4 .prog i{background:linear-gradient(90deg,var(--c1),var(--c3))}
+#h3 .w4 .pp{background:linear-gradient(180deg,#e8f0ff,#d5e3ff);color:var(--c3)}
+#h3 .w4{background:linear-gradient(180deg,#fff 55%,#e3ecff)}
+#h3 .w3 .core.lg{background:rgba(20,99,255,.25)}
+.f3#h3{background:linear-gradient(180deg,#f4f7ff 0%,#cfe0ff 40%,#4f8cff 78%,#1a5ff0 100%)}
 </style>
 
 <!-- H1 · Daily insight -->
 <section class="frame f1" id="h1" aria-label="Daily insight">
-  <img class="ph" src="img/walk.jpg" alt="Woman stretching on a sunlit forest road"><div class="scrim" style="background:linear-gradient(180deg,rgba(255,236,200,.15),rgba(0,0,0,.05) 60%,rgba(0,0,0,.2))"></div>
+  <img class="ph" src="img/walk.jpg" alt="Woman stretching on a sunlit forest road"><div class="scrim" style="background:linear-gradient(180deg,rgba(255,236,200,.15),rgba(0,0,0,.05) 60%,rgba(0,0,0,.2))"></div><div class="grade"></div>
   <div class="stage">
     <div class="fan" aria-hidden="true">
       <div class="n" style="left:0;transform:rotate(-8deg) translateY(26px)">
@@ -357,7 +381,7 @@ svg{display:block}
 
 <!-- H2 · Blood pressure card -->
 <section class="frame f2" id="h2" aria-label="Blood pressure this week">
-  <img class="ph" src="img/cuff.jpg" alt="Blood pressure cuff and monitor on an arm" style="object-position:40% 50%"><div class="scrim" style="background:rgba(10,10,20,.12)"></div>
+  <img class="ph" src="img/cuff.jpg" alt="Blood pressure cuff and monitor on an arm" style="object-position:40% 50%"><div class="scrim" style="background:rgba(10,10,20,.12)"></div><div class="grade"></div>
   <div class="ap lg">
     <div class="ap-head">
       <div class="circ"><svg width="48" height="48" style="color:#ff3b30"><use href="#heart"/></svg></div>
@@ -401,7 +425,7 @@ svg{display:block}
 <section class="frame f3" id="h3" aria-label="Health widget set">
   <div class="grid">
     <div class="w w1">
-      <img class="ph" src="img/gauge.jpg" alt="Stethoscope and blood pressure gauge"><div class="scrim" style="background:rgba(0,0,0,.08)"></div>
+      <img class="ph" src="img/gauge.jpg" alt="Stethoscope and blood pressure gauge"><div class="scrim" style="background:rgba(0,0,0,.08)"></div><div class="grade"></div>
       <div class="pk" style="left:46px;top:58px;transform:rotate(-7deg)"><b>Morning</b><small>Today at 08:02</small>
         <div class="tn" style="font-size:27px;font-weight:700;letter-spacing:-.035em;margin-top:18px">118/76</div><small>mmHg</small></div>
       <div class="pk" style="left:160px;top:46px;transform:rotate(6deg)"><b>Evening</b><small>Yesterday 20:10</small>
@@ -411,14 +435,14 @@ svg{display:block}
     </div>
 
     <div class="w w2">
-      <img class="ph" src="img/check.jpg" alt="Person holding a blood pressure device" style="object-position:30% 50%"><div class="scrim" style="background:rgba(0,0,0,.12)"></div>
+      <img class="ph" src="img/check.jpg" alt="Person holding a blood pressure device" style="object-position:30% 50%"><div class="scrim" style="background:rgba(0,0,0,.12)"></div><div class="grade"></div>
       <div class="top">
         <div class="who"><div class="av" style="background:#fff;box-shadow:0 0 0 1px var(--sep);color:#ff3b30"><svg width="24" height="24"><use href="#heart"/></svg></div><div><b>Blood pressure</b><small>Today at 08:02</small></div></div>
         <div class="tn" style="font-size:52px;font-weight:700;letter-spacing:-.045em;margin-top:12px;line-height:1">118/76 <span style="font-size:17px;font-weight:500;letter-spacing:0;color:var(--label-2)">mmHg</span></div>
       </div>
       <div class="bot lg">
         <div><b>Log reading</b><small>Next at 20:00</small></div>
-        <div class="go" style="color:#ff3b30"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+        <div class="go" style="color:#1463ff"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
       </div>
     </div>
 
@@ -426,7 +450,7 @@ svg{display:block}
       <img class="ph" src="img/night.jpg" alt="Starry night sky"><div class="scrim" style="background:rgba(10,10,40,.2)"></div>
       <div class="lbl"><svg width="15" height="15"><use href="#moon"/></svg>Sleep</div>
       <svg class="ring" width="292" height="292" viewBox="0 0 292 292">
-        <defs><linearGradient id="rgs" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b9b7ff"/><stop offset="1" stop-color="#ffffff"/></linearGradient></defs>
+        <defs><linearGradient id="rgs" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5a9bff"/><stop offset="1" stop-color="#ffffff"/></linearGradient></defs>
         <circle cx="146" cy="146" r="116" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="30"/>
         <circle cx="146" cy="146" r="116" fill="none" stroke="url(#rgs)" stroke-width="30" stroke-linecap="round" stroke-dasharray="699 728.8" transform="rotate(-90 146 146)"/>
       </svg>
@@ -451,7 +475,7 @@ svg{display:block}
 
 <!-- H4 · Today card -->
 <section class="frame f4" id="h4" aria-label="Today summary">
-  <img class="ph" src="img/peaks.jpg" alt="Mountain peaks above the clouds at sunrise">
+  <img class="ph" src="img/peaks.jpg" alt="Mountain peaks above the clouds at sunrise"><div class="grade top"></div>
   <div class="today lg">
     <div class="card">
       <div class="island"></div>
@@ -478,7 +502,7 @@ svg{display:block}
 
 <!-- H5 · Reminders -->
 <section class="frame f5" id="h5" aria-label="Reminders">
-  <img class="ph" src="img/hills.jpg" alt="Green hills under a bright sky">
+  <img class="ph" src="img/hills.jpg" alt="Green hills under a bright sky"><div class="grade"></div>
   <div class="card lg">
     <h3 style="font-size:54px;font-weight:700;letter-spacing:-.04em;line-height:1.02;padding:8px 6px 0">Make time<br>for you.</h3>
     <div class="slots" style="margin-top:30px">
@@ -493,7 +517,7 @@ svg{display:block}
 
 <!-- H6 · Lock screen -->
 <section class="frame f9" id="h6" aria-label="Lock screen reminder">
-  <img class="ph" src="img/bedroom.jpg" alt="Sunlit bedroom in the morning"><div class="scrim" style="background:linear-gradient(180deg,rgba(0,0,0,.28),rgba(0,0,0,.05) 40%,rgba(0,0,0,.25))"></div>
+  <img class="ph" src="img/bedroom.jpg" alt="Sunlit bedroom in the morning"><div class="scrim" style="background:linear-gradient(180deg,rgba(0,0,0,.28),rgba(0,0,0,.05) 40%,rgba(0,0,0,.25))"></div><div class="grade"></div>
   <div class="date">Monday, October 26</div>
   <div class="clock tn">8:00</div>
   <div class="stack">
