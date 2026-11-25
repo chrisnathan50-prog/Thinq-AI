@@ -15,3 +15,12 @@ All photos are from Unsplash, used under the Unsplash License (free to use, attr
 | bedroom.jpg | https://unsplash.com/photos/cozy-bedroom-with-a-large-window-and-sunlight-3lQautLFzMs | 6 Lock screen |
 | runners.jpg | https://images.unsplash.com/photo-1552674605-db6ffd4facb5 | 10 Landing shot |
 | gauge.jpg (reused) | see above | 10 Landing shot thumbnail |
+| sky-runner.jpg | https://unsplash.com/photos/man-running-on-green-grass-under-a-clear-blue-sky-Rs-3HwomgL4 | 11 Website mosaic |
+| consult.jpg | https://unsplash.com/photos/doctor-consulting-with-a-patient-in-an-office-MJmsLpeHPfg | 11 Website mosaic |
+| couch.jpg | https://unsplash.com/photos/doctor-talks-with-an-elderly-patient-on-a-couch-BUNNEclz-yQ | 11 Website mosaic |
+| clinician.jpg | https://unsplash.com/photos/doctor-talking-to-patient-in-an-office-IDM3n0LfNCY | 11 Website mosaic |
+| calm.jpg | https://unsplash.com/photos/serene-woman-with-closed-eyes-embracing-herself-in-sunlight-hMn55KZIoiY | 11 Website mosaic |
+| sunface.jpg | https://unsplash.com/photos/woman-with-eyes-closed-and-sun-on-her-face-D6P6qB7A09I | 11 Website mosaic |
+| dappled.jpg | https://unsplash.com/photos/young-woman-with-closed-eyes-in-dappled-sunlight-pwQeWO6Gk14 | 11, 12 |
+| dog.jpg | https://unsplash.com/photos/girl-in-black-and-white-stripe-shirt-wearing-sunglasses-holding-brown-short-coated-dog-BBUgGaGg7TA | 12 Help-with cards |
+| window.jpg | https://unsplash.com/photos/man-reading-a-book-and-drinking-coffee-by-window-wmVzh1Ky7FY | 12 Help-with cards |
