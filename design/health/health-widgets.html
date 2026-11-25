@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Health Widgets</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* iOS semantic colours */
+  --label:#1d1d1f; --label-2:rgba(60,60,67,.62); --label-3:rgba(60,60,67,.32); --sep:rgba(60,60,67,.12);
+  --fill:#f2f2f7; --blue:#0a84ff; --orange:#ff9500; --red:#ff3b30; --yellow:#ffcc00;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Inter",-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;font-optical-sizing:auto;
+  background:#d9d9de;color:var(--label);-webkit-font-smoothing:antialiased;letter-spacing:-.011em;
+  display:flex;flex-wrap:wrap;gap:40px;justify-content:center;padding:40px 16px}
+svg{display:block}
+.tn{font-variant-numeric:tabular-nums}
+.frame{width:900px;height:1200px;position:relative;overflow:hidden;flex:none;isolation:isolate}
+@media (max-width:960px){.frame{zoom:calc((100vw - 32px)/900px)}}
+
+/* Liquid Glass: clear body, lit rim, faint lensing at the edges */
+.lg{position:relative;
+  background:linear-gradient(180deg,rgba(255,255,255,.30),rgba(255,255,255,.14));
+  -webkit-backdrop-filter:blur(22px) saturate(185%);backdrop-filter:blur(22px) saturate(185%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.28),
+    inset 1.5px 1.5px 0 -.5px rgba(255,255,255,.95),
+    inset -1px -1px 0 -.5px rgba(255,255,255,.55),
+    inset 0 0 34px 0 rgba(255,255,255,.22),
+    0 2px 6px rgba(0,0,0,.04),0 24px 48px -24px rgba(0,0,0,.22)}
+.lg::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:radial-gradient(120% 70% at 18% -10%,rgba(255,255,255,.42),transparent 46%),
+             radial-gradient(90% 60% at 100% 120%,rgba(255,255,255,.18),transparent 50%)}
+
+/* =============== 1 · Morning brief =============== */
+.f1{background:linear-gradient(180deg,#eebf9b 0%,#f4d8bf 30%,#efe4da 52%,#d6e0ee 76%,#b3c8e6 100%)}
+.f1 .sun{position:absolute;left:-180px;top:-260px;width:820px;height:820px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,240,205,.95) 0,rgba(255,214,160,.55) 35%,transparent 68%)}
+.f1 .hill{position:absolute;left:-10%;right:-10%;border-radius:50%;filter:blur(40px)}
+.f1 .stage{position:absolute;left:68px;right:68px;top:540px}
+.fan{position:absolute;left:34px;right:34px;top:-148px;height:200px}
+.n{position:absolute;top:0;width:182px;height:178px;background:#fff;border-radius:30px;padding:18px 18px 0;transform-origin:50% 120%;
+  box-shadow:0 0 0 .5px rgba(0,0,0,.05),0 12px 28px -14px rgba(60,30,10,.35)}
+.n .app{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--label-2);font-weight:500}
+.n .app i{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;flex:none}
+.n b{display:block;font-size:17px;font-weight:600;letter-spacing:-.022em;margin-top:12px}
+.n p{font-size:13.5px;line-height:1.3;color:var(--label-2);margin-top:3px}
+.brief{border-radius:80px;height:312px;padding:52px 56px;display:grid;grid-template-columns:124px 1fr;column-gap:36px}
+.disc{width:124px;height:124px;border-radius:50%;display:grid;place-items:center;
+  background:linear-gradient(180deg,#fff,#f6f3f0);box-shadow:inset 0 -1px 0 rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.06),0 14px 28px -14px rgba(80,40,10,.35)}
+.brief .hd{display:flex;align-items:center;margin-top:18px}
+.brief h2{font-size:38px;font-weight:600;letter-spacing:-.026em;flex:1}
+.brief .when{font-size:24px;color:rgba(29,29,31,.5);margin-right:14px}
+.brief p{font-size:29px;line-height:1.3;letter-spacing:-.02em;color:rgba(29,29,31,.82);margin-top:16px;max-width:24ch;text-wrap:balance}
+
+/* =============== 2 · Approvals =============== */
+.f2{background:#f5f5f7}
+.ap{position:absolute;left:100px;right:100px;top:140px;height:880px;border-radius:116px;overflow:hidden;
+  background:linear-gradient(160deg,#ffd84d 0%,#ffc21a 38%,#ffcb52 62%,#f9dca0 82%,#cfe0f7 100%);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.35),inset 0 2px 0 rgba(255,255,255,.6),0 40px 80px -46px rgba(150,90,0,.55)}
+.ap .sheen{position:absolute;inset:0;filter:blur(36px);
+  background:radial-gradient(40% 30% at 82% 22%,rgba(255,255,255,.7),transparent 70%),radial-gradient(30% 50% at 105% 70%,rgba(170,205,255,.9),transparent 70%),radial-gradient(40% 30% at 10% 45%,rgba(255,180,0,.55),transparent 70%)}
+.ap-head{position:absolute;left:40px;right:40px;top:40px;display:flex;align-items:center;gap:24px}
+.circ{width:100px;height:100px;border-radius:50%;background:#fff;display:grid;place-items:center;box-shadow:0 8px 20px -10px rgba(120,70,0,.45)}
+.ap-head h2{flex:1;font-size:54px;font-weight:500;letter-spacing:-.032em;color:#fff;text-shadow:0 1px 12px rgba(160,90,0,.25)}
+.sheets{position:absolute;left:40px;right:40px;bottom:40px;height:570px}
+.sh{position:absolute;inset:0;border-radius:76px;background:#fff}
+.sh.b2{transform:translateY(-54px) scaleX(.84);opacity:.45}
+.sh.b1{transform:translateY(-28px) scaleX(.92);opacity:.7}
+.sh.fr{padding:46px 44px;box-shadow:0 -8px 24px -18px rgba(120,70,0,.35)}
+.sh h3{font-size:40px;font-weight:500;letter-spacing:-.028em}
+.sh .sub{font-size:21px;color:var(--label-2);margin-top:6px}
+.tag{position:absolute;left:44px;bottom:44px;font-size:19px;color:var(--label-2);padding:9px 20px;border-radius:99px;box-shadow:inset 0 0 0 1.5px var(--sep)}
+.it{position:absolute;width:236px;height:296px;border-radius:32px;background:#fff;padding:20px;overflow:hidden;
+  box-shadow:0 0 0 .5px rgba(0,0,0,.06),0 2px 4px rgba(0,0,0,.04),0 22px 40px -20px rgba(80,50,0,.4)}
+.it .k{font-size:12px;color:var(--label-2)}
+.it .t{font-size:15.5px;font-weight:600;letter-spacing:-.02em;margin-top:2px}
+.it .body{font-size:12px;line-height:1.42;color:rgba(29,29,31,.78);margin-top:10px}
+.it .cap{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;color:#fff;background:var(--blue);padding:7px 14px;border-radius:99px}
+.it .rule{height:1px;background:var(--sep);margin:12px -20px}
+.ev{margin-top:12px;border-radius:10px;background:rgba(10,132,255,.12);border-left:4px solid var(--blue);padding:8px 10px}
+.ev b{display:block;font-size:13.5px;color:#0a5fc2;font-weight:600}
+.ev span{font-size:12px;color:#3a78c8}
+.pdf{font-size:8.4px;line-height:1.55;color:rgba(29,29,31,.7)}
+.pdf h4{font-size:11px;font-weight:700;color:var(--label);margin-bottom:6px;letter-spacing:-.01em}
+.pdf mark{background:rgba(255,204,0,.45);color:var(--label);border-radius:2px;padding:0 1px}
+.f2 .logo{position:absolute;left:50%;bottom:66px;transform:translateX(-50%);color:var(--label)}
+
+/* =============== 3 · Widget set =============== */
+.f3{background:#e6ebf1}
+.grid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:grid;grid-template-columns:repeat(2,356px);gap:30px}
+.w{width:356px;height:356px;border-radius:66px;position:relative;overflow:hidden;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.25),0 1px 2px rgba(0,0,0,.05),0 22px 44px -26px rgba(20,40,80,.4)}
+/* folder */
+.w1{background:linear-gradient(180deg,#6aa9e3,#4a8ed6)}
+.w1 .bk{position:absolute;left:16px;right:16px;top:38px;bottom:16px;border-radius:50px;background:linear-gradient(180deg,#2f72bf,#3a80cf)}
+.w1 .bk::before{content:"";position:absolute;left:0;top:-14px;width:118px;height:44px;border-radius:22px 28px 0 0;background:#2f72bf}
+.pk{position:absolute;width:150px;height:170px;border-radius:24px;background:#fff;padding:15px;box-shadow:0 10px 22px -10px rgba(0,30,80,.55)}
+.pk b{display:block;font-size:13.5px;font-weight:600;letter-spacing:-.015em}
+.pk small{font-size:11px;color:var(--label-2)}
+.pk .ch{display:flex;align-items:flex-end;gap:7px;height:56px;margin-top:12px}
+.pk .ch span{flex:1;border-radius:4px;background:var(--blue)}
+.pk .ch span.o{background:#cfe3fb}
+.pk .dl{display:flex;justify-content:space-between;font-size:9px;color:var(--label-3);margin-top:5px;padding:0 3px}
+.pk p{font-size:10.5px;line-height:1.38;color:rgba(29,29,31,.75);margin-top:9px}
+.w1 .flap{position:absolute;left:16px;right:16px;bottom:16px;height:170px;border-radius:50px}
+.w1 .flap.lg{background:linear-gradient(180deg,rgba(255,255,255,.3),rgba(255,255,255,.12));-webkit-backdrop-filter:blur(18px) saturate(105%);backdrop-filter:blur(18px) saturate(105%)}
+.cap2{position:absolute;left:50%;bottom:36px;transform:translateX(-50%);display:flex;align-items:center;gap:9px;white-space:nowrap;z-index:2;
+  font-size:19px;font-weight:500;color:#fff;padding:12px 20px 12px 16px;border-radius:99px;background:rgba(255,255,255,.18);box-shadow:inset 0 0 0 1px rgba(255,255,255,.3),inset 1px 1px 0 rgba(255,255,255,.5)}
+/* reply */
+.w2{background:linear-gradient(180deg,#c9dcf5,#8eb1e0)}
+.w2 .top{position:absolute;left:14px;right:14px;top:14px;height:186px;border-radius:52px;background:#fff;padding:24px 26px}
+.w2 .who{display:flex;align-items:center;gap:12px}
+.av{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:15px;font-weight:600;letter-spacing:0;
+  background:linear-gradient(180deg,#a5abb8,#858b98)}
+.w2 .who b{display:block;font-size:16.5px;font-weight:600;letter-spacing:-.02em}
+.w2 .who small{font-size:13px;color:var(--label-2)}
+.w2 .msg{font-size:16.5px;line-height:1.34;color:rgba(29,29,31,.85);margin-top:14px;letter-spacing:-.015em}
+.w2 .bot{position:absolute;left:14px;right:14px;bottom:14px;height:128px;border-radius:52px;display:flex;align-items:center;justify-content:space-between;padding:0 18px 0 28px}
+.w2 .bot b{display:block;font-size:23px;font-weight:600;color:#fff;letter-spacing:-.025em}
+.w2 .bot small{font-size:16px;color:rgba(255,255,255,.82)}
+.w2 .go{width:74px;height:74px;border-radius:50%;background:#fff;display:grid;place-items:center;color:var(--blue);box-shadow:0 6px 16px -8px rgba(0,40,100,.45)}
+/* ring over a scene */
+.w3{background:linear-gradient(180deg,#f3b58e 0%,#f6c9a6 30%,#e9cdbb 46%,#7fa7c9 47%,#5d8db8 70%,#3f6f9e 100%)}
+.w3 .scene{position:absolute;inset:0;filter:blur(3px)}
+.w3 .lbl{position:absolute;top:22px;left:0;right:0;display:flex;justify-content:center;align-items:center;gap:6px;font-size:15px;font-weight:600;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.18)}
+.w3 svg.ring{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+.w3 .core{position:absolute;left:50%;top:50%;width:148px;height:148px;transform:translate(-50%,-50%);border-radius:50%;display:grid;place-content:center;text-align:center;color:#fff}
+.w3 .core.lg{background:rgba(255,255,255,.12)}
+.w3 .core small{font-size:13px;font-weight:500;opacity:.92}
+.w3 .core b{font-size:52px;font-weight:600;letter-spacing:-.045em;line-height:1.02}
+.w3 .time{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);font-size:14px;font-weight:600;color:#fff;padding:5px 12px;border-radius:99px}
+.w3 .time.lg{background:rgba(255,255,255,.14)}
+/* now playing */
+.w4{background:#fff}
+.w4 .art{position:absolute;left:14px;right:14px;top:14px;height:156px;border-radius:52px;overflow:hidden;
+  background:linear-gradient(135deg,#ffb36b 0%,#ff7a59 45%,#e2577a 100%)}
+.w4 .art::before{content:"";position:absolute;inset:0;background:radial-gradient(60% 90% at 85% 10%,rgba(255,230,170,.8),transparent 60%),radial-gradient(70% 90% at 0% 100%,rgba(140,60,140,.55),transparent 60%)}
+.wave{position:absolute;left:34px;right:34px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:5px;height:72px}
+.wave span{flex:1;border-radius:99px;background:#fff}
+.wave span.d{opacity:.42}
+.w4 .meta{position:absolute;left:28px;right:28px;top:186px;text-align:center}
+.w4 .meta b{display:block;font-size:21px;font-weight:600;letter-spacing:-.025em}
+.w4 .meta small{font-size:15px;color:var(--label-2)}
+.prog{position:absolute;left:36px;right:36px;top:254px;height:5px;border-radius:5px;background:var(--fill)}
+.prog i{position:absolute;inset:0 54% 0 0;border-radius:5px;background:var(--label)}
+.ctr{position:absolute;bottom:22px;left:0;right:0;display:flex;justify-content:center;align-items:center;gap:30px;color:var(--label)}
+.ctr .pp{width:58px;height:58px;border-radius:50%;background:var(--fill);display:grid;place-items:center}
+
+/* =============== 4 · Today =============== */
+.f4{background:linear-gradient(180deg,#5f9be3 0%,#86b6ee 35%,#b4d2f6 70%,#d9e8fb 100%)}
+.cl{position:absolute;filter:blur(14px)}
+.cl span{position:absolute;border-radius:50%;background:#fff}
+.today{position:absolute;left:156px;right:156px;top:178px;border-radius:84px;padding:12px 12px 0}
+.today.lg{background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(246,247,250,.78))}
+.today .card{position:relative;z-index:1;background:#fff;border-radius:72px;padding:22px 40px 44px;text-align:center;box-shadow:0 0 0 .5px rgba(0,0,0,.04),0 10px 26px -18px rgba(20,40,80,.35)}
+.island{width:170px;height:48px;border-radius:99px;background:var(--fill);margin:0 auto}
+.streak{display:inline-flex;align-items:center;gap:6px;margin-top:34px;font-size:19px;font-weight:600;padding:7px 15px 7px 12px;border-radius:99px;box-shadow:inset 0 0 0 1.5px var(--sep)}
+.greet{font-size:44px;line-height:1.26;letter-spacing:-.032em;font-weight:600;margin-top:22px}
+.greet .g{color:#c4c4ca}
+.greet .r1{display:flex;justify-content:center;align-items:center;gap:14px}
+.greet .av{width:56px;height:56px;font-size:21px;box-shadow:0 0 0 3px #fff,0 2px 8px rgba(0,0,0,.12)}
+.plan{display:inline-flex;align-items:center;gap:14px;padding:6px 6px 6px 18px;border-radius:20px;vertical-align:3px;
+  box-shadow:inset 0 0 0 1.5px var(--sep),0 6px 14px -10px rgba(0,0,0,.3)}
+.calico{width:54px;height:54px;border-radius:13px;background:#fff;box-shadow:0 0 0 1px var(--sep);overflow:hidden;text-align:center;line-height:1}
+.calico i{display:block;font-style:normal;font-size:10px;font-weight:600;color:var(--red);padding-top:7px;letter-spacing:0}
+.calico b{display:block;font-size:26px;font-weight:400;letter-spacing:-.03em;margin-top:2px}
+.hr{height:1px;background:var(--sep);margin:38px 0 32px}
+.big{font-size:108px;font-weight:600;letter-spacing:-.05em;line-height:.95}
+.big+small{display:block;font-size:21px;color:var(--label-2);margin-top:8px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);margin-top:38px}
+.stats b{display:block;font-size:30px;font-weight:600;letter-spacing:-.03em}
+.stats small{font-size:18px;color:var(--label-2)}
+.today .foot{position:relative;z-index:1;padding:38px 0 32px;text-align:center}
+.btn{display:inline-flex;align-items:center;gap:12px;font-size:23px;font-weight:600;letter-spacing:-.02em;color:#fff;padding:21px 38px 21px 32px;border-radius:99px;background:var(--label);
+  box-shadow:0 1px 2px rgba(0,0,0,.2),0 12px 24px -12px rgba(0,0,0,.45)}
+.fine{display:flex;justify-content:center;align-items:center;gap:6px;font-size:15.5px;color:var(--label-3);margin-top:20px}
+
+/* ---------- shared for 5–9 ---------- */
+.wall{position:absolute;inset:0;width:100%;height:100%}
+.lgd{position:relative;
+  background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,.06));
+  -webkit-backdrop-filter:blur(24px) saturate(180%);backdrop-filter:blur(24px) saturate(180%);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),inset 1.5px 1.5px 0 -.5px rgba(255,255,255,.6),inset -1px -1px 0 -.5px rgba(255,255,255,.25),
+    inset 0 0 30px rgba(255,255,255,.06),0 24px 48px -24px rgba(0,0,0,.5)}
+.lgd::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:radial-gradient(120% 70% at 18% -10%,rgba(255,255,255,.16),transparent 46%)}
+.lg>*,.lgd>*{position:relative;z-index:1}
+.inset{background:rgba(255,255,255,.46);box-shadow:inset 0 0 0 1px rgba(255,255,255,.5),inset 1px 1px 0 rgba(255,255,255,.9)}
+.mk{width:46px;height:46px;border-radius:50%;background:var(--label);color:#fff;display:grid;place-items:center;flex:none}
+.black{display:flex;align-items:center;justify-content:center;gap:12px;height:76px;border-radius:99px;background:var(--label);color:#fff;font-size:23px;font-weight:600;letter-spacing:-.02em;
+  box-shadow:0 1px 2px rgba(0,0,0,.2),0 14px 26px -14px rgba(0,0,0,.5)}
+
+/* 5 · Find a time */
+.f5 .card{position:absolute;left:104px;right:104px;top:236px;border-radius:66px;padding:36px}
+.bub{margin-left:auto;width:fit-content;max-width:80%;font-size:21px;line-height:1.3;padding:15px 22px;border-radius:28px 28px 8px 28px}
+.f5 .ans{display:flex;align-items:center;gap:16px;margin-top:30px}
+.f5 .ans h3{font-size:29px;font-weight:600;letter-spacing:-.026em;line-height:1.2}
+.slots{display:grid;gap:12px;margin-top:26px}
+.slot{display:flex;align-items:center;gap:18px;padding:16px 20px 16px 16px;border-radius:30px}
+.slot.on{background:rgba(255,255,255,.88);box-shadow:0 0 0 2px var(--blue),0 10px 24px -14px rgba(0,60,140,.45)}
+.dt{width:66px;height:66px;border-radius:17px;background:#fff;text-align:center;line-height:1;box-shadow:0 0 0 1px var(--sep);flex:none}
+.dt i{display:block;font-style:normal;font-size:12px;font-weight:600;color:var(--red);padding-top:10px}
+.dt b{display:block;font-size:28px;font-weight:400;letter-spacing:-.03em;margin-top:3px}
+.slot .tx{flex:1}
+.slot .tx b{display:block;font-size:22px;font-weight:600;letter-spacing:-.02em}
+.slot .tx small{font-size:16px;color:var(--label-2)}
+.radio{width:34px;height:34px;border-radius:50%;box-shadow:inset 0 0 0 2px rgba(60,60,67,.22)}
+.radio.on{background:var(--blue);box-shadow:none;display:grid;place-items:center;color:#fff}
+.f5 .black{margin-top:28px}
+.f5 .note{text-align:center;font-size:16px;color:var(--label-2);margin-top:16px}
+
+/* 6 · Voice note */
+.f6{color:#fff}
+.f6 .isl{position:absolute;left:50%;top:84px;transform:translateX(-50%);display:flex;align-items:center;gap:14px;padding:16px 28px 16px 22px;border-radius:99px;font-size:22px;font-weight:600}
+.f6 .dot{width:14px;height:14px;border-radius:50%;background:#ff453a;box-shadow:0 0 0 5px rgba(255,69,58,.25)}
+.f6 .isl span:last-child{color:rgba(255,255,255,.6);font-weight:500}
+.f6 .orbw{position:absolute;left:50%;top:420px;transform:translate(-50%,-50%)}
+.f6 .halo{position:absolute;left:50%;top:50%;border-radius:50%;transform:translate(-50%,-50%);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.14)}
+.f6 .orb{width:250px;height:250px;border-radius:50%;display:grid;place-items:center}
+.f6 .tr{position:absolute;left:84px;right:84px;top:660px;border-radius:56px;padding:38px 40px 42px}
+.f6 .tr small{display:flex;align-items:center;gap:8px;font-size:17px;color:rgba(255,255,255,.62);font-weight:500}
+.f6 .tr p{font-size:32px;line-height:1.32;letter-spacing:-.022em;margin-top:16px;font-weight:500}
+.f6 .tr p span{color:rgba(255,255,255,.42)}
+.f6 .bar{position:absolute;left:0;right:0;bottom:92px;display:flex;justify-content:center;align-items:center;gap:56px}
+.f6 .c{border-radius:50%;display:grid;place-items:center}
+
+/* 7 · Memory */
+.f7 .card{position:absolute;left:100px;right:100px;top:290px;border-radius:66px;padding:38px 36px 36px}
+.f7 .hd{display:flex;align-items:center;gap:18px}
+.f7 .hd .mk{width:72px;height:72px}
+.f7 .hd b{display:block;font-size:32px;font-weight:600;letter-spacing:-.028em}
+.f7 .hd small{font-size:18px;color:var(--label-2)}
+.grp{margin-top:30px;border-radius:30px;overflow:hidden}
+.row{display:flex;align-items:center;gap:18px;padding:18px 22px 18px 18px;position:relative}
+.row+.row::before{content:"";position:absolute;left:88px;right:0;top:0;height:1px;background:rgba(60,60,67,.14)}
+.sq{width:52px;height:52px;border-radius:14px;display:grid;place-items:center;color:#fff;flex:none}
+.row .tx{flex:1}
+.row .tx b{display:block;font-size:21px;font-weight:500;letter-spacing:-.018em}
+.row .tx small{font-size:15.5px;color:var(--label-2)}
+.inp{display:flex;align-items:center;gap:14px;margin-top:18px;border-radius:99px;padding:10px 10px 10px 28px;font-size:20px;color:var(--label-2)}
+.inp span{flex:1}
+.inp .pl{width:56px;height:56px;border-radius:50%;background:var(--label);color:#fff;display:grid;place-items:center}
+
+/* 8 · Document */
+.f8 .page{position:absolute;left:176px;top:96px;width:548px;height:420px;background:#fff;border-radius:22px;padding:56px 54px;transform:rotate(-3deg);
+  box-shadow:0 1px 2px rgba(0,0,0,.08),0 40px 70px -30px rgba(0,40,60,.45);font-size:14.5px;line-height:1.6;color:rgba(29,29,31,.75)}
+.f8 .page h4{font-size:26px;font-weight:600;color:var(--label);letter-spacing:-.025em;margin-bottom:6px}
+.f8 .page .m{font-size:13px;color:var(--label-3);margin-bottom:24px}
+.f8 .page p+p{margin-top:14px}
+.f8 .page mark{background:rgba(255,204,0,.42);color:var(--label);border-radius:3px;padding:0 2px}
+.f8 .card{position:absolute;left:90px;right:90px;top:476px;border-radius:64px;padding:32px}
+.att{display:flex;align-items:center;gap:14px;padding:12px 22px 12px 12px;border-radius:24px;width:fit-content}
+.att .pf{width:48px;height:56px;border-radius:9px;background:#fff;box-shadow:0 0 0 1px var(--sep);display:grid;place-items:end center;padding-bottom:6px;font-size:10px;font-weight:700;color:var(--red)}
+.att b{display:block;font-size:18px;font-weight:600;letter-spacing:-.015em}
+.att small{font-size:15px;color:var(--label-2)}
+.f8 .bub{margin-top:18px}
+.kd{margin-top:18px;border-radius:32px;overflow:hidden}
+.kd .r{display:flex;align-items:baseline;gap:20px;padding:18px 26px;position:relative}
+.kd .r+.r::before{content:"";position:absolute;left:26px;right:0;top:0;height:1px;background:rgba(60,60,67,.14)}
+.kd .r b{width:100px;font-size:21px;font-weight:600;letter-spacing:-.02em}
+.kd .r span{font-size:21px;color:rgba(29,29,31,.8);flex:1}
+.f8 .black{margin-top:22px}
+
+/* 9 · Lock screen */
+.f9{color:#fff}
+.f9 .date{position:absolute;top:96px;left:0;right:0;text-align:center;font-size:30px;font-weight:600;letter-spacing:-.015em;opacity:.92}
+.f9 .clock{position:absolute;top:118px;left:0;right:0;text-align:center;font-size:250px;font-weight:600;letter-spacing:-.045em;line-height:1;
+  color:rgba(255,255,255,.78);text-shadow:0 2px 0 rgba(255,255,255,.35),0 10px 40px rgba(120,60,90,.25)}
+.stack{position:absolute;left:44px;right:44px;top:600px}
+.nt{border-radius:46px;padding:22px 26px 24px 22px;display:flex;gap:18px;color:var(--label)}
+.nt+.nt{margin-top:12px}
+.nt .ic{width:62px;height:62px;border-radius:16px;background:var(--label);color:#fff;display:grid;place-items:center;flex:none}
+.nt .bd{flex:1}
+.nt .top{display:flex;justify-content:space-between;font-size:16px;color:var(--label-2)}
+.nt .top b{color:var(--label);font-weight:600}
+.nt .t{font-size:21px;font-weight:600;letter-spacing:-.018em;margin-top:4px}
+.nt p{font-size:19px;line-height:1.32;color:rgba(29,29,31,.82);margin-top:2px}
+.ghost{height:22px;margin:-34px auto 0;border-radius:0 0 34px 34px;position:relative;z-index:-1}
+.f9 .qa{position:absolute;bottom:84px;left:96px;right:96px;display:flex;justify-content:space-between}
+.f9 .qa div{width:100px;height:100px;border-radius:50%;display:grid;place-items:center}
+.f9 .home{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);width:270px;height:9px;border-radius:9px;background:rgba(255,255,255,.85)}
+.stack{z-index:1}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="mark" viewBox="0 0 24 24"><g fill="currentColor">
+    <circle cx="12" cy="3" r="2"/><circle cx="12" cy="21" r="2"/><circle cx="3" cy="12" r="2"/><circle cx="21" cy="12" r="2"/>
+    <circle cx="5.6" cy="5.6" r="1.7"/><circle cx="18.4" cy="5.6" r="1.7"/><circle cx="5.6" cy="18.4" r="1.7"/><circle cx="18.4" cy="18.4" r="1.7"/>
+    <circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="7.5" r="1.5"/><circle cx="12" cy="16.5" r="1.5"/><circle cx="7.5" cy="12" r="1.5"/><circle cx="16.5" cy="12" r="1.5"/>
+  </g></symbol>
+  <symbol id="env" viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="3" fill="#fff"/><path d="m4.5 7.5 7.5 5.5 7.5-5.5" fill="none" stroke="#1a82f5" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="chev" viewBox="0 0 12 20"><path d="m2.5 2.5 7.5 7.5-7.5 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="heart" viewBox="0 0 24 24"><path d="M12 20.5s-8-4.7-8-10.6A4.4 4.4 0 0 1 12 7.3a4.4 4.4 0 0 1 8 2.6c0 5.9-8 10.6-8 10.6z" fill="currentColor"/></symbol>
+  <symbol id="hp" viewBox="0 0 24 24"><path d="M12 20.5s-8-4.7-8-10.6A4.4 4.4 0 0 1 12 7.3a4.4 4.4 0 0 1 8 2.6c0 5.9-8 10.6-8 10.6z" fill="#fff"/><path d="M5 12.2h3.6l1.6-2.6 2.4 4.6 1.5-2h4.9" fill="none" stroke="#1463ff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="moon" viewBox="0 0 24 24"><path d="M20 14.6A8.2 8.2 0 0 1 9.4 4a8.2 8.2 0 1 0 10.6 10.6z" fill="currentColor"/></symbol>
+  <symbol id="bell" viewBox="0 0 24 24"><path d="M12 2.5a6 6 0 0 0-6 6v4.2L4.3 16a1 1 0 0 0 .9 1.5h13.6a1 1 0 0 0 .9-1.5L18 12.7V8.5a6 6 0 0 0-6-6zM9.5 19a2.5 2.5 0 0 0 5 0z" fill="currentColor"/></symbol>
+</svg>
+<style>
+.appi{background:linear-gradient(180deg,#3a86ff,#1257ee)}
+.sw{width:64px;height:38px;border-radius:19px;background:#34c759;position:relative;flex:none}
+.sw::after{content:"";position:absolute;right:3px;top:3px;width:32px;height:32px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.sw.off{background:rgba(120,120,128,.28)}.sw.off::after{right:auto;left:3px}
+.f5 .slot .sq{width:66px;height:66px;border-radius:18px}
+.pill-ok{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:#1f8a3a;background:rgba(52,199,89,.16);padding:4px 10px;border-radius:99px;margin-top:10px}
+</style>
+
+<!-- H1 · Daily insight -->
+<section class="frame f1" id="h1" aria-label="Daily insight">
+  <div class="sun"></div>
+  <div class="hill" style="top:840px;height:520px;background:#c7d6ec;opacity:.8"></div>
+  <div class="hill" style="top:960px;height:520px;left:20%;right:-30%;background:#a9c1e4;opacity:.8"></div>
+  <div class="stage">
+    <div class="fan" aria-hidden="true">
+      <div class="n" style="left:0;transform:rotate(-8deg) translateY(26px)">
+        <div class="app"><i class="appi"><svg width="16" height="16"><use href="#hp"/></svg></i>Morning</div>
+        <b class="tn">118/76</b><p>mmHg at 08:02, in your normal range</p></div>
+      <div class="n" style="left:140px;transform:rotate(-3.5deg) translateY(6px)">
+        <div class="app"><i style="background:#ff3b30;color:#fff"><svg width="14" height="14"><use href="#heart"/></svg></i>Pulse</div>
+        <b class="tn">72 bpm</b><p>Resting, same as last week</p></div>
+      <div class="n" style="left:282px;transform:rotate(.8deg)">
+        <div class="app"><i style="background:#5e5ce6;color:#fff"><svg width="14" height="14"><use href="#moon"/></svg></i>Sleep</div>
+        <b class="tn">7h 42m</b><p>18 minutes more than your average</p></div>
+      <div class="n" style="left:424px;transform:rotate(4.5deg) translateY(8px)">
+        <div class="app"><i class="appi"><svg width="16" height="16"><use href="#hp"/></svg></i>Evening</div>
+        <b class="tn">121/78</b><p>Yesterday at 20:10</p></div>
+      <div class="n" style="left:560px;transform:rotate(8deg) translateY(20px)">
+        <div class="app"><i style="background:#ff9500;color:#fff"><svg width="14" height="14"><use href="#bell"/></svg></i>Reminder</div>
+        <b class="tn">22:00</b><p>Wind down, every night</p></div>
+    </div>
+    <div class="brief lg">
+      <div class="disc"><svg width="60" height="60" style="color:#ff3b30"><use href="#heart"/></svg></div>
+      <div>
+        <div class="hd"><h2>Daily insight</h2><span class="when tn">8:05 AM</span><svg width="14" height="24" style="color:rgba(29,29,31,.35)"><use href="#chev"/></svg></div>
+        <p>Your blood pressure held steady all week. Keep the 08:00 check going.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- H2 · Blood pressure card -->
+<section class="frame f2" id="h2" aria-label="Blood pressure this week">
+  <div class="ap" style="background:linear-gradient(160deg,#ff8f9c 0%,#ff5e72 36%,#ff7a8a 60%,#ffc4c2 82%,#cfe0f7 100%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.35),inset 0 2px 0 rgba(255,255,255,.6),0 40px 80px -46px rgba(180,30,60,.55)">
+    <div class="sheen" style="background:radial-gradient(40% 30% at 82% 22%,rgba(255,255,255,.6),transparent 70%),radial-gradient(30% 50% at 105% 70%,rgba(170,205,255,.9),transparent 70%),radial-gradient(40% 30% at 10% 45%,rgba(255,60,90,.5),transparent 70%)"></div>
+    <div class="ap-head">
+      <div class="circ"><svg width="48" height="48" style="color:#ff3b30"><use href="#heart"/></svg></div>
+      <h2 style="text-shadow:0 1px 12px rgba(160,20,50,.25)">Blood pressure</h2>
+      <div class="circ"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#1d1d1f" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8.5 7H17v8.5"/></svg></div>
+    </div>
+    <div class="sheets">
+      <div class="sh b2"></div><div class="sh b1"></div>
+      <div class="sh fr">
+        <h3>This week</h3>
+        <p class="sub tn">Average 118/76 mmHg</p>
+
+        <div class="it" style="left:84px;top:178px;transform:rotate(-8deg)">
+          <div class="k">Pulse</div><div class="t tn" style="font-size:30px;margin-top:4px">72 <span style="font-size:15px;font-weight:500;color:var(--label-2)">bpm</span></div>
+          <svg width="196" height="90" viewBox="0 0 196 90" style="margin-top:18px"><path d="M0 50h40l10-26 14 52 12-40 8 14h40l10-20 12 36 10-30h40" fill="none" stroke="#ff3b30" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div class="body">Resting, same as last week</div>
+        </div>
+
+        <div class="it" style="left:384px;top:126px;transform:rotate(7deg)">
+          <div class="k">Sleep</div><div class="t tn" style="font-size:30px;margin-top:4px">7h 42m</div>
+          <div style="display:flex;align-items:flex-end;gap:8px;height:110px;margin-top:20px">
+            <span style="flex:1;height:62%;border-radius:6px;background:#c9c8f7"></span><span style="flex:1;height:78%;border-radius:6px;background:#c9c8f7"></span><span style="flex:1;height:70%;border-radius:6px;background:#c9c8f7"></span><span style="flex:1;height:88%;border-radius:6px;background:#c9c8f7"></span><span style="flex:1;height:74%;border-radius:6px;background:#c9c8f7"></span><span style="flex:1;height:82%;border-radius:6px;background:#c9c8f7"></span><span style="flex:1;height:96%;border-radius:6px;background:#5e5ce6"></span></div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--label-3);margin-top:6px;padding:0 6px"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+        </div>
+
+        <div class="it" style="left:222px;top:250px;height:282px;transform:rotate(-1.5deg)">
+          <div class="k">Mon 26 Oct, 08:02</div>
+          <div class="tn" style="font-size:56px;font-weight:700;letter-spacing:-.045em;margin-top:8px;line-height:1">118/76</div>
+          <div class="k" style="margin-top:4px">mmHg</div>
+          <span class="pill-ok"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Normal range</span>
+          <div class="rule"></div>
+          <div class="body" style="margin-top:0">Systolic 118, diastolic 76, pulse 72.</div>
+        </div>
+        <div class="tag tn">7 readings</div>
+      </div>
+    </div>
+  </div>
+  <svg class="logo" width="48" height="48" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#1463ff"/><g transform="translate(4 4) scale(.667)"><use href="#hp"/></g></svg>
+</section>
+
+<!-- H3 · Widget set -->
+<section class="frame f3" id="h3" aria-label="Health widget set">
+  <div class="grid">
+    <div class="w w1">
+      <div class="bk"></div>
+      <div class="pk" style="left:46px;top:58px;transform:rotate(-7deg)"><b>Morning</b><small>Today at 08:02</small>
+        <div class="tn" style="font-size:27px;font-weight:700;letter-spacing:-.035em;margin-top:18px">118/76</div><small>mmHg</small></div>
+      <div class="pk" style="left:160px;top:46px;transform:rotate(6deg)"><b>Evening</b><small>Yesterday 20:10</small>
+        <div class="tn" style="font-size:27px;font-weight:700;letter-spacing:-.035em;margin-top:18px">121/78</div><small>mmHg</small></div>
+      <div class="flap lg"></div>
+      <div class="cap2"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 8h8M8 12h8M8 16h5" stroke-linecap="round"/></svg>Your readings</div>
+    </div>
+
+    <div class="w w2" style="background:linear-gradient(180deg,#ffd0d4,#ff8e9a)">
+      <div class="top">
+        <div class="who"><div class="av" style="background:#fff;box-shadow:0 0 0 1px var(--sep);color:#ff3b30"><svg width="24" height="24"><use href="#heart"/></svg></div><div><b>Blood pressure</b><small>Today at 08:02</small></div></div>
+        <div class="tn" style="font-size:52px;font-weight:700;letter-spacing:-.045em;margin-top:12px;line-height:1">118/76 <span style="font-size:17px;font-weight:500;letter-spacing:0;color:var(--label-2)">mmHg</span></div>
+      </div>
+      <div class="bot lg">
+        <div><b>Log reading</b><small>Next at 20:00</small></div>
+        <div class="go" style="color:#ff3b30"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+      </div>
+    </div>
+
+    <div class="w w3" style="background:linear-gradient(180deg,#1b2350 0%,#2c3a78 40%,#4a4f8f 46%,#2a3c6e 47%,#1d2c57 75%,#121c3d 100%)">
+      <svg class="scene" viewBox="0 0 356 356" preserveAspectRatio="none" aria-hidden="true">
+        <circle cx="250" cy="100" r="22" fill="#f3eedb" opacity=".95"/>
+        <g fill="#fff" opacity=".8"><circle cx="60" cy="50" r="1.6"/><circle cx="120" cy="90" r="1.2"/><circle cx="300" cy="40" r="1.4"/><circle cx="190" cy="30" r="1.1"/><circle cx="40" cy="120" r="1.2"/></g>
+        <path d="M200 175 h100 M215 195 h70 M232 216 h40" stroke="#f3eedb" stroke-width="3" opacity=".4" stroke-linecap="round"/>
+      </svg>
+      <div class="lbl"><svg width="15" height="15"><use href="#moon"/></svg>Sleep</div>
+      <svg class="ring" width="292" height="292" viewBox="0 0 292 292">
+        <defs><linearGradient id="rgs" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b9b7ff"/><stop offset="1" stop-color="#ffffff"/></linearGradient></defs>
+        <circle cx="146" cy="146" r="116" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="30"/>
+        <circle cx="146" cy="146" r="116" fill="none" stroke="url(#rgs)" stroke-width="30" stroke-linecap="round" stroke-dasharray="699 728.8" transform="rotate(-90 146 146)"/>
+      </svg>
+      <div class="core lg"><small>Last night</small><b class="tn" style="font-size:38px;white-space:nowrap">7h 42m</b><small class="tn">of 8h goal</small></div>
+      <div class="time lg tn">Woke 6:48</div>
+    </div>
+
+    <div class="w w4">
+      <div class="art" style="background:linear-gradient(135deg,#2b3a8f 0%,#5e5ce6 50%,#9a86e8 100%)"><div class="wave" aria-hidden="true">
+        <span style="height:20%"></span><span style="height:34%"></span><span style="height:52%"></span><span style="height:40%"></span><span style="height:62%"></span><span style="height:46%"></span><span style="height:30%"></span><span style="height:44%"></span><span style="height:58%"></span><span style="height:36%"></span><span class="d" style="height:48%"></span><span class="d" style="height:28%"></span><span class="d" style="height:40%"></span><span class="d" style="height:54%"></span><span class="d" style="height:32%"></span><span class="d" style="height:22%"></span><span class="d" style="height:36%"></span><span class="d" style="height:24%"></span>
+      </div></div>
+      <div class="meta"><b>Wind down</b><small class="tn">Slow breathing, 10 min</small></div>
+      <div class="prog"><i style="right:62%"></i></div>
+      <div class="ctr">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M11 6.8v10.4c0 .8-.9 1.3-1.5.8L3 13a1.2 1.2 0 0 1 0-2l6.5-5c.6-.5 1.5 0 1.5.8zm10 0v10.4c0 .8-.9 1.3-1.5.8L13 13a1.2 1.2 0 0 1 0-2l6.5-5c.6-.5 1.5 0 1.5.8z"/></svg>
+        <div class="pp"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="5.5" y="4.5" width="4.4" height="15" rx="1.3"/><rect x="14.1" y="4.5" width="4.4" height="15" rx="1.3"/></svg></div>
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M3 6.8v10.4c0 .8.9 1.3 1.5.8L11 13a1.2 1.2 0 0 0 0-2L4.5 6c-.6-.5-1.5 0-1.5.8zm10 0v10.4c0 .8.9 1.3 1.5.8L21 13a1.2 1.2 0 0 0 0-2l-6.5-5c-.6-.5-1.5 0-1.5.8z"/></svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- H4 · Today card -->
+<section class="frame f4" id="h4" aria-label="Today summary">
+  <div class="cl" style="left:-60px;top:70px;width:520px;height:220px"><span style="left:0;top:90px;width:260px;height:120px"></span><span style="left:120px;top:20px;width:220px;height:180px"></span><span style="left:260px;top:70px;width:240px;height:140px"></span></div>
+  <div class="cl" style="left:600px;top:150px;width:420px;height:200px;opacity:.85"><span style="left:0;top:80px;width:200px;height:100px"></span><span style="left:90px;top:20px;width:180px;height:150px"></span><span style="left:210px;top:60px;width:220px;height:120px"></span></div>
+  <div class="cl" style="left:-120px;top:620px;width:400px;height:200px;opacity:.75"><span style="left:0;top:70px;width:240px;height:110px"></span><span style="left:110px;top:10px;width:180px;height:150px"></span></div>
+  <div class="cl" style="left:700px;top:560px;width:360px;height:180px;opacity:.7"><span style="left:0;top:60px;width:200px;height:100px"></span><span style="left:100px;top:0;width:180px;height:150px"></span></div>
+  <div class="cl" style="left:40px;top:1000px;width:900px;height:300px"><span style="left:0;top:110px;width:360px;height:180px"></span><span style="left:200px;top:30px;width:300px;height:240px"></span><span style="left:430px;top:80px;width:380px;height:200px"></span></div>
+  <div class="today lg">
+    <div class="card">
+      <div class="island"></div>
+      <div class="streak"><svg width="20" height="20" viewBox="0 0 24 24"><path d="M12.5 2.5c.4 3.2 2.6 4.8 4.2 6.7 1.4 1.7 2.3 3.6 2.3 5.8 0 3.9-3.1 6.9-7 6.9s-7-3-7-6.9c0-2.6 1.3-4.6 3-6.1.3 1.5 1.1 2.6 2.3 3.1-.3-3.6.7-6.9 2.2-9.5z" fill="#ff9500"/><path d="M12 21c-1.9 0-3.3-1.4-3.3-3.2 0-1.6 1.1-2.6 2.2-3.6.3 1 .9 1.6 1.7 1.8 0-1.2.4-2.3 1-3.1 1.1 1.3 1.7 2.6 1.7 4 0 2.4-1.5 4.1-3.3 4.1z" fill="#ffcc00"/></svg><span class="tn">21</span></div>
+      <div class="greet">
+        <div class="r1"><span class="av">CO</span>Hi Chinedu,</div>
+        <div class="g">Today’s rhythm is</div>
+        <div><span class="g">set to:</span> <span class="plan"><span class="tn">2 reminders</span><span class="calico" style="display:grid;place-items:center;color:#ff9500"><svg width="28" height="28"><use href="#bell"/></svg></span></span></div>
+      </div>
+      <div class="hr"></div>
+      <div class="big tn" style="font-size:100px">118/76</div><small>mmHg this morning</small>
+      <div class="stats">
+        <div><b class="tn">72 bpm</b><small>Pulse</small></div>
+        <div><b class="tn">7h 42m</b><small>Sleep</small></div>
+        <div><b class="tn">7</b><small>Readings</small></div>
+      </div>
+    </div>
+    <div class="foot">
+      <div class="btn"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Log a reading</div>
+      <div class="fine"><svg width="15" height="15"><use href="#bell"/></svg>Next reminder at 20:00</div>
+    </div>
+  </div>
+</section>
+
+<!-- H5 · Reminders -->
+<section class="frame f5" id="h5" aria-label="Reminders">
+  <svg class="wall" viewBox="0 0 900 1200" preserveAspectRatio="none" aria-hidden="true">
+    <defs><linearGradient id="hs5" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b7d6ea"/><stop offset=".55" stop-color="#e4eee6"/><stop offset="1" stop-color="#f1efe2"/></linearGradient>
+      <filter id="hb5"><feGaussianBlur stdDeviation="2"/></filter></defs>
+    <rect width="900" height="1200" fill="url(#hs5)"/>
+    <circle cx="690" cy="300" r="120" fill="#fff6dc" opacity=".8" filter="url(#hb5)"/>
+    <g filter="url(#hb5)">
+      <path d="M0 640 C160 560 330 600 470 560 S760 520 900 570 V1200 H0Z" fill="#b6d1ae"/>
+      <path d="M0 780 C220 700 420 760 610 710 S840 690 900 720 V1200 H0Z" fill="#8fbb8e"/>
+      <path d="M0 920 C260 850 520 920 900 850 V1200 H0Z" fill="#6a9e72"/>
+      <path d="M0 1060 C300 1000 600 1060 900 1010 V1200 H0Z" fill="#4f8360"/>
+    </g>
+  </svg>
+  <div class="card lg">
+    <h3 style="font-size:54px;font-weight:700;letter-spacing:-.04em;line-height:1.02;padding:8px 6px 0">Make time<br>for you.</h3>
+    <div class="slots" style="margin-top:30px">
+      <div class="slot on" style="box-shadow:0 10px 24px -14px rgba(0,60,140,.35)"><div class="sq" style="background:#ff3b30"><svg width="34" height="34" style="color:#fff"><use href="#heart"/></svg></div><div class="tx"><b>Check blood pressure</b><small class="tn">08:00 daily</small></div><div class="sw"></div></div>
+      <div class="slot inset"><div class="sq" style="background:#5e5ce6"><svg width="32" height="32" style="color:#fff"><use href="#moon"/></svg></div><div class="tx"><b>Wind down</b><small class="tn">22:00 daily</small></div><div class="sw"></div></div>
+      <div class="slot inset"><div class="sq" style="background:#0a84ff"><svg width="34" height="34" viewBox="0 0 24 24"><use href="#hp"/></svg></div><div class="tx"><b>Evening reading</b><small class="tn">20:00 weekdays</small></div><div class="sw off"></div></div>
+    </div>
+    <div class="black"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add reminder</div>
+    <p class="note">Change or pause a reminder any time</p>
+  </div>
+</section>
+
+<!-- H6 · Lock screen -->
+<section class="frame f9" id="h6" aria-label="Lock screen reminder">
+  <svg class="wall" viewBox="0 0 900 1200" preserveAspectRatio="none" aria-hidden="true">
+    <defs><linearGradient id="hs9" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8a27a"/><stop offset=".35" stop-color="#f4c79c"/><stop offset=".6" stop-color="#f1d6c2"/></linearGradient>
+      <filter id="hb9"><feGaussianBlur stdDeviation="2"/></filter><filter id="hb9b" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="50"/></filter></defs>
+    <rect width="900" height="1200" fill="url(#hs9)"/>
+    <circle cx="560" cy="560" r="150" fill="#fff2d6" opacity=".85" filter="url(#hb9b)"/>
+    <g filter="url(#hb9)">
+      <path d="M0 640 L120 560 L210 610 L330 500 L450 590 L560 520 L690 600 L800 540 L900 590 V1200 H0Z" fill="#b997a6"/>
+      <path d="M0 760 L140 660 L260 730 L400 640 L520 720 L650 650 L780 730 L900 680 V1200 H0Z" fill="#8f7699"/>
+      <path d="M0 880 L170 790 L320 860 L470 780 L620 860 L760 800 L900 850 V1200 H0Z" fill="#62557e"/>
+      <path d="M0 1010 L200 930 L380 990 L560 920 L740 990 L900 950 V1200 H0Z" fill="#3b3a5c"/>
+    </g>
+  </svg>
+  <div class="date">Monday, October 26</div>
+  <div class="clock tn">8:00</div>
+  <div class="stack">
+    <div class="nt lg"><div class="ic" style="background:linear-gradient(180deg,#3a86ff,#1257ee)"><svg width="38" height="38" viewBox="0 0 24 24"><use href="#hp"/></svg></div>
+      <div class="bd"><div class="top"><b>Reminder</b><span>now</span></div><div class="t">Time to check your blood pressure</div><p>Sit for a minute first. Last reading was 121/78.</p></div></div>
+    <div class="nt lg"><div class="ic" style="background:#5e5ce6"><svg width="32" height="32" style="color:#fff"><use href="#moon"/></svg></div>
+      <div class="bd"><div class="top"><b>Sleep</b><span>1h ago</span></div><div class="t">7h 42m last night</div><p>18 minutes more than your weekly average.</p></div></div>
+    <div class="ghost lg" style="width:92%;margin-top:-30px"></div>
+    <div class="ghost lg" style="width:84%;margin-top:-12px;height:24px"></div>
+  </div>
+  <div class="qa">
+    <div class="lgd"><svg width="40" height="40" viewBox="0 0 24 24" fill="#fff"><path d="M7 2.5h10v4l-2.5 3.5V21a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1V10L7 6.5z"/><rect x="11" y="12" width="2" height="3.5" rx="1" fill="#3b3a5c"/></svg></div>
+    <div class="lgd"><svg width="42" height="42" viewBox="0 0 24 24" fill="#fff"><path d="M9 4h6l1.6 2.5H19a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8.5a2 2 0 0 1 2-2h2.4z"/><circle cx="12" cy="13" r="3.6" fill="#3b3a5c"/></svg></div>
+  </div>
+  <div class="home"></div>
+</section>
+</body>
+</html>
