@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Health Features</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&display=swap" rel="stylesheet">
+<style>
+:root{--label:#16161a;--label-2:rgba(60,60,67,.6);--label-3:rgba(60,60,67,.32);--sep:rgba(60,60,67,.1);
+  --c1:#3a86ff;--c2:#1463ff;--c3:#0e47d1;--navy:#0a1238}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Inter",-apple-system,system-ui,sans-serif;font-optical-sizing:auto;-webkit-font-smoothing:antialiased;letter-spacing:-.012em;color:var(--label);
+  background:#d9d9de;display:flex;flex-wrap:wrap;gap:40px;justify-content:center;padding:40px 16px}
+svg{display:block}.tn{font-variant-numeric:tabular-nums}
+.frame{width:900px;height:1200px;position:relative;overflow:hidden;flex:none;isolation:isolate}
+@media (max-width:960px){.frame{zoom:calc((100vw - 32px)/900px)}}
+.ph{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.grain{position:absolute;inset:0;pointer-events:none;opacity:.18;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
+.lg{position:relative;background:linear-gradient(180deg,rgba(255,255,255,.5),rgba(255,255,255,.28));
+  -webkit-backdrop-filter:blur(24px) saturate(180%);backdrop-filter:blur(24px) saturate(180%);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.35),inset 1.5px 1.5px 0 -.5px rgba(255,255,255,.95),inset -1px -1px 0 -.5px rgba(255,255,255,.5),inset 0 0 30px rgba(255,255,255,.25),0 30px 60px -30px rgba(10,40,140,.45)}
+.appi{background:linear-gradient(180deg,#3d8bff,#1257ee);color:#fff;display:grid;place-items:center;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 8px 18px -8px rgba(18,87,238,.7)}
+
+/* ===== 7 · bento ===== */
+.f7{background:linear-gradient(180deg,#f3f4f7 0%,#eceef3 55%,#dbe6fb 100%)}
+.f7 .hd{position:absolute;top:118px;left:0;right:0;text-align:center}
+.f7 .hd h1{font-size:54px;font-weight:500;letter-spacing:-.035em}
+.f7 .hd p{font-size:19px;line-height:1.5;color:var(--label-2);margin:14px auto 0;max-width:40ch;text-wrap:balance}
+.bento{position:absolute;left:44px;right:44px;top:330px;bottom:96px;padding:10px;border-radius:46px;background:rgba(255,255,255,.55);
+  box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.9),0 30px 60px -40px rgba(20,40,120,.35);
+  display:grid;gap:10px;grid-template-columns:1fr 1fr;grid-template-rows:112px 1fr 1fr 112px;grid-template-areas:"dev dev" "rem pct" "rem slp" "log log"}
+.b{background:#fff;border-radius:36px;padding:26px 28px;position:relative;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.04),0 10px 24px -18px rgba(20,40,120,.3)}
+.b h3{font-size:23px;font-weight:500;letter-spacing:-.02em}
+.b .s{font-size:15px;color:var(--label-2);margin-top:3px}
+.dev{grid-area:dev;display:flex;align-items:center;justify-content:space-between}
+.chips{display:flex}
+.chips span{width:58px;height:58px;border-radius:50%;background:#fff;display:grid;place-items:center;color:var(--c2);box-shadow:0 0 0 3px #fff,0 0 0 4.5px rgba(20,99,255,.22);margin-left:-10px}
+.rem{grid-area:rem;display:flex;flex-direction:column;padding:0}
+.rem .top{padding:30px 28px;flex:1;position:relative}
+.rem .ico{width:60px;height:60px;border-radius:16px}
+.rem h3{margin-top:30px;font-size:25px}
+.rem p{font-size:17px;line-height:1.55;color:var(--label-2);margin-top:12px}
+.rem .tiles{position:absolute;right:0;top:0;width:220px;height:200px;
+  background-image:linear-gradient(rgba(20,99,255,.08) 1.5px,transparent 1.5px),linear-gradient(90deg,rgba(20,99,255,.08) 1.5px,transparent 1.5px);background-size:66px 66px;
+  -webkit-mask:radial-gradient(120% 100% at 100% 0,#000,transparent 70%);mask:radial-gradient(120% 100% at 100% 0,#000,transparent 70%)}
+.rem .ft{border-top:1px solid var(--sep);padding:20px 22px;display:flex;align-items:center;justify-content:space-between}
+.pill{display:inline-flex;align-items:center;gap:9px;font-size:17px;padding:11px 18px;border-radius:99px;background:#f2f3f6}
+.tog{width:62px;height:36px;border-radius:18px;background:#eef2fb;box-shadow:inset 0 0 0 1px var(--sep);position:relative}
+.tog::after{content:"";position:absolute;right:5px;top:5px;width:26px;height:26px;border-radius:50%;background:linear-gradient(180deg,#3d8bff,#1257ee);box-shadow:0 2px 6px rgba(18,87,238,.5)}
+.pct{grid-area:pct;display:flex;flex-direction:column}
+.pct .r{display:flex;justify-content:space-between;align-items:flex-start}
+.pct .r em{font-style:normal;font-size:15px;color:var(--c2)}
+.pct .big{font-size:112px;font-weight:500;letter-spacing:-.055em;line-height:1;margin-top:auto;
+  background:linear-gradient(180deg,var(--navy) 35%,var(--c2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.pct .bt{display:flex;justify-content:space-between;font-size:15px;color:var(--label-2);margin-top:14px}
+.pct .bt b{font-weight:500;color:var(--label)}
+.slp{grid-area:slp;display:flex;flex-direction:column}
+.slp .dots{position:absolute;right:0;top:0;width:100%;height:100%;
+  background-image:radial-gradient(circle,rgba(20,99,255,.45) 1.4px,transparent 1.6px);background-size:12px 12px;
+  -webkit-mask:radial-gradient(90% 80% at 100% 0,#000,transparent 70%);mask:radial-gradient(90% 80% at 100% 0,#000,transparent 70%)}
+.slp .big{font-size:72px;font-weight:500;letter-spacing:-.05em;line-height:1;position:relative}
+.slp h3{margin-top:auto;position:relative}
+.slp p{font-size:15.5px;line-height:1.5;color:var(--label-2);margin-top:6px;position:relative}
+.log{grid-area:log;display:flex;align-items:center;gap:20px}
+.log .ic{width:62px;height:62px;border-radius:50%;background:#fff;display:grid;place-items:center;color:var(--c2);box-shadow:inset 0 0 0 1.5px var(--sep)}
+.log .tx{flex:1}
+.key{display:flex;align-items:center;gap:12px;font-size:20px;color:var(--label-2)}
+.key b{font-weight:600;color:var(--label);background:#f2f3f6;padding:14px 22px;border-radius:99px}
+.key i{font-style:normal;width:56px;height:56px;border-radius:50%;background:#eef3ff;color:var(--c2);display:grid;place-items:center;font-weight:600;font-size:18px}
+
+/* ===== 8 · wind-down card ===== */
+.f8{background:#f6f7fa}
+.wd{position:absolute;left:120px;right:120px;top:250px;height:700px;border-radius:48px;overflow:hidden;
+  background:radial-gradient(70% 55% at 50% 80%,#0e47d1 0%,#1463ff 18%,#5d97ff 38%,#b4cdff 58%,#e3ebfa 76%,#eef1f7 92%)}
+.wd .grain{opacity:.35}
+.wd .glow{position:absolute;inset:0;background:radial-gradient(30% 22% at 50% 78%,rgba(255,255,255,.35),transparent 70%)}
+.wd .top{position:absolute;left:0;right:0;top:0;height:330px;background:#fff;border-radius:48px;padding:34px 38px;display:flex;flex-direction:column;
+  box-shadow:0 1px 0 rgba(0,0,0,.03),0 18px 40px -24px rgba(14,71,209,.45)}
+.wd .meta{font-size:24px;color:#a2a2aa;letter-spacing:-.01em}
+.wd h2{margin-top:auto;font-size:58px;font-weight:400;letter-spacing:-.045em;line-height:1}
+.wd .row{display:flex;align-items:center;gap:22px;margin-top:20px;font-size:24px}
+.wd .row i{width:12px;height:12px;border-radius:50%;background:var(--c2);display:inline-block;margin-left:8px;vertical-align:2px}
+.wd .row span:last-child{margin-left:auto;color:#a2a2aa}
+.wd svg.eyes{position:absolute;left:50%;top:505px;transform:translateX(-50%)}
+
+/* ===== 9 · insight pill ===== */
+.f9{background:radial-gradient(70% 60% at 10% 0%,#f4f8ff 0,transparent 70%),radial-gradient(60% 60% at 100% 100%,#0e47d1 0,transparent 70%),linear-gradient(150deg,#dfe9ff 0%,#9dbfff 40%,#3d7fff 72%,#1a5ff0 100%)}
+.f9 .st{position:absolute;left:64px;right:64px;top:560px}
+.rc{position:absolute;top:-128px;width:150px;height:170px;background:#fff;border-radius:24px;padding:16px;transform-origin:50% 120%;
+  box-shadow:0 1px 1px rgba(0,0,0,.05),0 16px 30px -14px rgba(10,40,140,.45)}
+.rc b{display:block;font-size:24px;font-weight:600;letter-spacing:-.04em}
+.rc small{display:block;font-size:12px;color:var(--label-2);margin-top:2px}
+.rc i{display:block;height:5px;border-radius:5px;background:#eef0f5;margin-top:12px}
+.rc i+i{margin-top:7px;width:64%}
+.rc .tag{display:flex;justify-content:space-between;font-size:11px;color:var(--label-3);margin-top:14px}
+.ins{border-radius:96px;height:300px;display:grid;grid-template-columns:126px 1fr 30px;column-gap:40px;align-items:start;padding:52px 56px 0 54px}
+.ins .disc{width:126px;height:126px;border-radius:50%;display:grid;place-items:center;
+  background:radial-gradient(circle at 35% 28%,#fff 0,rgba(255,255,255,.9) 45%,rgba(230,238,255,.85) 100%);box-shadow:inset 0 -6px 14px rgba(20,99,255,.12),0 16px 30px -14px rgba(10,40,140,.5)}
+.ins h2{font-size:38px;font-weight:400;letter-spacing:-.03em;margin-top:22px}
+.ins p{font-size:29px;line-height:1.36;font-weight:350;color:rgba(22,22,26,.82);margin-top:24px;letter-spacing:-.02em}
+.ins .chev{margin-top:30px;color:var(--label)}
+.ins .iris{position:absolute;inset:0;border-radius:inherit;filter:blur(30px);opacity:.7;pointer-events:none;z-index:0;
+  background:radial-gradient(24% 40% at 46% 96%,rgba(20,99,255,.45),transparent 70%),radial-gradient(22% 42% at 86% 70%,rgba(180,205,255,.9),transparent 70%)}
+.ins>*:not(.iris){position:relative;z-index:1}
+
+/* ===== 10 · landing shot ===== */
+.f10 .bgph{position:absolute;inset:-40px;width:calc(100% + 80px);height:calc(100% + 80px);object-fit:cover;filter:blur(34px) saturate(120%);transform:scale(1.05)}
+.f10 .tint{position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.1),rgba(14,71,209,.25) 70%,rgba(10,18,56,.45))}
+.ghost{position:absolute;left:0;right:0;top:150px;text-align:center;font-size:178px;font-weight:300;letter-spacing:-.06em;line-height:1;white-space:nowrap;
+  background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.28) 90%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.site{position:absolute;left:36px;right:36px;top:350px;height:600px;border-radius:34px;overflow:hidden;display:grid;grid-template-columns:1fr 1fr;
+  box-shadow:0 0 0 1.5px rgba(255,255,255,.65),0 50px 90px -40px rgba(0,10,60,.6)}
+.site .l{background:#fff;position:relative;padding:34px 32px}
+.site .nav{display:flex;align-items:center;justify-content:space-between}
+.site .nav .ic{display:flex;gap:8px}
+.site .nav .ic span{width:34px;height:34px;border-radius:50%;box-shadow:inset 0 0 0 1.2px rgba(0,0,0,.25);display:grid;place-items:center}
+.site .eb{font-size:13px;color:var(--label-2);margin-top:100px}
+.site h2{font-size:37px;white-space:nowrap;font-weight:400;letter-spacing:-.04em;line-height:1.06;margin-top:12px}
+.site .cta{display:flex;gap:6px;margin-top:26px}
+.site .cta b{font-size:14px;font-weight:500;color:#fff;background:var(--label);padding:12px 18px;border-radius:99px}
+.site .cta i{width:42px;height:42px;border-radius:50%;background:var(--label);color:#fff;display:grid;place-items:center}
+.site .th{position:absolute;left:32px;right:32px;bottom:32px;display:flex;gap:18px;align-items:center}
+.site .th .im{width:170px;height:112px;border-radius:16px;overflow:hidden;position:relative;flex:none}
+.site .th .im::after{content:"";position:absolute;left:10px;top:10px;width:26px;height:26px;border-radius:50%;background:#fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M9 7v10l8-5z' fill='%2316161a'/></svg>") center/14px no-repeat}
+.site .th b{display:block;font-size:17px;font-weight:500;letter-spacing:-.02em}
+.site .th small{display:block;font-size:12.5px;color:var(--label-2);margin-top:4px;line-height:1.35}
+.site .th u{display:inline-block;font-size:12px;margin-top:12px;text-underline-offset:3px}
+.site .r{position:relative}
+.site .r .exp{position:absolute;top:22px;right:22px;display:flex;gap:6px}
+.site .r .exp b{font-size:13px;font-weight:500;background:#fff;padding:11px 16px;border-radius:99px}
+.site .r .exp i{width:40px;height:40px;border-radius:50%;background:#fff;display:grid;place-items:center}
+.site .r .wk{position:absolute;left:24px;right:24px;bottom:24px;color:#fff}
+.site .r .wk small{font-size:12px;opacity:.8}
+.site .r .wk .row{display:flex;gap:10px;margin-top:12px}
+.site .r .wk .row span{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:500;padding:9px 14px 9px 10px;border-radius:99px}
+.badge{position:absolute;bottom:34px;display:flex;align-items:center;gap:10px;font-size:16px;font-weight:500;padding:9px 16px 9px 9px;border-radius:14px}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="heart" viewBox="0 0 24 24"><path d="M12 20.5s-8-4.7-8-10.6A4.4 4.4 0 0 1 12 7.3a4.4 4.4 0 0 1 8 2.6c0 5.9-8 10.6-8 10.6z" fill="currentColor"/></symbol>
+  <symbol id="hp" viewBox="0 0 24 24"><path d="M12 20.5s-8-4.7-8-10.6A4.4 4.4 0 0 1 12 7.3a4.4 4.4 0 0 1 8 2.6c0 5.9-8 10.6-8 10.6z" fill="#fff"/><path d="M5 12.2h3.6l1.6-2.6 2.4 4.6 1.5-2h4.9" fill="none" stroke="#1463ff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="bell" viewBox="0 0 24 24"><path d="M12 2.5a6 6 0 0 0-6 6v4.2L4.3 16a1 1 0 0 0 .9 1.5h13.6a1 1 0 0 0 .9-1.5L18 12.7V8.5a6 6 0 0 0-6-6zM9.5 19a2.5 2.5 0 0 0 5 0z" fill="currentColor"/></symbol>
+  <symbol id="cuff" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="11" height="10" rx="3"/><circle cx="18" cy="12" r="3"/><path d="M14 12h1M8.5 10v4"/></g></symbol>
+  <symbol id="watch" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="6" y="6" width="12" height="12" rx="3.5"/><path d="M9 6l.6-3h4.8L15 6M9 18l.6 3h4.8L15 18M12 9.5V12l1.6 1"/></g></symbol>
+  <symbol id="arr" viewBox="0 0 24 24"><path d="M7 17 17 7M8.5 7H17v8.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<!-- 7 · Features bento -->
+<section class="frame f7" id="h7" aria-label="Features">
+  <div class="hd"><h1>Everything in one rhythm</h1><p>Track your blood pressure and sleep, set gentle reminders and see how your week is going.</p></div>
+  <div class="bento">
+    <div class="b dev"><div><h3>Devices connected</h3><div class="s tn">02 monitors paired</div></div>
+      <div class="chips"><span><svg width="30" height="30"><use href="#cuff"/></svg></span><span><svg width="28" height="28"><use href="#watch"/></svg></span><span style="color:#ff3b30"><svg width="26" height="26"><use href="#heart"/></svg></span></div></div>
+    <div class="b rem">
+      <div class="top"><div class="tiles"></div>
+        <div class="ico appi"><svg width="30" height="30"><use href="#bell"/></svg></div>
+        <h3>Gentle reminders</h3>
+        <p>A nudge at 08:00 to check your blood pressure, and another at 22:00 to start winding down. Change them whenever your days change.</p></div>
+      <div class="ft"><span class="pill"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1463ff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2.5 12h3M18.5 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>Configure</span><span class="tog"></span></div>
+    </div>
+    <div class="b pct"><div class="r"><div><h3>In range</h3><div class="s">Blood pressure this month</div></div><em>Last 30 days</em></div>
+      <div class="big tn">86%</div>
+      <div class="bt"><span class="tn">52 readings</span><b>Monthly view</b></div></div>
+    <div class="b slp"><div class="dots"></div><div class="big tn">7h 42m</div>
+      <h3>Better sleep</h3><p>18 minutes more rest than your usual week.</p></div>
+    <div class="b log"><div class="ic"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+      <div class="tx"><h3>Quick log</h3><div class="s">Add a reading in two taps</div></div>
+      <div class="key"><b class="tn">118 / 76</b>+<i class="tn">72</i></div></div>
+  </div>
+</section>
+
+<!-- 8 · Wind-down card -->
+<section class="frame f8" id="h8" aria-label="Wind down">
+  <div class="wd">
+    <div class="glow"></div><div class="grain"></div>
+    <svg class="eyes" width="190" height="70" viewBox="0 0 190 70" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="16" stroke-linecap="round"><path d="M14 20c10 26 46 26 56 0"/><path d="M120 20c10 26 46 26 56 0"/></g></svg>
+    <div class="top">
+      <div class="meta">sleep • bedroom • routine</div>
+      <h2>chinedu’s wind down</h2>
+      <div class="row"><span>breathing<i></i></span><span class="tn">pace: 6 / min</span><span>edit</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 9 · Daily insights -->
+<section class="frame f9" id="h9" aria-label="Daily insights">
+  <div class="grain" style="opacity:.12"></div>
+  <div class="st">
+    <div class="rc" style="left:46px;transform:rotate(-8deg) translateY(22px)"><b class="tn">7h 12m</b><small>Monday</small><i></i><i></i><div class="tag tn"><span>23:40</span><span>06:52</span></div></div>
+    <div class="rc" style="left:180px;transform:rotate(-4deg) translateY(6px)"><b class="tn">6h 58m</b><small>Tuesday</small><i></i><i></i><div class="tag tn"><span>23:55</span><span>06:53</span></div></div>
+    <div class="rc" style="left:314px;transform:rotate(1deg)"><b class="tn">7h 42m</b><small>Wednesday</small><i></i><i></i><div class="tag tn"><span>23:06</span><span>06:48</span></div></div>
+    <div class="rc" style="left:448px;transform:rotate(5deg) translateY(8px)"><b class="tn">8h 05m</b><small>Thursday</small><i></i><i></i><div class="tag tn"><span>22:41</span><span>06:46</span></div></div>
+    <div class="rc" style="left:582px;transform:rotate(9deg) translateY(26px)"><b class="tn">7h 30m</b><small>Friday</small><i></i><i></i><div class="tag tn"><span>23:20</span><span>06:50</span></div></div>
+    <div class="ins lg">
+      <div class="iris"></div>
+      <div class="disc"><svg width="50" height="50" viewBox="0 0 24 24" fill="#16161a"><path d="M12 2.5a6.8 6.8 0 0 0-4 12.3c.6.5 1 1.2 1 2v.7h6v-.7c0-.8.4-1.5 1-2a6.8 6.8 0 0 0-4-12.3z"/><rect x="9" y="18.6" width="6" height="1.6" rx=".8"/><rect x="10" y="21" width="4" height="1.5" rx=".75"/></svg></div>
+      <div><h2>Daily insights</h2><p>Nice rhythm! You slept 18 minutes more than your average this week.</p></div>
+      <svg class="chev" width="18" height="32" viewBox="0 0 12 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2.5 2.5 7.5 7.5-7.5 7.5"/></svg>
+    </div>
+  </div>
+</section>
+
+<!-- 10 · Landing shot -->
+<section class="frame f10" id="h10" aria-label="Landing page shot">
+  <img class="bgph" src="img/runners.jpg" alt=""><div class="tint"></div>
+  <div class="ghost">Your Rhythm</div>
+  <div class="site">
+    <div class="l">
+      <div class="nav"><span class="appi" style="width:40px;height:40px;border-radius:11px"><svg width="24" height="24"><use href="#hp"/></svg></span>
+        <div class="ic"><span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16161a" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg></span><span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16161a" stroke-width="2" stroke-linecap="round"><path d="M5 8h14M5 12h14M5 16h14"/></svg></span></div></div>
+      <div class="eb">Blood pressure and sleep, side by side.</div>
+      <h2>Know Your Numbers.<br>Rest Easier.</h2>
+      <div class="cta"><b>Start tracking</b><i><svg width="16" height="16"><use href="#arr"/></svg></i></div>
+      <div class="th"><div class="im"><img class="ph" src="img/gauge.jpg" alt="Stethoscope and gauge"></div>
+        <div><b>Two-minute setup</b><small>Pair your monitor and log your first reading.</small><u>Watch the guide</u></div></div>
+    </div>
+    <div class="r"><img class="ph" src="img/runners.jpg" alt="Three runners at dawn" style="object-position:62% 50%"><div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 55%,rgba(10,18,56,.55))"></div>
+      <div class="exp"><b>Explore features</b><i><svg width="16" height="16"><use href="#arr"/></svg></i></div>
+      <div class="wk"><small>Works with</small><div class="row">
+        <span class="lg" style="background:rgba(255,255,255,.18);color:#fff"><svg width="18" height="18"><use href="#cuff"/></svg>Cuff monitors</span>
+        <span class="lg" style="background:rgba(255,255,255,.18);color:#fff"><svg width="18" height="18"><use href="#watch"/></svg>Watches</span></div></div>
+    </div>
+  </div>
+  <div class="badge lg" style="left:36px"><span class="appi" style="width:32px;height:32px;border-radius:9px"><svg width="20" height="20"><use href="#hp"/></svg></span>Health app concept</div>
+  <div class="badge lg" style="right:36px;padding:15px 18px">Landing page</div>
+</section>
+</body>
+</html>

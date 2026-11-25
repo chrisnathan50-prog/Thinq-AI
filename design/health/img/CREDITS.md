@@ -13,3 +13,5 @@ All photos are from Unsplash, used under the Unsplash License (free to use, attr
 | peaks.jpg | https://images.unsplash.com/photo-1506905925346-21bda4d32df4 | 4 Today |
 | hills.jpg | https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05 | 5 Reminders |
 | bedroom.jpg | https://unsplash.com/photos/cozy-bedroom-with-a-large-window-and-sunlight-3lQautLFzMs | 6 Lock screen |
+| runners.jpg | https://images.unsplash.com/photo-1552674605-db6ffd4facb5 | 10 Landing shot |
+| gauge.jpg (reused) | see above | 10 Landing shot thumbnail |
