@@ -8,7 +8,8 @@ node_modules/
 .DS_Store
 
 # local tool settings
-.claude/
+.claude/*
+!.claude/skills/
 # broken DB copy from the move
 thinq-app/data/
 
